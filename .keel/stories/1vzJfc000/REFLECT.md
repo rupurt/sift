@@ -6,19 +6,7 @@ created_at: 2026-03-08T14:10:04
 
 ## Knowledge
 
-### 1vzLO0001: Keep materialized eval corpora self-contained
-| Field | Value |
-|-------|-------|
-| **Category** | architecture |
-| **Context** | When a CLI benchmark command needs both document files and query/qrels metadata from a downloaded evaluation corpus |
-| **Insight** | Copying the benchmark query TSV into the materialized corpus directory keeps benchmark commands path-local and avoids coupling later stories to the raw download tree layout |
-| **Suggested Action** | For future corpora, materialize documents plus the benchmark-facing query/qrels files into one self-contained directory structure |
-| **Applies To** | `src/eval.rs`, `src/bench.rs`, future eval corpus adapters |
-| **Linked Knowledge IDs** | |
-| **Observed At** | 2026-03-08T14:11:00Z |
-| **Score** | 0.82 |
-| **Confidence** | 0.91 |
-| **Applied** | yes |
+- [1vzLO0001](../../knowledge/1vzLO0001.md) Keep materialized eval corpora self-contained
 
 ## Observations
 
