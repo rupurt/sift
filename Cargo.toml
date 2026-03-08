@@ -12,3 +12,6 @@ serde_json = "1.0.149"
 zvec-sys = "0.3.0"
 
 [features]
+
+[patch.crates-io]
+zvec-sys = { path = "third_party/zvec-sys" }

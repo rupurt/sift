@@ -1,0 +1,15 @@
+---
+recorded_at: 2026-03-08T09:18:23.144270068-07:00
+command: nix develop --command cargo check
+---
+
+--- stderr ---
+path '/home/alex/workspace/rupurt/sift/.keel' does not contain a 'flake.nix', searching up
+   Compiling zvec-sys v0.3.0 (/home/alex/workspace/rupurt/sift/third_party/zvec-sys)
+warning: zvec-sys@0.3.0: Using cached zvec source at /home/alex/.cache/cargo-target/sift/debug/build/zvec-sys-69faaa3cd5ec8aa4/out/zvec-source
+warning: zvec-sys@0.3.0: Running: "cmake" "-S" "/home/alex/.cache/cargo-target/sift/debug/build/zvec-sys-69faaa3cd5ec8aa4/out/zvec-source" "-B" "/home/alex/.cache/cargo-target/sift/debug/build/zvec-sys-69faaa3cd5ec8aa4/out/zvec-build-cmake" "-DCMAKE_BUILD_TYPE=Release" "-DBUILD_PYTHON_BINDINGS=OFF" "-DBUILD_TOOLS=OFF" "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" "-DCMAKE_C_COMPILER=/nix/store/kks0nbx2riwry5qsx0qr87qr0lswmhzi-gcc-wrapper-14.3.0/bin/cc" "-DCMAKE_CXX_COMPILER=/nix/store/kks0nbx2riwry5qsx0qr87qr0lswmhzi-gcc-wrapper-14.3.0/bin/c++"
+warning: zvec-sys@0.3.0: Running: "cmake" "--build" "/home/alex/.cache/cargo-target/sift/debug/build/zvec-sys-69faaa3cd5ec8aa4/out/zvec-build-cmake" "--parallel" "48"
+warning: zvec-sys@0.3.0: Running: "cmake" "-S" "/home/alex/workspace/rupurt/sift/third_party/zvec-sys/zvec-c-wrapper" "-B" "/home/alex/.cache/cargo-target/sift/debug/build/zvec-sys-69faaa3cd5ec8aa4/out/zvec-c-wrapper-build-cmake" "-DZVEC_SRC_DIR=/home/alex/.cache/cargo-target/sift/debug/build/zvec-sys-69faaa3cd5ec8aa4/out/zvec-source" "-DCMAKE_BUILD_TYPE=Release" "-DCMAKE_C_COMPILER=/nix/store/kks0nbx2riwry5qsx0qr87qr0lswmhzi-gcc-wrapper-14.3.0/bin/cc" "-DCMAKE_CXX_COMPILER=/nix/store/kks0nbx2riwry5qsx0qr87qr0lswmhzi-gcc-wrapper-14.3.0/bin/c++"
+warning: zvec-sys@0.3.0: Running: "cmake" "--build" "/home/alex/.cache/cargo-target/sift/debug/build/zvec-sys-69faaa3cd5ec8aa4/out/zvec-c-wrapper-build-cmake" "--parallel" "48"
+    Checking sift v0.1.0 (/home/alex/workspace/rupurt/sift)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.00s

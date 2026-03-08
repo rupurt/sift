@@ -1,0 +1,17 @@
+[package]
+name = "zvec-sys"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Raw FFI bindings to zvec C library"
+keywords = ["vector", "database", "ffi", "bindings"]
+categories = ["database", "external-ffi-bindings"]
+links = "zvec_c"
+
+[build-dependencies]
+bindgen = "0.70"
+
+[features]
+default = []
+static = []

@@ -1,0 +1,9 @@
+---
+recorded_at: 2026-03-08T09:18:03.741765780-07:00
+command: nix develop --command sh -lc 'echo $CC; $CC --version | head -n 1'
+---
+/nix/store/kks0nbx2riwry5qsx0qr87qr0lswmhzi-gcc-wrapper-14.3.0/bin/cc
+gcc (GCC) 14.3.0
+
+--- stderr ---
+path '/home/alex/workspace/rupurt/sift/.keel' does not contain a 'flake.nix', searching up

@@ -5,6 +5,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs-cmake.url = "github:NixOS/nixpkgs/nixos-25.05";
     keel = {
       url = "git+ssh://git@github.com/rupurt/keel.git";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -18,12 +19,14 @@
     nixpkgs,
     rust-overlay,
     flake-utils,
+    nixpkgs-cmake,
     keel,
   }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
+        compatPkgs = import nixpkgs-cmake { inherit system; };
         rust = pkgs.rust-bin.stable.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" ];
         };
@@ -32,11 +35,10 @@
 
         sharedInputs = [
           rust
-          pkgs.cmake
+          compatPkgs.cmake
           pkgs.ninja
           pkgs.gnumake
-          pkgs.gcc
-          pkgs.clang
+          compatPkgs.stdenv.cc
           pkgs.pkg-config
           pkgs.just
           pkgs.cargo-nextest
@@ -57,7 +59,7 @@
 
         linuxInputs = pkgs.lib.optionals isLinux [
           pkgs.mold
-          pkgs.stdenv.cc.cc.lib
+          compatPkgs.stdenv.cc.cc.lib
         ];
       in {
         packages = {
@@ -70,6 +72,8 @@
 
           shellHook = ''
             export CARGO_TARGET_DIR="$HOME/.cache/cargo-target/sift"
+            export CC="${compatPkgs.stdenv.cc}/bin/cc"
+            export CXX="${compatPkgs.stdenv.cc}/bin/c++"
             export LIBCLANG_PATH="${pkgs.llvmPackages.libclang.lib}/lib"
           '' + pkgs.lib.optionalString isLinux ''
             export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-fuse-ld=mold"

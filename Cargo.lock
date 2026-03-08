@@ -741,8 +741,6 @@ checksum = "b8848ee67ecc8aedbaf3e4122217aff892639231befc6a1b58d29fff4c2cabaa"
 [[package]]
 name = "zvec-sys"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0455e5f537219af9e61a5c6a6b9997893ac989c12750398fcb6bcbdb2389848d"
 dependencies = [
  "bindgen",
 ]

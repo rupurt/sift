@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-08T09:18:26.650462457-07:00
+mode: manual
+---
+Scoped the compatibility input to the native build components zvec-sys actually needs: flake.nix now sources compat CMake and the GCC 14 wrapper from nixpkgs-cmake, exports CC/CXX from that wrapper, removes pkgs.gcc and the unused pkgs.clang shell input, and leaves the rest of the shell on the primary unstable package set.

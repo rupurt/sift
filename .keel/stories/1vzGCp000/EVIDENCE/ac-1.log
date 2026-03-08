@@ -1,0 +1,10 @@
+---
+recorded_at: 2026-03-08T09:17:56.762801371-07:00
+command: nix develop --command cmake --version
+---
+cmake version 3.31.6
+
+CMake suite maintained and supported by Kitware (kitware.com/cmake).
+
+--- stderr ---
+path '/home/alex/workspace/rupurt/sift/.keel' does not contain a 'flake.nix', searching up

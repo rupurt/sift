@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-08T09:18:07.390699873-07:00
+mode: manual
+---
+Patched third_party/zvec-sys/build.rs to clone zvec v0.2.0 into OUT_DIR, build zvec and the wrapper in isolated CMake build trees, forward CC/CXX into CMake, and derive bindgen include paths from the active compiler. Patched third_party/zvec-sys/zvec-c-wrapper/src/collection.cpp to call Collection::AddColumn with the v0.2.0 signature.
