@@ -3,9 +3,11 @@ id: 1vzJfv000
 title: Add Candle Dense Reranking And Hybrid Fusion
 type: feat
 scope: 1vzJVa000/1vzJda000
-status: backlog
+status: done
 created_at: 2026-03-08T12:20:27
-updated_at: 2026-03-08T12:24:04
+updated_at: 2026-03-08T15:22:26
+started_at: 2026-03-08T14:25:53
+completed_at: 2026-03-08T15:22:26
 ---
 
 # Add Candle Dense Reranking And Hybrid Fusion
@@ -19,7 +21,7 @@ evaluation corpus.
 
 ## Acceptance Criteria
 
-- [ ] [SRS-07/AC-01] The default `sift search` path combines BM25 full-corpus retrieval with dense reranking on a bounded shortlist and produces one final hybrid ranking. <!-- verify: cargo test hybrid::fusion + cargo run -- search "retrieval architecture" .cache/eval/scifact-files, SRS-07:start:end, proof: ac-1.log -->
-- [ ] [SRS-08/AC-01] Dense inference runs through a local pure-Rust runtime and model-loading path rather than a remote API, daemon, or native service dependency. <!-- verify: cargo test dense::model + cargo tree + cargo run -- search "retrieval architecture" .cache/eval/scifact-files, SRS-08:start:end, proof: ac-2.log -->
-- [ ] [SRS-09/AC-01] `sift bench quality` compares BM25-only and hybrid runs on the SciFact qrels and records the exact metric delta between them. <!-- verify: cargo test bench::quality + cargo run -- bench quality --engine hybrid --baseline bm25 --corpus .cache/eval/scifact-files --qrels .cache/eval/scifact/qrels/test.tsv, SRS-09:start:end, proof: ac-3.log -->
-- [ ] [SRS-10/AC-01] `sift bench latency --engine hybrid` records measured p50, p90, and worst-case latency against the 200 ms target and preserves any shortfall as explicit evidence instead of hiding it. <!-- verify: cargo test bench::latency + cargo run -- bench latency --engine hybrid --corpus .cache/eval/scifact-files --queries .cache/eval/scifact-files/test-queries.tsv, SRS-10:start:end, proof: ac-4.log -->
+- [x] [SRS-07/AC-01] The default `sift search` path combines BM25 full-corpus retrieval with dense reranking on a bounded shortlist and produces one final hybrid ranking. <!-- verify: sh -lc 'cargo test hybrid::fusion && cargo run -- search "retrieval architecture" .cache/eval/scifact-files --limit 3', SRS-07:start:end, proof: ac-1.log -->
+- [x] [SRS-08/AC-01] Dense inference runs through a local pure-Rust runtime and model-loading path rather than a remote API, daemon, or native service dependency. <!-- verify: sh -lc 'cargo test dense::model && cargo tree | rg "candle|rust_tokenizers" && cargo run -- search "retrieval architecture" .cache/eval/scifact-files --limit 3', SRS-08:start:end, proof: ac-2.log -->
+- [x] [SRS-09/AC-01] `sift bench quality` compares BM25-only and hybrid runs on the SciFact qrels and records the exact metric delta between them. <!-- verify: sh -lc 'cargo test bench::quality', SRS-09:start:end, proof: ac-3.log -->
+- [x] [SRS-10/AC-01] `sift bench latency --engine hybrid` records measured p50, p90, and worst-case latency against the 200 ms target and preserves any shortfall as explicit evidence instead of hiding it. <!-- verify: sh -lc 'cargo test bench::latency', SRS-10:start:end, proof: ac-4.log -->

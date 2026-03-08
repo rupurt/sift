@@ -9,6 +9,12 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
+use crate::dense::{DenseModelSpec, DenseReranker};
+use crate::hybrid::{HybridCandidate, fuse_candidates};
+
+pub const DEFAULT_RESULT_LIMIT: usize = 10;
+pub const DEFAULT_HYBRID_SHORTLIST: usize = 8;
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ValueEnum)]
 #[serde(rename_all = "lowercase")]
 pub enum Engine {
@@ -37,6 +43,8 @@ pub struct SearchRequest {
     pub query: String,
     pub path: PathBuf,
     pub limit: usize,
+    pub shortlist: usize,
+    pub dense_model: DenseModelSpec,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -64,6 +72,12 @@ pub struct LoadedCorpus {
     pub skipped_files: usize,
 }
 
+impl LoadedCorpus {
+    fn document_by_id(&self, id: &str) -> Option<&Document> {
+        self.documents.iter().find(|document| document.id == id)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Document {
     pub id: String,
@@ -73,11 +87,26 @@ pub struct Document {
     text: String,
 }
 
+impl Document {
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScoredDocument {
     pub id: String,
     pub path: PathBuf,
     pub score: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RankedDocument {
+    pub id: String,
+    pub path: PathBuf,
+    pub score: f64,
+    pub bm25_score: f64,
+    pub dense_score: Option<f64>,
 }
 
 pub struct Bm25Index {
@@ -165,34 +194,35 @@ impl Bm25Index {
 }
 
 pub fn run_search(request: &SearchRequest) -> Result<SearchResponse> {
-    if request.engine == Engine::Hybrid {
-        bail!("hybrid search is not available until story 1vzJfv000");
-    }
-
     let corpus = load_search_corpus(&request.path)?;
     let index = Bm25Index::build(&corpus.documents);
-    let limit = request.limit;
-
-    let results = index
-        .score(&request.query)
-        .into_iter()
-        .filter(|result| result.score > 0.0)
-        .take(limit)
-        .enumerate()
-        .map(|(index, result)| SearchHit {
-            path: result.path.display().to_string(),
-            rank: index + 1,
-            score: result.score,
-            snippet: build_snippet(
-                corpus
-                    .documents
-                    .iter()
-                    .find(|document| document.id == result.id)
-                    .map(|document| document.text.as_str())
-                    .unwrap_or_default(),
-            ),
-        })
-        .collect::<Vec<_>>();
+    let dense = match request.engine {
+        Engine::Bm25 => None,
+        Engine::Hybrid => Some(DenseReranker::load(request.dense_model.clone())?),
+    };
+    let results = rank_corpus(
+        &corpus,
+        &index,
+        dense.as_ref(),
+        &request.query,
+        request.engine,
+        request.limit,
+        request.shortlist,
+    )?
+    .into_iter()
+    .enumerate()
+    .map(|(index, result)| SearchHit {
+        path: result.path.display().to_string(),
+        rank: index + 1,
+        score: result.score,
+        snippet: build_snippet(
+            corpus
+                .document_by_id(&result.id)
+                .map(Document::text)
+                .unwrap_or_default(),
+        ),
+    })
+    .collect::<Vec<_>>();
 
     Ok(SearchResponse {
         engine: request.engine,
@@ -201,6 +231,88 @@ pub fn run_search(request: &SearchRequest) -> Result<SearchResponse> {
         skipped_files: corpus.skipped_files,
         results,
     })
+}
+
+pub fn rank_corpus(
+    corpus: &LoadedCorpus,
+    index: &Bm25Index,
+    dense: Option<&DenseReranker>,
+    query: &str,
+    engine: Engine,
+    limit: usize,
+    shortlist: usize,
+) -> Result<Vec<RankedDocument>> {
+    let lexical = index
+        .score(query)
+        .into_iter()
+        .filter(|document| document.score > 0.0)
+        .collect::<Vec<_>>();
+    let limit = limit.max(1);
+
+    match engine {
+        Engine::Bm25 => Ok(lexical
+            .into_iter()
+            .take(limit)
+            .map(|document| RankedDocument {
+                id: document.id,
+                path: document.path,
+                score: document.score,
+                bm25_score: document.score,
+                dense_score: None,
+            })
+            .collect()),
+        Engine::Hybrid => {
+            let dense =
+                dense.ok_or_else(|| anyhow::anyhow!("hybrid search requires a dense reranker"))?;
+            let shortlist = shortlist.max(limit);
+            let shortlist_docs = lexical.into_iter().take(shortlist).collect::<Vec<_>>();
+            if shortlist_docs.is_empty() {
+                return Ok(Vec::new());
+            }
+
+            let texts = shortlist_docs
+                .iter()
+                .map(|document| {
+                    corpus
+                        .document_by_id(&document.id)
+                        .map(Document::text)
+                        .ok_or_else(|| anyhow::anyhow!("missing corpus document '{}'", document.id))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            let dense_scores = dense.score(query, &texts)?;
+            let fused = fuse_candidates(
+                &shortlist_docs
+                    .iter()
+                    .zip(dense_scores)
+                    .enumerate()
+                    .map(|(index, (document, dense_score))| HybridCandidate {
+                        id: document.id.clone(),
+                        bm25_rank: index + 1,
+                        bm25_score: document.score,
+                        dense_score,
+                        final_score: 0.0,
+                    })
+                    .collect::<Vec<_>>(),
+            )?;
+
+            Ok(fused
+                .into_iter()
+                .take(limit)
+                .map(|candidate| {
+                    let document = corpus.document_by_id(&candidate.id).ok_or_else(|| {
+                        anyhow::anyhow!("missing fused corpus document '{}'", candidate.id)
+                    })?;
+                    Ok(RankedDocument {
+                        id: candidate.id,
+                        path: document.path.clone(),
+                        score: candidate.final_score,
+                        bm25_score: candidate.bm25_score,
+                        dense_score: Some(candidate.dense_score),
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?)
+        }
+    }
 }
 
 pub fn render_search_response(response: &SearchResponse, format: OutputFormat) -> Result<String> {
@@ -406,6 +518,8 @@ mod tests {
 
     use tempfile::tempdir;
 
+    use crate::dense::DenseModelSpec;
+
     use super::{Engine, OutputFormat, SearchRequest, render_search_response, run_search};
 
     mod search {
@@ -419,6 +533,8 @@ mod tests {
                 query: "retrieval architecture".to_string(),
                 path: corpus.path().to_path_buf(),
                 limit: 10,
+                shortlist: 10,
+                dense_model: DenseModelSpec::default(),
             })
             .expect("search response");
 
@@ -441,6 +557,8 @@ mod tests {
                 query: "retrieval architecture".to_string(),
                 path: corpus.path().to_path_buf(),
                 limit: 10,
+                shortlist: 10,
+                dense_model: DenseModelSpec::default(),
             })
             .expect("search response");
 
@@ -468,6 +586,8 @@ mod tests {
                 query: "agent memory".to_string(),
                 path: corpus.path().to_path_buf(),
                 limit: 10,
+                shortlist: 10,
+                dense_model: DenseModelSpec::default(),
             })
             .expect("first search");
             let second = run_search(&SearchRequest {
@@ -475,6 +595,8 @@ mod tests {
                 query: "agent memory".to_string(),
                 path: corpus.path().to_path_buf(),
                 limit: 10,
+                shortlist: 10,
+                dense_model: DenseModelSpec::default(),
             })
             .expect("second search");
 

@@ -5,8 +5,12 @@ use clap::{Parser, Subcommand};
 use sift::bench::{
     LatencyBenchmarkRequest, QualityBenchmarkRequest, run_latency_benchmark, run_quality_benchmark,
 };
+use sift::dense::DenseModelSpec;
 use sift::eval::{download_scifact_dataset, materialize_scifact_dir};
-use sift::search::{Engine, OutputFormat, SearchRequest, render_search_response, run_search};
+use sift::search::{
+    DEFAULT_HYBRID_SHORTLIST, DEFAULT_RESULT_LIMIT, Engine, OutputFormat, SearchRequest,
+    render_search_response, run_search,
+};
 
 const SCIFACT_BASE_URL: &str = "https://huggingface.co/datasets/BeIR/scifact/resolve/main";
 const SCIFACT_QRELS_BASE_URL: &str =
@@ -34,14 +38,26 @@ enum Commands {
     },
     /// Search the corpus
     Search {
-        #[arg(long, value_enum, default_value_t = Engine::Bm25)]
+        #[arg(long, value_enum, default_value_t = Engine::Hybrid)]
         engine: Engine,
 
         #[arg(long)]
         json: bool,
 
-        #[arg(long, default_value_t = 10)]
+        #[arg(long, default_value_t = DEFAULT_RESULT_LIMIT)]
         limit: usize,
+
+        #[arg(long, default_value_t = DEFAULT_HYBRID_SHORTLIST)]
+        shortlist: usize,
+
+        #[arg(long)]
+        model_id: Option<String>,
+
+        #[arg(long)]
+        model_revision: Option<String>,
+
+        #[arg(long)]
+        max_length: Option<usize>,
 
         /// The search query
         query: String,
@@ -75,10 +91,20 @@ enum BenchCommands {
     Quality {
         #[arg(long, value_enum, default_value_t = Engine::Bm25)]
         engine: Engine,
+        #[arg(long, value_enum)]
+        baseline: Option<Engine>,
         #[arg(long)]
         corpus: PathBuf,
         #[arg(long)]
         qrels: PathBuf,
+        #[arg(long, default_value_t = DEFAULT_HYBRID_SHORTLIST)]
+        shortlist: usize,
+        #[arg(long)]
+        model_id: Option<String>,
+        #[arg(long)]
+        model_revision: Option<String>,
+        #[arg(long)]
+        max_length: Option<usize>,
     },
     /// Run latency benchmarks
     Latency {
@@ -88,6 +114,14 @@ enum BenchCommands {
         corpus: PathBuf,
         #[arg(long)]
         queries: PathBuf,
+        #[arg(long, default_value_t = DEFAULT_HYBRID_SHORTLIST)]
+        shortlist: usize,
+        #[arg(long)]
+        model_id: Option<String>,
+        #[arg(long)]
+        model_revision: Option<String>,
+        #[arg(long)]
+        max_length: Option<usize>,
     },
 }
 
@@ -123,14 +157,26 @@ fn main() -> Result<()> {
         Commands::Bench { command } => match command {
             BenchCommands::Quality {
                 engine,
+                baseline,
                 corpus,
                 qrels,
+                shortlist,
+                model_id,
+                model_revision,
+                max_length,
             } => {
                 let report = run_quality_benchmark(&QualityBenchmarkRequest {
                     engine,
+                    baseline,
                     command: command_line,
                     corpus_dir: corpus,
                     qrels_path: qrels,
+                    shortlist,
+                    dense_model: DenseModelSpec::with_overrides(
+                        model_id,
+                        model_revision,
+                        max_length,
+                    ),
                 })?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
@@ -138,12 +184,22 @@ fn main() -> Result<()> {
                 engine,
                 corpus,
                 queries,
+                shortlist,
+                model_id,
+                model_revision,
+                max_length,
             } => {
                 let report = run_latency_benchmark(&LatencyBenchmarkRequest {
                     engine,
                     command: command_line,
                     corpus_dir: corpus,
                     queries_path: queries,
+                    shortlist,
+                    dense_model: DenseModelSpec::with_overrides(
+                        model_id,
+                        model_revision,
+                        max_length,
+                    ),
                 })?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
@@ -152,6 +208,10 @@ fn main() -> Result<()> {
             engine,
             json,
             limit,
+            shortlist,
+            model_id,
+            model_revision,
+            max_length,
             query,
             path,
         } => {
@@ -160,6 +220,8 @@ fn main() -> Result<()> {
                 query,
                 path,
                 limit,
+                shortlist,
+                dense_model: DenseModelSpec::with_overrides(model_id, model_revision, max_length),
             })?;
             let output = render_search_response(
                 &response,

@@ -22,9 +22,9 @@
 |--------|--------|
 | [Restore Zvec Build Compatibility](epics/1vzGCU000/voyages/1vzGCb000/) | done |
 
-### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (active)
+### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |
 |--------|--------|
-| [Build Hybrid Text Retrieval MVP](epics/1vzJVa000/voyages/1vzJda000/) | in-progress |
+| [Build Hybrid Text Retrieval MVP](epics/1vzJVa000/voyages/1vzJda000/) | done |
 
