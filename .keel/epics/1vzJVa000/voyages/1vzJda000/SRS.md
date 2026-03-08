@@ -54,11 +54,15 @@
 | ID | Requirement | Scope | Source | Verification |
 |----|-------------|-------|--------|--------------|
 | SRS-01 | The repository must provide commands that download or materialize the BEIR SciFact corpus into local UTF-8 text files plus query and qrels manifests suitable for CLI benchmarking. | SCOPE-01 | FR-03 | command proof + file inspection |
-| SRS-02 | `sift search` must recursively scan supported ASCII/UTF-8 files from the filesystem and return ranked results without requiring a persisted index file. | SCOPE-02 | FR-01 | unit test + CLI proof |
-| SRS-03 | The default `sift search` ranking path must combine BM25 retrieval over the full corpus with dense semantic reranking on a bounded shortlist. | SCOPE-03 | FR-02 | unit test + quality benchmark |
-| SRS-04 | The CLI must expose benchmark or evaluation commands that compare BM25-only and hybrid quality on the selected corpus and emit reproducible latency metrics. | SCOPE-04 | FR-03 | command proof + benchmark logs |
+| SRS-02 | The CLI must expose BM25 quality and latency benchmark commands that run against the selected corpus and emit structured output. | SCOPE-04 | FR-03 | command proof + benchmark logs |
+| SRS-03 | Benchmark output must include the exact command line, git SHA, hardware summary, corpus shape, and measured fields required for reproducible evidence capture. | SCOPE-04 | NFR-02 | benchmark artifact inspection |
+| SRS-04 | `sift search` must recursively scan supported ASCII/UTF-8 files from the filesystem and return ranked results without requiring a persisted index file. | SCOPE-02 | FR-01 | unit test + CLI proof |
 | SRS-05 | Search results must support both human-readable output and JSON output with enough metadata for agent consumption. | SCOPE-05 | FR-04 | unit test + CLI proof |
 | SRS-06 | The implementation must not create or require a persisted sidecar index or background service. | SCOPE-02 | FR-01 | code inspection + CLI proof |
+| SRS-07 | The default `sift search` ranking path must combine BM25 retrieval over the full corpus with dense semantic reranking on a bounded shortlist. | SCOPE-03 | FR-02 | unit test + quality benchmark |
+| SRS-08 | Dense inference must run through a pure-Rust local path suitable for Linux and macOS distribution. | SCOPE-03 | NFR-01 | dependency inspection + build verification |
+| SRS-09 | The quality benchmark path must compare BM25-only and hybrid runs on the selected qrels and report the exact metric delta between them. | SCOPE-04 | FR-03 | command proof + benchmark logs |
+| SRS-10 | The latency benchmark path must report p50, p90, and worst-case latency against the 200 ms target and preserve any shortfall as explicit evidence. | SCOPE-04 | NFR-02 | benchmark logs |
 <!-- END FUNCTIONAL_REQUIREMENTS -->
 
 ### Non-Functional Requirements
@@ -66,7 +70,5 @@
 <!-- BEGIN NON_FUNCTIONAL_REQUIREMENTS -->
 | ID | Requirement | Scope | Source | Verification |
 |----|-------------|-------|--------|--------------|
-| SRS-NFR-01 | Dense inference must run through a pure-Rust local path suitable for Linux and macOS distribution. | SCOPE-03 | NFR-01 | dependency inspection + build verification |
-| SRS-NFR-02 | Benchmark evidence must record exact command lines, git SHA, hardware summary, corpus shape, and measured outputs. | SCOPE-04 | NFR-02 | benchmark artifact inspection |
-| SRS-NFR-03 | The MVP must measure latency against the 200 ms target and explicitly record any shortfall instead of masking it. | SCOPE-04 | NFR-02 | benchmark logs |
+| SRS-NFR-01 | Pure-Rust dense inference, reproducible benchmark evidence, and explicit latency accounting are captured under SRS-03 and SRS-08 through SRS-10 for Keel story traceability. | SCOPE-03 | NFR-01 | design reference only |
 <!-- END NON_FUNCTIONAL_REQUIREMENTS -->

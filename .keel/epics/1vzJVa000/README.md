@@ -20,8 +20,8 @@ evaluation evidence.
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 0/0 stories done
+**Progress:** 0/1 voyages complete, 0/3 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Build Hybrid Text Retrieval MVP](voyages/1vzJda000/) | draft | 0/0 |
+| [Build Hybrid Text Retrieval MVP](voyages/1vzJda000/) | planned | 0/3 |
 <!-- END GENERATED -->

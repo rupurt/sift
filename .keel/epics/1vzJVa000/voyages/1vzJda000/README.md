@@ -2,9 +2,10 @@
 id: 1vzJda000
 index: 1
 title: Build Hybrid Text Retrieval MVP
-status: draft
+status: planned
 epic: 1vzJVa000
 created_at: 2026-03-08T12:18:02
+updated_at: 2026-03-08T12:24:04
 ---
 
 # Build Hybrid Text Retrieval MVP
@@ -23,5 +24,11 @@ created_at: 2026-03-08T12:18:02
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/0 stories complete
+**Progress:** 0/3 stories complete
+
+| Title | Type | Status |
+|-------|------|--------|
+| [Build SciFact Evaluation And Benchmark Harness](../../../../stories/1vzJfc000/README.md) | feat | backlog |
+| [Implement Raw File BM25 Search CLI](../../../../stories/1vzJfp000/README.md) | feat | backlog |
+| [Add Candle Dense Reranking And Hybrid Fusion](../../../../stories/1vzJfv000/README.md) | feat | backlog |
 <!-- END GENERATED -->

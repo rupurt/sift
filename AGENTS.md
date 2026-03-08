@@ -49,6 +49,10 @@ product work rather than a single bounded change.
      to research or planning work immediately instead of stopping.
 3. **Check Story Coherence Before Coding**: Confirm acceptance criteria are traceable and verifiable:
    - Acceptance criteria are linked to source requirements (for example `[SRS-XX/AC-YY]`).
+   - Use canonical `SRS-XX` IDs in story acceptance criteria. If a non-functional
+     requirement needs implementation traceability, model it through a canonical
+     `SRS-XX` row sourced from `NFR-*` rather than referencing `SRS-NFR-*`
+     directly from the story.
    - Evidence strategy is clear for each criterion (test, CLI proof, or manual proof).
    - If requirements are ambiguous, loop back to planning artifacts before implementation.
 4. **Execute (TDD)**: Follow test-driven development:
@@ -114,14 +118,31 @@ cleanup step.
    - For tactical decomposition, create a Voyage: `keel voyage new "<Title>" --epic <epic-id> --goal "<Specific outcome>"`
 3. **Author Epic PRD Immediately After Creation**: Before decomposing into voyages or stories, fill out `PRD.md` with authored content for every required section.
 4. **Define Requirements (SRS)**: Fill out the voyage `SRS.md`. Requirements should be atomic, uniquely identified, and directly traceable to story acceptance criteria.
+   - In both `PRD.md` and `SRS.md`, the `Scope` section must include explicit
+     `In Scope` and `Out of Scope` subsections with canonical `[SCOPE-*]`
+     bullets or `keel doctor` will fail.
+   - Each SRS row's `Source` column must contain exactly one canonical `FR-*`
+     or `NFR-*` token.
 5. **Detail Design (SDD)**: Fill out `SDD.md` with the architectural approach and component changes.
 6. **Decompose Stories**: Break the design into implementable units with `keel story new "<Title>"`.
+   - After creating a story, verify that its frontmatter includes
+     `scope: <epic-id>/<voyage-id>`. Keel may create the story file without
+     attaching scope automatically, even when invoked from inside a voyage
+     directory.
+   - Keep newly created stories in `icebox` while the voyage remains `draft`.
+     Thaw them only after `keel voyage plan <id>` succeeds.
 7. **Align Verification Techniques From Config**: Run `keel config show`, `keel verify detect`, and `keel verify recommend` before finalizing verification planning.
 8. **Run Coherence Review**: Ensure every requirement has story coverage and every acceptance criterion has a concrete verification path.
+   - Prefer a one-story-to-one-requirement-slice mapping when possible. If
+     multiple stories share the same implementation-facing SRS rows, Keel may
+     report dependency-cycle errors during `keel doctor` or `keel voyage plan`.
 9. **Loop Back Upstream if Needed**: If decomposition exposes ambiguity, update PRD, SRS, or SDD first.
 10. **Generate Planning Summary In Chat (Required)**: Publish a terse planning summary in the harness response for every newly planned Epic or Voyage.
 11. **Commit (Required)**: Create exactly one atomic [Conventional Commit](https://www.conventionalcommits.org/) for the planning unit.
 12. **Seal Planning**: Promote the voyage when planning is complete with `keel voyage plan <id>`.
+    - `keel voyage plan` will fail if the voyage has no scoped stories, if any
+      acceptance criterion is missing a canonical `SRS-XX` reference, or if the
+      scoped stories form a dependency cycle.
 13. **Return To Execution**: After planning, immediately resume `keel next --agent`
     and continue implementation unless a real blocker remains.
 
@@ -231,6 +252,6 @@ Use one path for each concern:
 |----------|----------|
 | Setup | `keel init` `keel config show` `keel generate` |
 | Discovery | `keel bearing new <name>` `keel bearing survey <id>` `keel bearing assess <id>` `keel bearing list` |
-| Planning | `keel epic new <name> --problem <problem>` `keel voyage new <name> --epic <epic-id> --goal <goal>` |
-| Execution | `keel next --agent` `keel story new <title>` `keel story start <id>` `keel story record <id>` `keel story reflect <id>` `keel story submit <id>` |
-| Diagnostics | `keel doctor` `keel status` `keel flow` `keel gaps` `keel verify detect` `keel verify recommend` |
+| Planning | `keel epic new <name> --problem <problem>` `keel voyage new <name> --epic <epic-id> --goal <goal>` `keel voyage plan <id>` |
+| Execution | `keel next --agent` `keel story new <title>` `keel story thaw <id>` `keel story start <id>` `keel story record <id>` `keel story reflect <id>` `keel story submit <id>` `keel story accept <id>` |
+| Diagnostics | `keel doctor` `keel status` `keel flow` `keel gaps` `keel verify detect` `keel verify recommend` `keel verify run <id>` |
