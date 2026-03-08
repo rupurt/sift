@@ -31,11 +31,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1772993113,
-        "narHash": "sha256-e7+BMGRFgSRVWoCr9M4CLr80cPGoYKW01BGG+pxVAEw=",
+        "lastModified": 1773008913,
+        "narHash": "sha256-OHyUKQDVF4P2igh1hfsiYV0uJXxwL94z5n/gqQEBvIE=",
         "ref": "refs/heads/main",
-        "rev": "f8ffd4c346a4767c26a6c8a707cd27a603f7a9e2",
-        "revCount": 150,
+        "rev": "7a55b7e858c79be9940039b4faa1971fcd18402e",
+        "revCount": 155,
         "type": "git",
         "url": "ssh://git@github.com/rupurt/keel.git"
       },
