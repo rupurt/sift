@@ -9,6 +9,7 @@ const HTML_RENDER_WIDTH: usize = 200;
 pub enum SourceKind {
     Text,
     Html,
+    Pdf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,6 +24,8 @@ pub fn extract_path(path: &Path) -> Result<Option<ExtractedDocument>> {
 
     if is_html_path(path) {
         extract_html(&bytes)
+    } else if is_pdf_path(path) {
+        extract_pdf(&bytes)
     } else {
         Ok(extract_utf8(&bytes))
     }
@@ -33,6 +36,10 @@ fn is_html_path(path: &Path) -> bool {
         path.extension().and_then(|ext| ext.to_str()),
         Some("html" | "htm")
     )
+}
+
+fn is_pdf_path(path: &Path) -> bool {
+    matches!(path.extension().and_then(|ext| ext.to_str()), Some("pdf"))
 }
 
 fn extract_utf8(bytes: &[u8]) -> Option<ExtractedDocument> {
@@ -50,5 +57,14 @@ fn extract_html(bytes: &[u8]) -> Result<Option<ExtractedDocument>> {
     Ok(Some(ExtractedDocument {
         text,
         source_kind: SourceKind::Html,
+    }))
+}
+
+fn extract_pdf(bytes: &[u8]) -> Result<Option<ExtractedDocument>> {
+    let text = pdf_extract::extract_text_from_mem(bytes).context("extract pdf text")?;
+
+    Ok(Some(ExtractedDocument {
+        text,
+        source_kind: SourceKind::Pdf,
     }))
 }

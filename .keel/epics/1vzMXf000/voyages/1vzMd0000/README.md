@@ -25,11 +25,11 @@ started_at: 2026-03-08T15:33:36
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 1/3 stories complete
+**Progress:** 2/3 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
 | [Add Extractor Boundary And HTML Search Support](../../../../stories/1vzMe4000/README.md) | feat | done |
-| [Add Text-Bearing PDF Extraction](../../../../stories/1vzMeH000/README.md) | feat | backlog |
+| [Add Text-Bearing PDF Extraction](../../../../stories/1vzMeH000/README.md) | feat | done |
 | [Add OOXML Office Extraction And Mixed-Format Verification](../../../../stories/1vzMeL000/README.md) | feat | backlog |
 <!-- END GENERATED -->

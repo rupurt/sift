@@ -9,4 +9,12 @@ laid_at: 2026-03-08T12:17:25
 
 # Raw Document Retrieval Architecture Research
 
-See [BRIEF.md](BRIEF.md) for research details.
+## Documents
+
+<!-- BEGIN DOCUMENTS -->
+| Document | Description |
+|----------|-------------|
+| [BRIEF.md](BRIEF.md) | Research hypothesis, problem framing, and open questions |
+| [SURVEY.md](SURVEY.md) | Research findings, alternatives, and key constraints |
+| [ASSESSMENT.md](ASSESSMENT.md) | Recommendation and rollout decision |
+<!-- END DOCUMENTS -->

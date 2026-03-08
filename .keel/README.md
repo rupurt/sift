@@ -5,15 +5,10 @@
 
 ## Bearings
 
-<details>
-<summary>Completed Bearings</summary>
-
-| Bearing | Status |
-|---------|--------|
-| [Raw Document Retrieval Architecture Research](bearings/1vzJVa000/) | laid |
-| [Rich Document Extraction Support](bearings/1vzMXf000/) | laid |
-
-</details>
+| Bearing | Status | Survey | Assessment | Laid |
+|---------|--------|--------|------------|------|
+| [Raw Document Retrieval Architecture Research](bearings/1vzJVa000/) | laid | ✓ | ✓ | ✓ |
+| [Rich Document Extraction Support](bearings/1vzMXf000/) | laid | ✓ | ✓ | ✓ |
 
 ## Epics
 

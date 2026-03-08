@@ -669,6 +669,36 @@ mod tests {
             }
         }
 
+        mod pdf {
+            use std::path::Path;
+
+            use super::*;
+
+            #[test]
+            fn pdf_files_are_searchable_without_external_conversion() {
+                let fixture_root =
+                    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
+                let response = run_search(&SearchRequest {
+                    engine: Engine::Bm25,
+                    query: "architecture decision".to_string(),
+                    path: fixture_root,
+                    limit: 10,
+                    shortlist: 10,
+                    dense_model: DenseModelSpec::default(),
+                })
+                .expect("search response");
+
+                assert_eq!(response.results[0].rank, 1);
+                assert!(response.results[0].path.ends_with("docs/architecture.pdf"));
+                assert!(
+                    response.results[0]
+                        .snippet
+                        .to_lowercase()
+                        .contains("architecture decision")
+                );
+            }
+        }
+
         mod skip_handling {
             use super::*;
 
