@@ -1,22 +1,14 @@
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{Context, Result, bail};
-use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
-use walkdir::WalkDir;
 
+use crate::search::{Bm25Index, Engine, ScoredDocument, load_materialized_corpus};
 use crate::system::{HardwareSummary, current_git_sha, detect_hardware_summary};
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ValueEnum)]
-#[serde(rename_all = "lowercase")]
-pub enum Engine {
-    Bm25,
-    Hybrid,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BenchmarkMetadata {
@@ -75,7 +67,7 @@ pub fn run_quality_benchmark(request: &QualityBenchmarkRequest) -> Result<Qualit
     ensure_bm25_only(request.engine)?;
 
     let prepare_started = Instant::now();
-    let corpus = load_corpus(&request.corpus_dir)?;
+    let corpus = load_materialized_corpus(&request.corpus_dir)?;
     let index = Bm25Index::build(&corpus.documents);
     let queries_path = request.corpus_dir.join("test-queries.tsv");
     let queries = load_queries(&queries_path)?;
@@ -125,7 +117,7 @@ pub fn run_latency_benchmark(request: &LatencyBenchmarkRequest) -> Result<Latenc
     ensure_bm25_only(request.engine)?;
 
     let prepare_started = Instant::now();
-    let corpus = load_corpus(&request.corpus_dir)?;
+    let corpus = load_materialized_corpus(&request.corpus_dir)?;
     let index = Bm25Index::build(&corpus.documents);
     let queries = load_queries(&request.queries_path)?;
     let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
@@ -167,136 +159,6 @@ fn ensure_bm25_only(engine: Engine) -> Result<()> {
     }
 
     Ok(())
-}
-
-struct LoadedCorpus {
-    documents: Vec<Document>,
-    total_bytes: u64,
-}
-
-#[derive(Debug, Clone)]
-struct Document {
-    id: String,
-    length: usize,
-    terms: HashMap<String, usize>,
-}
-
-struct Bm25Index {
-    documents: Vec<Document>,
-    doc_freq: HashMap<String, usize>,
-    avg_doc_len: f64,
-}
-
-impl Bm25Index {
-    fn build(documents: &[Document]) -> Self {
-        let mut doc_freq = HashMap::new();
-        let total_len = documents
-            .iter()
-            .map(|document| document.length)
-            .sum::<usize>();
-
-        for document in documents {
-            let unique_terms = document.terms.keys().collect::<HashSet<_>>();
-            for term in unique_terms {
-                *doc_freq.entry(term.clone()).or_insert(0) += 1;
-            }
-        }
-
-        let avg_doc_len = if documents.is_empty() {
-            0.0
-        } else {
-            total_len as f64 / documents.len() as f64
-        };
-
-        Self {
-            documents: documents.to_vec(),
-            doc_freq,
-            avg_doc_len,
-        }
-    }
-
-    fn score(&self, query: &str) -> Vec<(String, f64)> {
-        let mut query_terms = tokenize(query);
-        query_terms.sort();
-        query_terms.dedup();
-
-        let total_docs = self.documents.len() as f64;
-        let mut ranked = Vec::with_capacity(self.documents.len());
-
-        for document in &self.documents {
-            let mut score = 0.0;
-
-            for term in &query_terms {
-                let tf = document.terms.get(term).copied().unwrap_or(0) as f64;
-                if tf == 0.0 {
-                    continue;
-                }
-
-                let doc_freq = self.doc_freq.get(term).copied().unwrap_or(0) as f64;
-                let idf = ((total_docs - doc_freq + 0.5) / (doc_freq + 0.5) + 1.0).ln();
-                let length_ratio = if self.avg_doc_len > 0.0 {
-                    document.length as f64 / self.avg_doc_len
-                } else {
-                    1.0
-                };
-                let denominator = tf + 1.5 * (1.0 - 0.75 + 0.75 * length_ratio);
-                score += idf * (tf * (1.5 + 1.0) / denominator);
-            }
-
-            ranked.push((document.id.clone(), score));
-        }
-
-        ranked.sort_by(|left, right| {
-            right
-                .1
-                .partial_cmp(&left.1)
-                .unwrap_or(Ordering::Equal)
-                .then_with(|| left.0.cmp(&right.0))
-        });
-        ranked
-    }
-}
-
-fn load_corpus(corpus_dir: &Path) -> Result<LoadedCorpus> {
-    let mut documents = Vec::new();
-    let mut total_bytes = 0_u64;
-
-    for entry in WalkDir::new(corpus_dir).max_depth(1) {
-        let entry = entry?;
-        if !entry.file_type().is_file() {
-            continue;
-        }
-
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) != Some("txt") {
-            continue;
-        }
-
-        let contents = fs::read_to_string(path)
-            .with_context(|| format!("failed to read corpus document {}", path.display()))?;
-        total_bytes += contents.len() as u64;
-        let terms = tokenize(&contents)
-            .into_iter()
-            .fold(HashMap::new(), |mut acc, term| {
-                *acc.entry(term).or_insert(0) += 1;
-                acc
-            });
-        let length = terms.values().sum();
-        let id = path
-            .file_stem()
-            .and_then(|stem| stem.to_str())
-            .with_context(|| format!("invalid document filename {}", path.display()))?
-            .to_string();
-
-        documents.push(Document { id, length, terms });
-    }
-
-    documents.sort_by(|left, right| left.id.cmp(&right.id));
-
-    Ok(LoadedCorpus {
-        documents,
-        total_bytes,
-    })
 }
 
 fn load_queries(path: &Path) -> Result<HashMap<String, String>> {
@@ -365,35 +227,16 @@ fn load_qrels(path: &Path) -> Result<HashMap<String, HashMap<String, u32>>> {
     Ok(qrels)
 }
 
-fn tokenize(text: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let mut current = String::new();
-
-    for ch in text.chars() {
-        if ch.is_alphanumeric() {
-            current.extend(ch.to_lowercase());
-        } else if !current.is_empty() {
-            tokens.push(std::mem::take(&mut current));
-        }
-    }
-
-    if !current.is_empty() {
-        tokens.push(current);
-    }
-
-    tokens
-}
-
-fn mrr_at_10(results: &[(String, f64)], relevances: &HashMap<String, u32>) -> f64 {
+fn mrr_at_10(results: &[ScoredDocument], relevances: &HashMap<String, u32>) -> f64 {
     results
         .iter()
         .enumerate()
-        .find(|(_, (doc_id, _))| relevances.get(doc_id).copied().unwrap_or(0) > 0)
+        .find(|(_, result)| relevances.get(&result.id).copied().unwrap_or(0) > 0)
         .map(|(index, _)| 1.0 / (index as f64 + 1.0))
         .unwrap_or(0.0)
 }
 
-fn recall_at_10(results: &[(String, f64)], relevances: &HashMap<String, u32>) -> f64 {
+fn recall_at_10(results: &[ScoredDocument], relevances: &HashMap<String, u32>) -> f64 {
     let relevant_total = relevances.values().filter(|score| **score > 0).count();
     if relevant_total == 0 {
         return 0.0;
@@ -401,18 +244,18 @@ fn recall_at_10(results: &[(String, f64)], relevances: &HashMap<String, u32>) ->
 
     let hits = results
         .iter()
-        .filter(|(doc_id, _)| relevances.get(doc_id).copied().unwrap_or(0) > 0)
+        .filter(|result| relevances.get(&result.id).copied().unwrap_or(0) > 0)
         .count();
 
     hits as f64 / relevant_total as f64
 }
 
-fn ndcg_at_10(results: &[(String, f64)], relevances: &HashMap<String, u32>) -> f64 {
+fn ndcg_at_10(results: &[ScoredDocument], relevances: &HashMap<String, u32>) -> f64 {
     let dcg = results
         .iter()
         .enumerate()
-        .map(|(index, (doc_id, _))| {
-            discounted_gain(index, relevances.get(doc_id).copied().unwrap_or(0))
+        .map(|(index, result)| {
+            discounted_gain(index, relevances.get(&result.id).copied().unwrap_or(0))
         })
         .sum::<f64>();
 

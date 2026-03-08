@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use sift::bench::{
-    Engine, LatencyBenchmarkRequest, QualityBenchmarkRequest, run_latency_benchmark,
-    run_quality_benchmark,
+    LatencyBenchmarkRequest, QualityBenchmarkRequest, run_latency_benchmark, run_quality_benchmark,
 };
 use sift::eval::{download_scifact_dataset, materialize_scifact_dir};
+use sift::search::{Engine, OutputFormat, SearchRequest, render_search_response, run_search};
 
 const SCIFACT_BASE_URL: &str = "https://huggingface.co/datasets/BeIR/scifact/resolve/main";
 const SCIFACT_QRELS_BASE_URL: &str =
@@ -34,6 +34,15 @@ enum Commands {
     },
     /// Search the corpus
     Search {
+        #[arg(long, value_enum, default_value_t = Engine::Bm25)]
+        engine: Engine,
+
+        #[arg(long)]
+        json: bool,
+
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+
         /// The search query
         query: String,
 
@@ -139,12 +148,28 @@ fn main() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
         },
-        Commands::Search { query, path } => {
-            bail!(
-                "search is not implemented yet for query '{}' on '{}'; finish story 1vzJfp000",
+        Commands::Search {
+            engine,
+            json,
+            limit,
+            query,
+            path,
+        } => {
+            let response = run_search(&SearchRequest {
+                engine,
                 query,
-                path.display()
-            );
+                path,
+                limit,
+            })?;
+            let output = render_search_response(
+                &response,
+                if json {
+                    OutputFormat::Json
+                } else {
+                    OutputFormat::Text
+                },
+            )?;
+            println!("{output}");
         }
     }
 
