@@ -2,10 +2,11 @@
 id: 1vzMd0000
 index: 1
 title: Implement Rich Document Extractors
-status: planned
+status: in-progress
 epic: 1vzMXf000
 created_at: 2026-03-08T15:29:38
 updated_at: 2026-03-08T15:32:02
+started_at: 2026-03-08T15:33:36
 ---
 
 # Implement Rich Document Extractors
@@ -24,11 +25,11 @@ updated_at: 2026-03-08T15:32:02
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/3 stories complete
+**Progress:** 1/3 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
-| [Add Extractor Boundary And HTML Search Support](../../../../stories/1vzMe4000/README.md) | feat | backlog |
+| [Add Extractor Boundary And HTML Search Support](../../../../stories/1vzMe4000/README.md) | feat | done |
 | [Add Text-Bearing PDF Extraction](../../../../stories/1vzMeH000/README.md) | feat | backlog |
 | [Add OOXML Office Extraction And Mixed-Format Verification](../../../../stories/1vzMeL000/README.md) | feat | backlog |
 <!-- END GENERATED -->

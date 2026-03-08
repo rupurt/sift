@@ -33,5 +33,5 @@
 
 | Voyage | Status |
 |--------|--------|
-| [Implement Rich Document Extractors](epics/1vzMXf000/voyages/1vzMd0000/) | planned |
+| [Implement Rich Document Extractors](epics/1vzMXf000/voyages/1vzMd0000/) | in-progress |
 

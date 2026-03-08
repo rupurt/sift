@@ -1,0 +1,3 @@
+service catalog note
+
+Plain text fallback for the service catalog.

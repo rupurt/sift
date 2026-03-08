@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
@@ -10,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
 
 use crate::dense::{DenseModelSpec, DenseReranker};
+use crate::extract::{SourceKind, extract_path};
 use crate::hybrid::{HybridCandidate, fuse_candidates};
 
 pub const DEFAULT_RESULT_LIMIT: usize = 10;
@@ -82,6 +82,7 @@ impl LoadedCorpus {
 pub struct Document {
     pub id: String,
     pub path: PathBuf,
+    pub source_kind: SourceKind,
     pub length: usize,
     pub terms: HashMap<String, usize>,
     text: String,
@@ -325,6 +326,7 @@ pub fn render_search_response(response: &SearchResponse, format: OutputFormat) -
 pub fn load_materialized_corpus(corpus_dir: &Path) -> Result<LoadedCorpus> {
     let mut documents = Vec::new();
     let mut total_bytes = 0_u64;
+    let mut skipped_files = 0_usize;
 
     for entry in WalkDir::new(corpus_dir).max_depth(1).sort_by_file_name() {
         let entry = entry?;
@@ -337,15 +339,20 @@ pub fn load_materialized_corpus(corpus_dir: &Path) -> Result<LoadedCorpus> {
             continue;
         }
 
-        let contents = fs::read_to_string(path)
-            .with_context(|| format!("failed to read corpus document {}", path.display()))?;
+        let extracted = match extract_path(path) {
+            Ok(Some(extracted)) => extracted,
+            Ok(None) | Err(_) => {
+                skipped_files += 1;
+                continue;
+            }
+        };
         let id = path
             .file_stem()
             .and_then(|stem| stem.to_str())
             .with_context(|| format!("invalid document filename {}", path.display()))?
             .to_string();
-        total_bytes += contents.len() as u64;
-        documents.push(index_document(id, path.to_path_buf(), contents));
+        total_bytes += extracted.text.len() as u64;
+        documents.push(index_document(id, path.to_path_buf(), extracted));
     }
 
     documents.sort_by(|left, right| left.id.cmp(&right.id));
@@ -355,7 +362,7 @@ pub fn load_materialized_corpus(corpus_dir: &Path) -> Result<LoadedCorpus> {
         documents,
         total_bytes,
         indexed_files,
-        skipped_files: 0,
+        skipped_files,
     })
 }
 
@@ -429,31 +436,28 @@ fn collect_search_file(
     total_bytes: &mut u64,
     skipped_files: &mut usize,
 ) {
-    let bytes = match fs::read(path) {
-        Ok(bytes) => bytes,
-        Err(_) => {
-            *skipped_files += 1;
-            return;
-        }
-    };
-    let contents = match String::from_utf8(bytes) {
-        Ok(contents) => contents,
-        Err(_) => {
+    let extracted = match extract_path(path) {
+        Ok(Some(extracted)) => extracted,
+        Ok(None) | Err(_) => {
             *skipped_files += 1;
             return;
         }
     };
 
-    *total_bytes += contents.len() as u64;
+    *total_bytes += extracted.text.len() as u64;
     documents.push(index_document(
         path.display().to_string(),
         path.to_path_buf(),
-        contents,
+        extracted,
     ));
 }
 
-fn index_document(id: String, path: PathBuf, text: String) -> Document {
-    let terms = tokenize(&text)
+fn index_document(
+    id: String,
+    path: PathBuf,
+    extracted: crate::extract::ExtractedDocument,
+) -> Document {
+    let terms = tokenize(&extracted.text)
         .into_iter()
         .fold(HashMap::new(), |mut acc, term| {
             *acc.entry(term).or_insert(0) += 1;
@@ -464,9 +468,10 @@ fn index_document(id: String, path: PathBuf, text: String) -> Document {
     Document {
         id,
         path,
+        source_kind: extracted.source_kind,
         length,
         terms,
-        text,
+        text: extracted.text,
     }
 }
 
@@ -520,7 +525,9 @@ mod tests {
 
     use crate::dense::DenseModelSpec;
 
-    use super::{Engine, OutputFormat, SearchRequest, render_search_response, run_search};
+    use super::{
+        Engine, OutputFormat, SearchRequest, load_search_corpus, render_search_response, run_search,
+    };
 
     mod search {
         use super::*;
@@ -606,6 +613,95 @@ mod tests {
         }
     }
 
+    mod rich_document {
+        use super::*;
+        use crate::extract::SourceKind;
+
+        mod extractor_boundary {
+            use super::*;
+
+            #[test]
+            fn routes_text_and_html_documents_through_shared_extractor() {
+                let corpus = sample_rich_search_tree();
+                let loaded = load_search_corpus(corpus.path()).expect("loaded corpus");
+
+                assert_eq!(loaded.indexed_files, 2);
+                assert_eq!(loaded.skipped_files, 1);
+
+                let html = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("docs/service.html"))
+                    .expect("html document");
+                assert_eq!(html.source_kind, SourceKind::Html);
+                assert!(html.text().contains("HTML Heading"));
+                assert!(html.text().contains("Service Catalog"));
+
+                let text = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("notes.txt"))
+                    .expect("text document");
+                assert_eq!(text.source_kind, SourceKind::Text);
+                assert!(text.text().contains("service catalog"));
+            }
+        }
+
+        mod html {
+            use super::*;
+
+            #[test]
+            fn html_files_are_searchable_without_preprocessing() {
+                let corpus = sample_rich_search_tree();
+                let response = run_search(&SearchRequest {
+                    engine: Engine::Bm25,
+                    query: "html heading".to_string(),
+                    path: corpus.path().to_path_buf(),
+                    limit: 10,
+                    shortlist: 10,
+                    dense_model: DenseModelSpec::default(),
+                })
+                .expect("search response");
+
+                assert_eq!(response.results[0].rank, 1);
+                assert!(response.results[0].path.ends_with("docs/service.html"));
+                assert!(response.results[0].snippet.contains("HTML Heading"));
+            }
+        }
+
+        mod skip_handling {
+            use super::*;
+
+            #[test]
+            fn invalid_binary_files_are_skipped_deterministically() {
+                let corpus = sample_rich_search_tree();
+
+                let first = run_search(&SearchRequest {
+                    engine: Engine::Bm25,
+                    query: "service catalog".to_string(),
+                    path: corpus.path().to_path_buf(),
+                    limit: 10,
+                    shortlist: 10,
+                    dense_model: DenseModelSpec::default(),
+                })
+                .expect("first search");
+                let second = run_search(&SearchRequest {
+                    engine: Engine::Bm25,
+                    query: "service catalog".to_string(),
+                    path: corpus.path().to_path_buf(),
+                    limit: 10,
+                    shortlist: 10,
+                    dense_model: DenseModelSpec::default(),
+                })
+                .expect("second search");
+
+                assert_eq!(first.indexed_files, 2);
+                assert_eq!(first.skipped_files, 1);
+                assert_eq!(first.results, second.results);
+            }
+        }
+    }
+
     fn sample_search_tree() -> tempfile::TempDir {
         let dir = tempdir().expect("search dir");
         stdfs::create_dir_all(dir.path().join("nested")).expect("nested dir");
@@ -625,6 +721,30 @@ mod tests {
         )
         .expect("write other");
         stdfs::write(dir.path().join("blob.bin"), [0xFF, 0xFE, 0xFD]).expect("write invalid utf8");
+        dir
+    }
+
+    fn sample_rich_search_tree() -> tempfile::TempDir {
+        let dir = tempdir().expect("rich search dir");
+        stdfs::create_dir_all(dir.path().join("docs")).expect("docs dir");
+        stdfs::write(
+            dir.path().join("docs/service.html"),
+            r#"<!doctype html>
+<html>
+  <body>
+    <h1>HTML Heading</h1>
+    <p>Service Catalog for the agent platform.</p>
+  </body>
+</html>
+"#,
+        )
+        .expect("write html");
+        stdfs::write(
+            dir.path().join("notes.txt"),
+            "service catalog note\n\nPlain text fallback for the service catalog.",
+        )
+        .expect("write notes");
+        stdfs::write(dir.path().join("blob.bin"), [0xFF, 0xFE, 0xFD]).expect("write invalid blob");
         dir
     }
 }
