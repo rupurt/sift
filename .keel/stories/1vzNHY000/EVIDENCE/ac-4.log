@@ -1,0 +1,16 @@
+---
+recorded_at: 2026-03-08T16:16:24.485400519-07:00
+mode: manual
+files: [".keel/stories/1vzNHY000/EVIDENCE/ac-4.log"]
+---
+
+--- File: ac-4.log ---
+$ rg -n benchmark evidence README.md
+15:  `sentence-transformers/all-MiniLM-L6-v2` as the current default model.
+65:  --model-id sentence-transformers/all-MiniLM-L6-v2 \
+106:- On the recorded SciFact run over 5,183 documents, hybrid search improved
+107:  nDCG@10 from 0.6647 to 0.6764 and MRR@10 from 0.6328 to 0.6466 over BM25,
+108:  using `all-MiniLM-L6-v2` with shortlist 8 and `max_length` 40.
+109:- On the same recorded hybrid latency run, p50 was 170.2 ms and p90 was
+110:  180.8 ms, with the worst query at 214.7 ms.
+

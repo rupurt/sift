@@ -1,0 +1,77 @@
+---
+recorded_at: 2026-03-08T16:16:24.308937671-07:00
+mode: manual
+files: [".keel/stories/1vzNHY000/EVIDENCE/ac-1.log"]
+---
+
+--- File: ac-1.log ---
+$ verify stale contract removed and current top-level help exists
+No stale index/zvec/API matches in README.md
+
+$ cargo --color never run -- --help
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `/home/alex/.cache/cargo-target/sift/debug/sift --help`
+Indexless hybrid search for local retrieval workflows
+
+Usage: sift <COMMAND>
+
+Commands:
+  eval    Evaluation corpus utilities
+  bench   Benchmark commands
+  search  Search the corpus
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+
+$ cargo --color never run -- search --help
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `/home/alex/.cache/cargo-target/sift/debug/sift search --help`
+Search the corpus
+
+Usage: sift search [OPTIONS] <QUERY> <PATH>
+
+Arguments:
+  <QUERY>  The search query
+  <PATH>   The path to search
+
+Options:
+      --engine <ENGINE>                  [default: hybrid] [possible values: bm25, hybrid]
+      --json                             
+      --limit <LIMIT>                    [default: 10]
+      --shortlist <SHORTLIST>            [default: 8]
+      --model-id <MODEL_ID>              
+      --model-revision <MODEL_REVISION>  
+      --max-length <MAX_LENGTH>          
+  -h, --help                             Print help
+
+$ cargo --color never run -- bench --help
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running `/home/alex/.cache/cargo-target/sift/debug/sift bench --help`
+Benchmark commands
+
+Usage: sift bench <COMMAND>
+
+Commands:
+  quality  Run quality benchmarks
+  latency  Run latency benchmarks
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+
+$ cargo --color never run -- eval --help
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `/home/alex/.cache/cargo-target/sift/debug/sift eval --help`
+Evaluation corpus utilities
+
+Usage: sift eval <COMMAND>
+
+Commands:
+  download     Download an evaluation dataset
+  materialize  Materialize a downloaded dataset as local text files
+  help         Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+

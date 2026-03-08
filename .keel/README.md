@@ -18,15 +18,21 @@
 |--------|--------|
 | [Restore Zvec Build Compatibility](epics/1vzGCU000/voyages/1vzGCb000/) | done |
 
+### [Align Product Thesis With Current CLI](epics/1vzNFk000/) (done)
+
+| Voyage | Status |
+|--------|--------|
+| [Refresh README For Current Retrieval Contract](epics/1vzNFk000/voyages/1vzNFu000/) | done |
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |
 |--------|--------|
 | [Build Hybrid Text Retrieval MVP](epics/1vzJVa000/voyages/1vzJda000/) | done |
 
-### [Rich Document Extraction Support](epics/1vzMXf000/) (active)
+### [Rich Document Extraction Support](epics/1vzMXf000/) (done)
 
 | Voyage | Status |
 |--------|--------|
-| [Implement Rich Document Extractors](epics/1vzMXf000/voyages/1vzMd0000/) | in-progress |
+| [Implement Rich Document Extractors](epics/1vzMXf000/voyages/1vzMd0000/) | done |
 

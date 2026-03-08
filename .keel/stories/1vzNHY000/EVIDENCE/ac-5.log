@@ -1,0 +1,10 @@
+---
+recorded_at: 2026-03-08T16:16:24.486803018-07:00
+mode: manual
+files: [".keel/stories/1vzNHY000/EVIDENCE/ac-5.log"]
+---
+
+--- File: ac-5.log ---
+$ verify obsolete claims removed README.md
+No obsolete README claims remain for zvec, index, disk-backed indices, or API embeddings
+

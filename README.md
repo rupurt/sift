@@ -1,54 +1,122 @@
-# sift 🔍
+# sift
 
-**Standalone hybrid search (BM25 + Vector) for lightning-fast document retrieval in agentic workflows—no database, just a single binary.**
+`sift` is a standalone Rust CLI for local document retrieval in agentic
+workflows. It searches raw local corpora without a persisted index, defaults to
+hybrid BM25 plus dense reranking, and keeps evaluation and benchmark workflows
+inside the same binary.
 
-`sift` is a high-performance search utility designed specifically for agentic coding harnesses and modern CLI environments. It provides the sophistication of hybrid ranking (BM25 keyword search + Vector semantic search) without the overhead of external databases, running LLMs, or complex ingestion pipelines.
+## Current Contract
 
-## 🚀 Key Features
+- Single Rust binary. No external database, daemon, or long-running service.
+- Default `search` mode is hybrid BM25 plus dense reranking.
+- Corpus loading is transient and query-time. Sift does not write persisted
+  sidecar indexes.
+- Dense inference runs locally through Candle with
+  `sentence-transformers/all-MiniLM-L6-v2` as the current default model.
+- Supported inputs today: ASCII and UTF-8 text, HTML, text-bearing PDF, and
+  OOXML Office files (`.docx`, `.xlsx`, `.pptx`).
+- Target platforms are Linux and macOS. Windows is still unverified.
 
-- **Hybrid Ranking:** Combines the precision of BM25 keyword matching with the semantic depth of Vector embeddings.
-- **Zero Database:** No SQLite, no Chroma, no Pinecone. It uses in-memory, disk-backed indices that live alongside your code.
-- **Single Binary:** A self-contained Rust executable. Drop it into any environment and start searching.
-- **Agent-Optimized:** Built-in JSON output and context-window-friendly snippets designed for ingestion by LLM agents.
-- **Ultra-Fast:** Powered by `zvec` for vectors and a high-performance Rust BM25 implementation.
+## Installation
 
-## 🛠️ Tech Stack
-
-- **Vector Engine:** [zvec](https://github.com/alibaba/zvec) — Alibaba's "SQLite of Vector Databases," an in-process, high-performance vector search engine.
-- **Keyword Search:** [bm25](https://crates.io/crates/bm25) — A native Rust implementation of the BM25 ranking function, optimized for in-memory and disk-backed retrieval.
-- **Embeddings:** Support for local lightweight embedding models (via `candle`) or fast API-based embeddings.
-
-## 📦 Installation
+For development, enter the shared shell first:
 
 ```bash
-cargo install sift-search
+nix develop
 ```
 
-## 📖 Usage
+Build a release binary:
 
-### Indexing a directory
 ```bash
-sift index ./docs
+cargo build --release
+./target/release/sift --help
 ```
 
-### Searching
+Install locally from source if you want `sift` on your `PATH`:
+
 ```bash
-# Basic keyword search
-sift search "authentication logic"
-
-# Hybrid search (Vector + BM25)
-sift search --hybrid "how do I reset the user password?"
-
-# Agent-friendly JSON output
-sift search --json "api endpoints" | jq .
+cargo install --path .
 ```
 
-## 🧠 Why Sift?
+## Search
 
-Existing tools often require you to run a separate vector database or a heavy local LLM just to get decent document retrieval. `sift` takes the opposite approach: it’s a lightweight tool that focuses on **ranking quality** and **developer experience**. 
+Hybrid search is the default:
 
-It’s the "ripgrep" of semantic search—fast, portable, and focused.
+```bash
+sift search "architecture decision" tests/fixtures/rich-docs
+```
 
-## 📜 License
+Request JSON output for agent consumption:
 
-MIT / Apache 2.0
+```bash
+sift search --json "quarterly roadmap" tests/fixtures/rich-docs
+```
+
+Force lexical-only BM25 search when you want a baseline:
+
+```bash
+sift search --engine bm25 "service catalog" tests/fixtures/rich-docs
+```
+
+Override dense model settings explicitly:
+
+```bash
+sift search \
+  --model-id sentence-transformers/all-MiniLM-L6-v2 \
+  --max-length 40 \
+  "retrieval architecture" \
+  .cache/eval/scifact-files
+```
+
+## Evaluation And Benchmarks
+
+Download and materialize the SciFact evaluation corpus:
+
+```bash
+sift eval download scifact --out .cache/eval/scifact
+sift eval materialize scifact \
+  --source .cache/eval/scifact \
+  --out .cache/eval/scifact-files
+```
+
+Measure hybrid quality against BM25:
+
+```bash
+sift bench quality \
+  --engine hybrid \
+  --baseline bm25 \
+  --corpus .cache/eval/scifact-files \
+  --qrels .cache/eval/scifact/qrels/test.tsv
+```
+
+Measure search latency:
+
+```bash
+sift bench latency \
+  --engine hybrid \
+  --corpus .cache/eval/scifact-files \
+  --queries .cache/eval/scifact-files/test-queries.tsv
+```
+
+## Recorded Evidence
+
+The current README claims are grounded in board evidence already checked into
+`.keel/`:
+
+- On the recorded SciFact run over 5,183 documents, hybrid search improved
+  nDCG@10 from 0.6647 to 0.6764 and MRR@10 from 0.6328 to 0.6466 over BM25,
+  using `all-MiniLM-L6-v2` with shortlist 8 and `max_length` 40.
+- On the same recorded hybrid latency run, p50 was 170.2 ms and p90 was
+  180.8 ms, with the worst query at 214.7 ms.
+- The rich-document fixture corpus now exercises HTML, PDF, `.docx`, `.xlsx`,
+  and `.pptx` extraction through the same search path and benchmark loaders.
+
+## Current Limits
+
+- No OCR or scanned-image PDF recovery.
+- No legacy binary Office formats (`.doc`, `.xls`, `.ppt`).
+- No persisted database or background indexing service.
+
+## License
+
+MIT OR Apache-2.0

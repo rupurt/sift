@@ -1,0 +1,16 @@
+---
+recorded_at: 2026-03-08T16:16:24.340110572-07:00
+mode: manual
+files: [".keel/stories/1vzNHY000/EVIDENCE/ac-3.log"]
+---
+
+--- File: ac-3.log ---
+$ rg -n supported formats and constraints README.md
+10:- Single Rust binary. No external database, daemon, or long-running service.
+16:- Supported inputs today: ASCII and UTF-8 text, HTML, text-bearing PDF, and
+17:  OOXML Office files (`.docx`, `.xlsx`, `.pptx`).
+111:- The rich-document fixture corpus now exercises HTML, PDF, `.docx`, `.xlsx`,
+112:  and `.pptx` extraction through the same search path and benchmark loaders.
+116:- No OCR or scanned-image PDF recovery.
+118:- No persisted database or background indexing service.
+

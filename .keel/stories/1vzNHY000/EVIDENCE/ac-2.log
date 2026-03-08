@@ -1,0 +1,118 @@
+---
+recorded_at: 2026-03-08T16:16:24.331181923-07:00
+mode: manual
+files: [".keel/stories/1vzNHY000/EVIDENCE/ac-2.log"]
+---
+
+--- File: ac-2.log ---
+$ rg -n command examples README.md
+46:sift search "architecture decision" tests/fixtures/rich-docs
+52:sift search --json "quarterly roadmap" tests/fixtures/rich-docs
+58:sift search --engine bm25 "service catalog" tests/fixtures/rich-docs
+64:sift search \
+76:sift eval download scifact --out .cache/eval/scifact
+77:sift eval materialize scifact \
+85:sift bench quality \
+95:sift bench latency \
+
+$ cargo --color never run -- --help
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `/home/alex/.cache/cargo-target/sift/debug/sift --help`
+Indexless hybrid search for local retrieval workflows
+
+Usage: sift <COMMAND>
+
+Commands:
+  eval    Evaluation corpus utilities
+  bench   Benchmark commands
+  search  Search the corpus
+  help    Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help  Print help
+
+$ cargo --color never run -- search --help
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `/home/alex/.cache/cargo-target/sift/debug/sift search --help`
+Search the corpus
+
+Usage: sift search [OPTIONS] <QUERY> <PATH>
+
+Arguments:
+  <QUERY>  The search query
+  <PATH>   The path to search
+
+Options:
+      --engine <ENGINE>                  [default: hybrid] [possible values: bm25, hybrid]
+      --json                             
+      --limit <LIMIT>                    [default: 10]
+      --shortlist <SHORTLIST>            [default: 8]
+      --model-id <MODEL_ID>              
+      --model-revision <MODEL_REVISION>  
+      --max-length <MAX_LENGTH>          
+  -h, --help                             Print help
+
+$ cargo --color never run -- bench quality --help
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running `/home/alex/.cache/cargo-target/sift/debug/sift bench quality --help`
+Run quality benchmarks
+
+Usage: sift bench quality [OPTIONS] --corpus <CORPUS> --qrels <QRELS>
+
+Options:
+      --engine <ENGINE>                  [default: bm25] [possible values: bm25, hybrid]
+      --baseline <BASELINE>              [possible values: bm25, hybrid]
+      --corpus <CORPUS>                  
+      --qrels <QRELS>                    
+      --shortlist <SHORTLIST>            [default: 8]
+      --model-id <MODEL_ID>              
+      --model-revision <MODEL_REVISION>  
+      --max-length <MAX_LENGTH>          
+  -h, --help                             Print help
+
+$ cargo --color never run -- bench latency --help
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `/home/alex/.cache/cargo-target/sift/debug/sift bench latency --help`
+Run latency benchmarks
+
+Usage: sift bench latency [OPTIONS] --corpus <CORPUS> --queries <QUERIES>
+
+Options:
+      --engine <ENGINE>                  [default: bm25] [possible values: bm25, hybrid]
+      --corpus <CORPUS>                  
+      --queries <QUERIES>                
+      --shortlist <SHORTLIST>            [default: 8]
+      --model-id <MODEL_ID>              
+      --model-revision <MODEL_REVISION>  
+      --max-length <MAX_LENGTH>          
+  -h, --help                             Print help
+
+$ cargo --color never run -- eval download --help
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `/home/alex/.cache/cargo-target/sift/debug/sift eval download --help`
+Download an evaluation dataset
+
+Usage: sift eval download --out <OUT> <DATASET>
+
+Arguments:
+  <DATASET>  [possible values: scifact]
+
+Options:
+      --out <OUT>  
+  -h, --help       Print help
+
+$ cargo --color never run -- eval materialize --help
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `/home/alex/.cache/cargo-target/sift/debug/sift eval materialize --help`
+Materialize a downloaded dataset as local text files
+
+Usage: sift eval materialize --source <SOURCE> --out <OUT> <DATASET>
+
+Arguments:
+  <DATASET>  [possible values: scifact]
+
+Options:
+      --source <SOURCE>  
+      --out <OUT>        
+  -h, --help             Print help
+
