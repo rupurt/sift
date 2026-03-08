@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use walkdir::WalkDir;
@@ -324,35 +324,34 @@ pub fn render_search_response(response: &SearchResponse, format: OutputFormat) -
 }
 
 pub fn load_materialized_corpus(corpus_dir: &Path) -> Result<LoadedCorpus> {
+    if !corpus_dir.exists() {
+        bail!("corpus path '{}' does not exist", corpus_dir.display());
+    }
+
     let mut documents = Vec::new();
     let mut total_bytes = 0_u64;
     let mut skipped_files = 0_usize;
 
-    for entry in WalkDir::new(corpus_dir).max_depth(1).sort_by_file_name() {
-        let entry = entry?;
-        if !entry.file_type().is_file() {
-            continue;
-        }
+    for entry in WalkDir::new(corpus_dir).sort_by_file_name() {
+        match entry {
+            Ok(entry) => {
+                if !entry.file_type().is_file() {
+                    continue;
+                }
 
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) != Some("txt") {
-            continue;
-        }
+                if is_benchmark_metadata_file(corpus_dir, entry.path()) {
+                    continue;
+                }
 
-        let extracted = match extract_path(path) {
-            Ok(Some(extracted)) => extracted,
-            Ok(None) | Err(_) => {
-                skipped_files += 1;
-                continue;
+                collect_materialized_file(
+                    entry.path(),
+                    &mut documents,
+                    &mut total_bytes,
+                    &mut skipped_files,
+                );
             }
-        };
-        let id = path
-            .file_stem()
-            .and_then(|stem| stem.to_str())
-            .with_context(|| format!("invalid document filename {}", path.display()))?
-            .to_string();
-        total_bytes += extracted.text.len() as u64;
-        documents.push(index_document(id, path.to_path_buf(), extracted));
+            Err(_) => skipped_files += 1,
+        }
     }
 
     documents.sort_by(|left, right| left.id.cmp(&right.id));
@@ -364,6 +363,21 @@ pub fn load_materialized_corpus(corpus_dir: &Path) -> Result<LoadedCorpus> {
         indexed_files,
         skipped_files,
     })
+}
+
+fn is_benchmark_metadata_file(root: &Path, path: &Path) -> bool {
+    if path.extension().and_then(|ext| ext.to_str()) == Some("tsv") {
+        return true;
+    }
+
+    path.strip_prefix(root)
+        .ok()
+        .map(|relative| {
+            relative
+                .components()
+                .any(|component| component.as_os_str() == "qrels")
+        })
+        .unwrap_or(false)
 }
 
 pub fn tokenize(text: &str) -> Vec<String> {
@@ -450,6 +464,32 @@ fn collect_search_file(
         path.to_path_buf(),
         extracted,
     ));
+}
+
+fn collect_materialized_file(
+    path: &Path,
+    documents: &mut Vec<Document>,
+    total_bytes: &mut u64,
+    skipped_files: &mut usize,
+) {
+    let extracted = match extract_path(path) {
+        Ok(Some(extracted)) => extracted,
+        Ok(None) | Err(_) => {
+            *skipped_files += 1;
+            return;
+        }
+    };
+
+    let id = match path.file_stem().and_then(|stem| stem.to_str()) {
+        Some(id) => id.to_string(),
+        None => {
+            *skipped_files += 1;
+            return;
+        }
+    };
+
+    *total_bytes += extracted.text.len() as u64;
+    documents.push(index_document(id, path.to_path_buf(), extracted));
 }
 
 fn index_document(
@@ -696,6 +736,84 @@ mod tests {
                         .to_lowercase()
                         .contains("architecture decision")
                 );
+            }
+        }
+
+        mod office {
+            use std::path::Path;
+
+            use super::*;
+
+            #[test]
+            fn office_documents_are_searchable_without_external_conversion() {
+                let fixture_root =
+                    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
+                let response = run_search(&SearchRequest {
+                    engine: Engine::Bm25,
+                    query: "quarterly roadmap".to_string(),
+                    path: fixture_root,
+                    limit: 10,
+                    shortlist: 10,
+                    dense_model: DenseModelSpec::default(),
+                })
+                .expect("search response");
+
+                let paths = response
+                    .results
+                    .iter()
+                    .map(|hit| hit.path.as_str())
+                    .collect::<Vec<_>>();
+
+                assert!(
+                    paths
+                        .iter()
+                        .any(|path| path.ends_with("docs/roadmap-docx.docx"))
+                );
+                assert!(
+                    paths
+                        .iter()
+                        .any(|path| path.ends_with("docs/roadmap-sheet.xlsx"))
+                );
+                assert!(
+                    paths
+                        .iter()
+                        .any(|path| path.ends_with("docs/roadmap-slides.pptx"))
+                );
+            }
+        }
+
+        mod determinism {
+            use std::path::Path;
+
+            use super::*;
+
+            #[test]
+            fn mixed_format_search_results_are_deterministic() {
+                let fixture_root =
+                    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
+
+                let first = run_search(&SearchRequest {
+                    engine: Engine::Bm25,
+                    query: "quarterly roadmap".to_string(),
+                    path: fixture_root.clone(),
+                    limit: 10,
+                    shortlist: 10,
+                    dense_model: DenseModelSpec::default(),
+                })
+                .expect("first search");
+                let second = run_search(&SearchRequest {
+                    engine: Engine::Bm25,
+                    query: "quarterly roadmap".to_string(),
+                    path: fixture_root,
+                    limit: 10,
+                    shortlist: 10,
+                    dense_model: DenseModelSpec::default(),
+                })
+                .expect("second search");
+
+                assert_eq!(first.indexed_files, second.indexed_files);
+                assert_eq!(first.skipped_files, second.skipped_files);
+                assert_eq!(first.results, second.results);
             }
         }
 

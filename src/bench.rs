@@ -546,3 +546,51 @@ mod latency {
         dir
     }
 }
+
+#[cfg(test)]
+mod rich_formats {
+    use std::path::Path;
+
+    use crate::dense::DenseModelSpec;
+    use crate::search::Engine;
+
+    use super::{
+        LatencyBenchmarkRequest, QualityBenchmarkRequest, run_latency_benchmark,
+        run_quality_benchmark,
+    };
+
+    #[test]
+    fn quality_benchmark_accepts_mixed_format_fixture_corpus() {
+        let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
+        let report = run_quality_benchmark(&QualityBenchmarkRequest {
+            engine: Engine::Bm25,
+            baseline: None,
+            command: "sift bench quality --engine bm25".to_string(),
+            corpus_dir: fixture_root.clone(),
+            qrels_path: fixture_root.join("qrels/test.tsv"),
+            shortlist: 8,
+            dense_model: DenseModelSpec::default(),
+        })
+        .expect("quality report");
+
+        assert!(report.metadata.corpus_documents >= 5);
+        assert!(report.metrics.recall_at_10 >= 0.0);
+    }
+
+    #[test]
+    fn latency_benchmark_accepts_mixed_format_fixture_corpus() {
+        let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
+        let report = run_latency_benchmark(&LatencyBenchmarkRequest {
+            engine: Engine::Bm25,
+            command: "sift bench latency --engine bm25".to_string(),
+            corpus_dir: fixture_root.clone(),
+            queries_path: fixture_root.join("test-queries.tsv"),
+            shortlist: 8,
+            dense_model: DenseModelSpec::default(),
+        })
+        .expect("latency report");
+
+        assert!(report.metadata.corpus_documents >= 5);
+        assert!(report.latency_ms.p50_ms >= 0.0);
+    }
+}

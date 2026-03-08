@@ -2,11 +2,12 @@
 id: 1vzMd0000
 index: 1
 title: Implement Rich Document Extractors
-status: in-progress
+status: done
 epic: 1vzMXf000
 created_at: 2026-03-08T15:29:38
 updated_at: 2026-03-08T15:32:02
 started_at: 2026-03-08T15:33:36
+completed_at: 2026-03-08T16:08:34
 ---
 
 # Implement Rich Document Extractors
@@ -20,16 +21,18 @@ started_at: 2026-03-08T15:33:36
 |----------|-------------|
 | [SRS.md](SRS.md) | Requirements and verification criteria |
 | [SDD.md](SDD.md) | Architecture and implementation details |
+| [VOYAGE_REPORT.md](VOYAGE_REPORT.md) | Narrative summary of implementation and evidence |
+| [COMPLIANCE_REPORT.md](COMPLIANCE_REPORT.md) | Traceability matrix and verification proof |
 <!-- END DOCUMENTS -->
 
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 2/3 stories complete
+**Progress:** 3/3 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
 | [Add Extractor Boundary And HTML Search Support](../../../../stories/1vzMe4000/README.md) | feat | done |
 | [Add Text-Bearing PDF Extraction](../../../../stories/1vzMeH000/README.md) | feat | done |
-| [Add OOXML Office Extraction And Mixed-Format Verification](../../../../stories/1vzMeL000/README.md) | feat | backlog |
+| [Add OOXML Office Extraction And Mixed-Format Verification](../../../../stories/1vzMeL000/README.md) | feat | done |
 <!-- END GENERATED -->

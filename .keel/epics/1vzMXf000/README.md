@@ -20,8 +20,8 @@ no-daemon search architecture.
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 2/3 stories done
+**Progress:** 1/1 voyages complete, 3/3 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Implement Rich Document Extractors](voyages/1vzMd0000/) | in-progress | 2/3 |
+| [Implement Rich Document Extractors](voyages/1vzMd0000/) | done | 3/3 |
 <!-- END GENERATED -->
