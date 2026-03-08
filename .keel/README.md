@@ -11,6 +11,7 @@
 | Bearing | Status |
 |---------|--------|
 | [Raw Document Retrieval Architecture Research](bearings/1vzJVa000/) | laid |
+| [Rich Document Extraction Support](bearings/1vzMXf000/) | laid |
 
 </details>
 
@@ -27,4 +28,10 @@
 | Voyage | Status |
 |--------|--------|
 | [Build Hybrid Text Retrieval MVP](epics/1vzJVa000/voyages/1vzJda000/) | done |
+
+### [Rich Document Extraction Support](epics/1vzMXf000/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Implement Rich Document Extractors](epics/1vzMXf000/voyages/1vzMd0000/) | planned |
 
