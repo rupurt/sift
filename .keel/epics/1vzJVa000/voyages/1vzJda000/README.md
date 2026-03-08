@@ -25,11 +25,11 @@ started_at: 2026-03-08T14:00:18
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 1/3 stories complete
+**Progress:** 2/3 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
 | [Build SciFact Evaluation And Benchmark Harness](../../../../stories/1vzJfc000/README.md) | feat | done |
-| [Implement Raw File BM25 Search CLI](../../../../stories/1vzJfp000/README.md) | feat | backlog |
+| [Implement Raw File BM25 Search CLI](../../../../stories/1vzJfp000/README.md) | feat | done |
 | [Add Candle Dense Reranking And Hybrid Fusion](../../../../stories/1vzJfv000/README.md) | feat | backlog |
 <!-- END GENERATED -->
