@@ -26,5 +26,5 @@
 
 | Voyage | Status |
 |--------|--------|
-| [Build Hybrid Text Retrieval MVP](epics/1vzJVa000/voyages/1vzJda000/) | planned |
+| [Build Hybrid Text Retrieval MVP](epics/1vzJVa000/voyages/1vzJda000/) | in-progress |
 

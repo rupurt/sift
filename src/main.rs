@@ -1,9 +1,20 @@
-use anyhow::Result;
+use std::path::PathBuf;
+
+use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
+use sift::bench::{
+    Engine, LatencyBenchmarkRequest, QualityBenchmarkRequest, run_latency_benchmark,
+    run_quality_benchmark,
+};
+use sift::eval::{download_scifact_dataset, materialize_scifact_dir};
+
+const SCIFACT_BASE_URL: &str = "https://huggingface.co/datasets/BeIR/scifact/resolve/main";
+const SCIFACT_QRELS_BASE_URL: &str =
+    "https://huggingface.co/datasets/BeIR/scifact-qrels/resolve/main";
 
 #[derive(Parser)]
 #[command(name = "sift")]
-#[command(about = "Standalone hybrid search (BM25 + Vector) for lightning-fast document retrieval", long_about = None)]
+#[command(about = "Indexless hybrid search for local retrieval workflows", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -11,42 +22,129 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Index a directory
-    Index {
-        /// The path to the directory to index
-        path: std::path::PathBuf,
+    /// Evaluation corpus utilities
+    Eval {
+        #[command(subcommand)]
+        command: EvalCommands,
     },
-    /// Search the index
+    /// Benchmark commands
+    Bench {
+        #[command(subcommand)]
+        command: BenchCommands,
+    },
+    /// Search the corpus
     Search {
         /// The search query
         query: String,
-        
-        /// Use hybrid search (Vector + BM25)
-        #[arg(short = 'H', long)]
-        hybrid: bool,
-        
-        /// Output search results as JSON
-        #[arg(long)]
-        json: bool,
+
+        /// The path to search
+        path: PathBuf,
     },
+}
+
+#[derive(Subcommand)]
+enum EvalCommands {
+    /// Download an evaluation dataset
+    Download {
+        dataset: Dataset,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Materialize a downloaded dataset as local text files
+    Materialize {
+        dataset: Dataset,
+        #[arg(long)]
+        source: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
+enum BenchCommands {
+    /// Run quality benchmarks
+    Quality {
+        #[arg(long, value_enum, default_value_t = Engine::Bm25)]
+        engine: Engine,
+        #[arg(long)]
+        corpus: PathBuf,
+        #[arg(long)]
+        qrels: PathBuf,
+    },
+    /// Run latency benchmarks
+    Latency {
+        #[arg(long, value_enum, default_value_t = Engine::Bm25)]
+        engine: Engine,
+        #[arg(long)]
+        corpus: PathBuf,
+        #[arg(long)]
+        queries: PathBuf,
+    },
+}
+
+#[derive(clap::ValueEnum, Clone, Copy)]
+enum Dataset {
+    Scifact,
 }
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    let command_line = std::env::args().collect::<Vec<_>>().join(" ");
 
-    match &cli.command {
-        Commands::Index { path } => {
-            println!("Indexing directory: {:?}", path);
-            // TODO: Implement indexing logic
-        }
-        Commands::Search { query, hybrid, json } => {
-            if *json {
-                // TODO: Implement JSON search output
-                println!("{{ \"query\": \"{}\", \"hybrid\": {}, \"results\": [] }}", query, hybrid);
-            } else {
-                println!("Searching for: '{}' (hybrid: {})", query, hybrid);
-                // TODO: Implement text search output
+    match cli.command {
+        Commands::Eval { command } => match command {
+            EvalCommands::Download { dataset, out } => match dataset {
+                Dataset::Scifact => {
+                    let summary =
+                        download_scifact_dataset(SCIFACT_BASE_URL, SCIFACT_QRELS_BASE_URL, &out)?;
+                    println!("{}", serde_json::to_string_pretty(&summary)?);
+                }
+            },
+            EvalCommands::Materialize {
+                dataset,
+                source,
+                out,
+            } => match dataset {
+                Dataset::Scifact => {
+                    let summary = materialize_scifact_dir(&source, &out)?;
+                    println!("{}", serde_json::to_string_pretty(&summary)?);
+                }
+            },
+        },
+        Commands::Bench { command } => match command {
+            BenchCommands::Quality {
+                engine,
+                corpus,
+                qrels,
+            } => {
+                let report = run_quality_benchmark(&QualityBenchmarkRequest {
+                    engine,
+                    command: command_line,
+                    corpus_dir: corpus,
+                    qrels_path: qrels,
+                })?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
             }
+            BenchCommands::Latency {
+                engine,
+                corpus,
+                queries,
+            } => {
+                let report = run_latency_benchmark(&LatencyBenchmarkRequest {
+                    engine,
+                    command: command_line,
+                    corpus_dir: corpus,
+                    queries_path: queries,
+                })?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            }
+        },
+        Commands::Search { query, path } => {
+            bail!(
+                "search is not implemented yet for query '{}' on '{}'; finish story 1vzJfp000",
+                query,
+                path.display()
+            );
         }
     }
 
