@@ -57,7 +57,6 @@ pub struct SearchResponse {
     pub indexed_files: usize,
     pub skipped_files: usize,
     pub results: Vec<SearchHit>,
-    pub telemetry: Option<SearchTelemetry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

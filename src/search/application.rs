@@ -318,11 +318,6 @@ impl<'a> SearchEnvironment<'a> {
             indexed_files: self.corpus.indexed_files,
             skipped_files: self.corpus.skipped_files,
             results,
-            telemetry: Some(SearchTelemetry {
-                heuristic_hit_rate: self.telemetry.heuristic_hit_rate(),
-                blob_hit_rate: self.telemetry.blob_hit_rate(),
-                embedding_hit_rate: self.telemetry.embedding_hit_rate(),
-            }),
         })
     }
 }
@@ -411,11 +406,6 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
         indexed_files: corpus.indexed_files,
         skipped_files: corpus.skipped_files,
         results,
-        telemetry: Some(SearchTelemetry {
-            heuristic_hit_rate: request.telemetry.heuristic_hit_rate(),
-            blob_hit_rate: request.telemetry.blob_hit_rate(),
-            embedding_hit_rate: request.telemetry.embedding_hit_rate(),
-        }),
     })
 }
 
@@ -494,7 +484,8 @@ mod tests {
             documents: &[],
             bm25_index: None,
         };
-        let results = service.execute(&plan, "search", &corpus, 10, 0).unwrap();
+        let telemetry = crate::system::Telemetry::new();
+        let results = service.execute(&plan, "search", &corpus, 10, 0, &telemetry).unwrap();
 
         // "search" expansion with SynonymExpander gives "search" and "retrieval"
         // MockRetriever returns them as candidates
@@ -527,7 +518,8 @@ mod tests {
             documents: &[],
             bm25_index: None,
         };
-        let results = service.execute(&plan, "query", &corpus, 10, 0).unwrap();
+        let telemetry = crate::system::Telemetry::new();
+        let results = service.execute(&plan, "query", &corpus, 10, 0, &telemetry).unwrap();
 
         // Both retrievers should return "query"
         // RRF should fuse them

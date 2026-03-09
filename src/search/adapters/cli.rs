@@ -12,33 +12,10 @@ pub fn render_search_response(response: &SearchResponse, format: OutputFormat) -
 
 fn render_text_response(response: &SearchResponse) -> Result<String> {
     let mut output = String::new();
-    writeln!(&mut output, "strategy: {}", response.strategy)?;
-    let mut root = response.root.clone();
-    if root.starts_with("./") {
-        root = root.chars().skip(2).collect();
-    }
-    writeln!(&mut output, "root: {}", root)?;
-    writeln!(&mut output, "indexed_files: {}", response.indexed_files)?;
-    writeln!(&mut output, "skipped_files: {}", response.skipped_files)?;
 
     if response.results.is_empty() {
-        writeln!(&mut output, "results: 0")?;
-        writeln!(&mut output)?;
-        writeln!(&mut output, "no matching results")?;
-        return Ok(output.trim_end().to_string());
+        return Ok("no matching results".to_string());
     }
-
-    writeln!(&mut output, "results: {}", response.results.len())?;
-    if let Some(t) = &response.telemetry {
-        writeln!(
-            &mut output,
-            "cache_hits: heuristic={:.1}%, blob={:.1}%, embedding={:.1}%",
-            t.heuristic_hit_rate * 100.0,
-            t.blob_hit_rate * 100.0,
-            t.embedding_hit_rate * 100.0
-        )?;
-    }
-    writeln!(&mut output)?;
 
     for hit in &response.results {
         writeln!(&mut output, "{}. \x1b[1;32m{}\x1b[0m", hit.rank, hit.path)?;
