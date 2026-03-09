@@ -105,6 +105,8 @@ enum EvalCommands {
         dataset: Dataset,
         #[arg(long)]
         out: Option<PathBuf>,
+        #[arg(short, long, action = clap::ArgAction::Count)]
+        verbose: u8,
     },
     /// Materialize a downloaded dataset as local text files
     Materialize {
@@ -113,6 +115,8 @@ enum EvalCommands {
         source: Option<PathBuf>,
         #[arg(long)]
         out: Option<PathBuf>,
+        #[arg(short, long, action = clap::ArgAction::Count)]
+        verbose: u8,
     },
 }
 
@@ -136,6 +140,8 @@ enum BenchCommands {
         max_length: Option<usize>,
         #[arg(long)]
         json: bool,
+        #[arg(short, long, action = clap::ArgAction::Count)]
+        verbose: u8,
     },
     /// Run quality benchmarks
     Quality {
@@ -157,6 +163,8 @@ enum BenchCommands {
         model_revision: Option<String>,
         #[arg(long)]
         max_length: Option<usize>,
+        #[arg(short, long, action = clap::ArgAction::Count)]
+        verbose: u8,
     },
     /// Run latency benchmarks
     Latency {
@@ -174,6 +182,8 @@ enum BenchCommands {
         model_revision: Option<String>,
         #[arg(long)]
         max_length: Option<usize>,
+        #[arg(short, long, action = clap::ArgAction::Count)]
+        verbose: u8,
     },
 }
 
@@ -190,7 +200,7 @@ fn main() -> Result<()> {
 
     match cli.command {
         Commands::Eval { command } => match command {
-            EvalCommands::Download { dataset, out } => {
+            EvalCommands::Download { dataset, out, verbose: _ } => {
                 let dataset_name = match dataset {
                     Dataset::Scifact => "scifact",
                 };
@@ -215,6 +225,7 @@ fn main() -> Result<()> {
                 dataset,
                 source,
                 out,
+                verbose: _,
             } => {
                 let dataset_name = match dataset {
                     Dataset::Scifact => "scifact",
@@ -248,6 +259,7 @@ fn main() -> Result<()> {
                 model_revision,
                 max_length,
                 json,
+                verbose,
             } => {
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
                 let report = run_comparative_benchmark(
@@ -264,6 +276,7 @@ fn main() -> Result<()> {
                             model_revision.clone().or(Some(config.model.model_revision.clone())),
                             max_length.or(Some(config.model.max_length)),
                         ),
+                        verbose,
                     },
                     Some(&ignore),
                 )?;
@@ -284,6 +297,7 @@ fn main() -> Result<()> {
                 model_id,
                 model_revision,
                 max_length,
+                verbose,
             } => {
                 let strategy = strategy.unwrap_or_else(|| config.search.strategy.clone());
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
@@ -301,6 +315,7 @@ fn main() -> Result<()> {
                             model_revision.clone().or(Some(config.model.model_revision.clone())),
                             max_length.or(Some(config.model.max_length)),
                         ),
+                        verbose,
                     },
                     Some(&ignore),
                 )?;
@@ -314,6 +329,7 @@ fn main() -> Result<()> {
                 model_id,
                 model_revision,
                 max_length,
+                verbose,
             } => {
                 let strategy = strategy.unwrap_or_else(|| config.search.strategy.clone());
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
@@ -329,6 +345,7 @@ fn main() -> Result<()> {
                             model_revision.clone().or(Some(config.model.model_revision.clone())),
                             max_length.or(Some(config.model.max_length)),
                         ),
+                        verbose,
                     },
                     Some(&ignore),
                 )?;

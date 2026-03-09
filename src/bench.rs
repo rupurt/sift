@@ -90,6 +90,7 @@ pub struct QualityBenchmarkRequest {
     pub qrels_path: PathBuf,
     pub shortlist: usize,
     pub dense_model: DenseModelSpec,
+    pub verbose: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -100,6 +101,7 @@ pub struct LatencyBenchmarkRequest {
     pub queries_path: PathBuf,
     pub shortlist: usize,
     pub dense_model: DenseModelSpec,
+    pub verbose: u8,
 }
 
 pub fn run_quality_benchmark(
@@ -126,6 +128,7 @@ pub fn run_quality_benchmark(
         &request.strategy,
         request.shortlist,
         &request.dense_model,
+        request.verbose,
         ignore,
     )?;
 
@@ -141,6 +144,7 @@ pub fn run_quality_benchmark(
             strategy,
             request.shortlist,
             &request.dense_model,
+            request.verbose,
             ignore,
         )?),
         None => None,
@@ -159,6 +163,7 @@ pub fn run_quality_benchmark(
             &champion_strategy_name,
             request.shortlist,
             &request.dense_model,
+            request.verbose,
             ignore,
         )?)
     } else {
@@ -213,7 +218,7 @@ pub fn run_latency_benchmark(
                 limit: 10,
                 shortlist: request.shortlist,
                 dense_model: request.dense_model.clone(),
-                verbose: 0,
+                verbose: request.verbose,
                 retrievers: None,
                 fusion: None,
                 reranking: None,
@@ -280,6 +285,7 @@ pub fn run_comparative_benchmark(
             &name,
             request.shortlist,
             &request.dense_model,
+            request.verbose,
             ignore,
         )?;
 
@@ -298,7 +304,7 @@ pub fn run_comparative_benchmark(
                     limit: 10,
                     shortlist: request.shortlist,
                     dense_model: request.dense_model.clone(),
-                    verbose: 0,
+                    verbose: request.verbose,
                     retrievers: None,
                     fusion: None,
                     reranking: None,
@@ -463,6 +469,7 @@ fn evaluate_quality(
     strategy: &str,
     shortlist: usize,
     dense_model: &DenseModelSpec,
+    verbose: u8,
     ignore: Option<&Ignore>,
 ) -> Result<QualityMetrics> {
     let mut ndcg_total = 0.0;
@@ -483,7 +490,7 @@ fn evaluate_quality(
                 limit: 10,
                 shortlist,
                 dense_model: dense_model.clone(),
-                verbose: 0,
+                verbose,
                 retrievers: None,
                 fusion: None,
                 reranking: None,
