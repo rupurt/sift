@@ -59,7 +59,7 @@ check:
     cargo test --doc
 
 search *args:
-    cargo run -- search {{args}}
+    cargo run --release -- search {{args}}
 
 config:
-    cargo run -- config
+    cargo run --release -- config
