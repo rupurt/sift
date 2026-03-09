@@ -34,8 +34,10 @@ impl Retriever for SegmentVectorRetriever {
         }
 
         crate::trace!(2, verbose, "    vector: scoring {} segments", segments.len());
+        let semantic_start = std::time::Instant::now();
         let semantic =
             retrieve_semantic_documents(&self.dense, query, &segments, corpus.documents.len())?;
+        crate::trace!(2, verbose, "    vector: search complete in {:.2?}", semantic_start.elapsed());
 
         let results = semantic
             .into_iter()
@@ -85,6 +87,7 @@ impl Retriever for PhraseRetriever {
         }
 
         crate::trace!(2, verbose, "    phrase: scanning {} documents", corpus.documents.len());
+        let phrase_start = std::time::Instant::now();
         let mut results = Vec::new();
         for document in corpus.documents {
             let text = document.text.to_lowercase();
@@ -105,6 +108,7 @@ impl Retriever for PhraseRetriever {
                 });
             }
         }
+        crate::trace!(2, verbose, "    phrase: scan complete in {:.2?}", phrase_start.elapsed());
 
         Ok(CandidateList {
             results: results.into_iter().take(limit).collect(),
@@ -137,7 +141,9 @@ impl Retriever for Bm25Retriever {
             .unwrap_or("");
 
         crate::trace!(2, verbose, "    bm25: scoring {} documents", corpus.documents.len());
+        let bm25_start = std::time::Instant::now();
         let scored = index.score(query);
+        crate::trace!(2, verbose, "    bm25: score complete in {:.2?}", bm25_start.elapsed());
         let results = scored
             .into_iter()
             .take(limit)

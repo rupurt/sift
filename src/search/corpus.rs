@@ -120,6 +120,7 @@ pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>, verbose: u8) -> 
             verbose,
         );
     } else if root.is_dir() {
+        let walk_start = std::time::Instant::now();
         for entry in WalkDir::new(root).sort_by_file_name() {
             match entry {
                 Ok(entry) => {
@@ -145,6 +146,7 @@ pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>, verbose: u8) -> 
                 Err(_) => skipped_files += 1,
             }
         }
+        crate::trace!(2, verbose, "    directory walk and load took: {:.2?}", walk_start.elapsed());
     } else {
         bail!(
             "search path '{}' is neither a regular file nor directory",
@@ -153,7 +155,9 @@ pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>, verbose: u8) -> 
     }
 
     if manifest_updated {
+        let save_start = std::time::Instant::now();
         let _ = manifest.save(&manifest_path);
+        crate::trace!(2, verbose, "    manifest updated in {:.2?}", save_start.elapsed());
     }
 
     documents.sort_by(|left, right| left.id.cmp(&right.id));
