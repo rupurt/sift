@@ -58,3 +58,5 @@
 | [Incremental File Caching](epics/1vzfew000/voyages/1vzfjD000/) | done |
 | [Vector Embedding Caching](epics/1vzfew000/voyages/1vzgQK000/) | done |
 
+### [Comprehensive Performance Instrumentation](epics/1vziaX000/) (draft)
+
