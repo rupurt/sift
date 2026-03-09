@@ -41,6 +41,9 @@ pub struct SearchRequest {
     pub shortlist: usize,
     pub dense_model: DenseModelSpec,
     pub verbose: u8,
+    pub retrievers: Option<Vec<RetrieverPolicy>>,
+    pub fusion: Option<FusionPolicy>,
+    pub reranking: Option<RerankingPolicy>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -368,19 +371,22 @@ pub enum QueryExpansionPolicy {
     Synonym,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
 pub enum RetrieverPolicy {
     Bm25,
     Phrase,
-    SegmentVector,
+    Vector,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
 pub enum FusionPolicy {
     Rrf,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
 pub enum RerankingPolicy {
     None,
     PositionAware,

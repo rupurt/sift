@@ -49,14 +49,31 @@ data/raw/
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `strategy` | String | `"hybrid"` | The named search strategy to use. |
+| `strategy` | String | `"page-index-hybrid"` | The named search strategy to use. |
 | `limit` | Integer | `10` | The maximum number of results to return. |
 | `shortlist` | Integer | `8` | The number of candidates to pass to the reranking phase. |
 
 #### Available Strategies
-- **`hybrid`** (default, alias for `page-index`): A robust strategy combining BM25 lexical search, Phrase matching, and Dense Vector semantic search, followed by Position-Aware reranking.
+- **`page-index-hybrid`** (default): Our champion strategy. Combines BM25, Phrase matching, and Vector search, followed by Position-Aware reranking.
+- **`page-index`**: Lexical-focused strategy (inspired by qmd). Uses BM25 and Phrase matching with Position-Aware reranking (no vectors).
 - **`bm25`**: Lexical search only. Fast and strictly keyword-based.
-- **`legacy-hybrid`**: Simple BM25 + Vector fusion without phrase matching or structural bonuses.
+- **`vector`**: Semantic search only. Uses dense embeddings.
+- **`legacy-hybrid`**: Simple BM25 + Vector fusion (no phrase matching or structural bonuses).
+
+---
+
+## Decoupled Execution (CLI Overrides)
+
+You can override the components of any strategy directly from the CLI:
+
+```bash
+sift search --retrievers bm25,phrase --reranking position-aware "my query"
+```
+
+### Override Flags
+- `--retrievers`: Comma-separated list (`bm25`, `phrase`, `vector`).
+- `--fusion`: Currently only `rrf` is supported.
+- `--reranking`: `none` or `position-aware`.
 
 ---
 
@@ -74,10 +91,8 @@ These settings control the local machine learning model used for semantic vector
 
 ## Ranking & Reranking
 
-Currently, reranking logic is tied to the chosen **Search Strategy**.
-
 ### Position-Aware Reranking
-Used by the `hybrid` strategy. It applies bonuses to the base retrieval score to prioritize structural matches:
+Applies "soft bonuses" to prioritizing structural matches:
 - **Filename Bonus (+0.05):** Added if the query matches the file name.
 - **Heading/Location Bonus (+0.02):** Added if the query matches a structural label (e.g., a PDF Page or HTML Heading).
 

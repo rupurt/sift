@@ -68,7 +68,7 @@ impl Retriever for SegmentVectorRetriever {
                     path: s.path,
                     score: s.score,
                     contributors: vec![ContributorScore {
-                        retriever: RetrieverPolicy::SegmentVector,
+                        retriever: RetrieverPolicy::Vector,
                         score: s.score,
                     }],
                     snippet: Some(s.best_segment_text),
@@ -81,7 +81,7 @@ impl Retriever for SegmentVectorRetriever {
     }
 
     fn policy(&self) -> RetrieverPolicy {
-        RetrieverPolicy::SegmentVector
+        RetrieverPolicy::Vector
     }
 }
 
@@ -377,7 +377,7 @@ mod tests {
                 path: std::path::PathBuf::from("path1"),
                 score: 0.8,
                 contributors: vec![ContributorScore {
-                    retriever: RetrieverPolicy::SegmentVector,
+                    retriever: RetrieverPolicy::Vector,
                     score: 0.8,
                 }],
                 snippet: None,
@@ -398,7 +398,7 @@ mod tests {
             fused.results[0]
                 .contributors
                 .iter()
-                .any(|c| c.retriever == RetrieverPolicy::SegmentVector)
+                .any(|c| c.retriever == RetrieverPolicy::Vector)
         );
     }
 }

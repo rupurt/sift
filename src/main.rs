@@ -10,7 +10,10 @@ use sift::cache::cache_dir;
 use sift::config::Config;
 use sift::dense::DenseModelSpec;
 use sift::eval::{download_scifact_dataset, materialize_scifact_dir};
-use sift::search::{OutputFormat, SearchRequest, render_search_response, run_search};
+use sift::search::{
+    FusionPolicy, OutputFormat, RerankingPolicy, RetrieverPolicy, SearchRequest,
+    render_search_response, run_search,
+};
 
 const SCIFACT_BASE_URL: &str = "https://huggingface.co/datasets/BeIR/scifact/resolve/main";
 const SCIFACT_QRELS_BASE_URL: &str =
@@ -70,6 +73,15 @@ struct SearchCommand {
 
     #[arg(short, long, action = clap::ArgAction::Count)]
     verbose: u8,
+
+    #[arg(long, value_delimiter = ',', num_args = 1..)]
+    retrievers: Option<Vec<RetrieverPolicy>>,
+
+    #[arg(long)]
+    fusion: Option<FusionPolicy>,
+
+    #[arg(long)]
+    reranking: Option<RerankingPolicy>,
 
     /// Provide QUERY to search the current directory, or PATH QUERY to search a specific corpus.
     #[arg(num_args = 1..=2, value_names = ["PATH", "QUERY"])]
@@ -351,6 +363,9 @@ fn main() -> Result<()> {
                         search.max_length.or(Some(config.model.max_length)),
                     ),
                     verbose: search.verbose,
+                    retrievers: search.retrievers.clone(),
+                    fusion: search.fusion,
+                    reranking: search.reranking,
                 },
                 Some(&ignore),
             )?;

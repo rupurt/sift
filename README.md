@@ -13,7 +13,7 @@ There is no external database, no daemon, and no background indexing service.
 
 - Single Rust binary. No external database, daemon, or long-running service.
 - Pure-Rust toolchain. No C++ dependencies, enabling easy static binary distribution.
-- Default `search` mode uses a configurable champion strategy (currently the `page-index` preset).
+- Default `search` mode uses a configurable champion strategy (currently the `page-index-hybrid` preset).
 - Search execution is modeled as a layered pipeline: Query Expansion -> Retrieval -> Fusion -> Reranking.
 - Heuristic Incremental Caching. Uses `mtime`, `inode`, and `size` to bypass 
   extraction and hashing for unchanged files, keeping repeat searches sub-second.

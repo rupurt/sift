@@ -28,7 +28,7 @@ impl StrategyPresetRegistry {
     }
 
     pub fn default_registry() -> Self {
-        let mut registry = Self::new("page-index");
+        let mut registry = Self::new("page-index-hybrid");
 
         // bm25 preset
         registry.register(
@@ -42,19 +42,31 @@ impl StrategyPresetRegistry {
             },
         );
 
-        // hybrid preset (as an explicit preset)
+        // vector preset
         registry.register(
-            "legacy-hybrid",
+            "vector",
             SearchPlan {
-                name: "legacy-hybrid".to_string(),
+                name: "vector".to_string(),
                 query_expansion: QueryExpansionPolicy::None,
-                retrievers: vec![RetrieverPolicy::Bm25, RetrieverPolicy::SegmentVector],
+                retrievers: vec![RetrieverPolicy::Vector],
                 fusion: FusionPolicy::Rrf,
                 reranking: RerankingPolicy::None,
             },
         );
 
-        // page-index inspired preset
+        // legacy-hybrid preset
+        registry.register(
+            "legacy-hybrid",
+            SearchPlan {
+                name: "legacy-hybrid".to_string(),
+                query_expansion: QueryExpansionPolicy::None,
+                retrievers: vec![RetrieverPolicy::Bm25, RetrieverPolicy::Vector],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::None,
+            },
+        );
+
+        // page-index (lexical focus, inspired by qmd)
         registry.register(
             "page-index",
             SearchPlan {
@@ -63,7 +75,22 @@ impl StrategyPresetRegistry {
                 retrievers: vec![
                     RetrieverPolicy::Bm25,
                     RetrieverPolicy::Phrase,
-                    RetrieverPolicy::SegmentVector,
+                ],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::PositionAware,
+            },
+        );
+
+        // page-index-hybrid (champion, lexical + vector)
+        registry.register(
+            "page-index-hybrid",
+            SearchPlan {
+                name: "page-index-hybrid".to_string(),
+                query_expansion: QueryExpansionPolicy::None,
+                retrievers: vec![
+                    RetrieverPolicy::Bm25,
+                    RetrieverPolicy::Phrase,
+                    RetrieverPolicy::Vector,
                 ],
                 fusion: FusionPolicy::Rrf,
                 reranking: RerankingPolicy::PositionAware,
@@ -198,13 +225,24 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
 
     // For SegmentVectorRetriever, we need to load the model if the plan requires it
     let registry = StrategyPresetRegistry::default_registry();
-    let plan = registry.resolve(&request.strategy)?;
+    let mut plan = registry.resolve(&request.strategy)?;
+
+    // Apply overrides from SearchRequest
+    if let Some(retrievers) = &request.retrievers {
+        plan.retrievers = retrievers.clone();
+    }
+    if let Some(fusion) = request.fusion {
+        plan.fusion = fusion;
+    }
+    if let Some(reranking) = request.reranking {
+        plan.reranking = reranking;
+    }
 
     let corpus_start = std::time::Instant::now();
     
     // Determine if we need to pass the dense model for embedding during load
     let mut dense_for_load = None;
-    if plan.retrievers.contains(&RetrieverPolicy::SegmentVector) {
+    if plan.retrievers.contains(&RetrieverPolicy::Vector) {
         let model_start = std::time::Instant::now();
         let dense = DenseReranker::load(request.dense_model.clone())?;
         crate::trace!(1, verbose, "→ dense model loaded in {:.2?}", model_start.elapsed());
