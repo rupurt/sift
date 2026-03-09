@@ -2,6 +2,7 @@
 id: 1vzfew000
 title: Zig-Style Global File Cache
 status: laid
+epic: 1vzfew000
 created_at: 2026-03-09T11:48:54
 index: 5
 laid_at: 2026-03-09T11:51:30

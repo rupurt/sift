@@ -2,6 +2,7 @@
 id: 1vzXLN000
 title: Composable Search Strategy Architecture
 status: laid
+epic: 1vzXLN000
 created_at: 2026-03-09T02:56:09
 index: 4
 laid_at: 2026-03-09T03:20:00

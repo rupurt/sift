@@ -2,6 +2,7 @@
 id: 1vzSne000
 title: True Hybrid Retrieval Architecture
 status: laid
+epic: 1vzSne000
 created_at: 2026-03-08T22:05:02
 index: 3
 laid_at: 2026-03-08T22:14:00

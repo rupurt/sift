@@ -6,7 +6,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     keel = {
-      url = "github:rupurt/keel?rev=2b14d578c1771b247275ad5ba295e2cf4a0f1fec";
+      url = "github:rupurt/keel?rev=3966e1cd0d48c4a0b0a0bf6074310af521d3cd80";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.rust-overlay.follows = "rust-overlay";
       inputs.flake-utils.follows = "flake-utils";

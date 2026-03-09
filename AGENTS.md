@@ -9,43 +9,39 @@ Shared guidance for AI agents working with this repository.
 3. Regenerate board summaries after structural changes with `keel generate`.
 4. Validate board health before finalizing work with `keel doctor`.
 
-## Autonomous Delivery Policy
+## Mission Workflow (Autonomous Operation)
 
-These rules define how agents should behave when the user asks for end-to-end
-product work rather than a single bounded change.
+Missions are the top-level steering loop for long-running, autonomous objectives.
+An agent should ALWAYS be working within a mission when the user provides a
+broad product or feature goal.
 
-1. **Top-Level Objective Overrides Local Scope**: If the user provides a larger
-   MVP, product objective, or end-state than the current board covers, treat
-   that objective as the real stopping condition. The current story, voyage, or
-   epic is only an intermediate slice.
-2. **Queue Empty Is Not Completion**: If `keel next --agent` returns no ready
-   work and the user objective is still incomplete, do not stop. Inspect the
-   current epic, voyage, PRD, SRS, SDD, and README context, then create the
-   next bearing, epic, voyage, or stories needed to continue.
-3. **Voyage Completion Is Not Request Completion**: Finishing a voyage does not
-   mean the user request is complete unless the user explicitly scoped the work
-   to that voyage.
-4. **Board Is Authoritative, But Not Self-Terminating**: Use the board as the
-   system of record for sequencing, evidence, and traceability, but extend it
-   whenever the active product objective still has unimplemented work.
-5. **Stop Only For Real Boundaries**: Stop only when one of the following is
-   true:
-   - the defined MVP or user objective is complete,
-   - a real external blocker prevents safe progress,
-   - or the user explicitly asks to pause or change direction.
-6. **Autonomous Manual Review**: If a story is blocked only on manual
-   verification and the agent has directly inspected the relevant output, docs,
-   or behavior, record the proof, submit the story, and complete the required
-   human acceptance step explicitly with the appropriate `keel` command.
-7. **Successive Voyages Are Expected**: In autonomous product-building mode,
-   agents should expect to create and complete multiple voyages in sequence
-   until the requested MVP is satisfied.
+1. **Bootstrap Mission**: If no active mission covers the current user request,
+   create one: `keel mission new "<Title>"`.
+2. **Refine Charter**: Fill out `CHARTER.md` with specific goals (MG-*),
+   constraints, and halting rules.
+   - Every goal should have a clear verification path (`board:`, `metric:`, or `manual:`).
+   - Use `keel mission refine <id>` to ensure the charter is structurally sound.
+3. **Activate**: Promote the mission to `active` status: `keel mission activate <id>`.
+4. **Log Decisions**: Record significant tactical choices, research findings,
+   or deviations in the mission log: `keel mission log <id> --msg "Description"`.
+5. **Digest Regularly**: Periodically summarize log entries into the mission's
+   session digest to maintain context: `keel mission digest <id>`.
+6. **Execution Loop**: While the mission is active:
+   - Run `keel next --agent` to pull the next task.
+   - If no tasks are ready but mission goals are incomplete, use Planning or
+     Research workflows to extend the board.
+   - Stop ONLY when the mission's halting rules are met or an external blocker
+     is reached.
+7. **Achievement**: Once all goals are satisfied, mark the mission as achieved:
+   `keel mission achieve <id>`.
+8. **Final Verification**: Run `keel mission verify <id>` to transition from
+   Achieved to Verified, ensuring all evidence is traceable.
 
 ## Execution Workflow (Implementer)
 
 1. **Pull Context**: Read current board health and identify bottlenecks with `keel flow`.
 2. **Claim Work**: Pull the highest-priority implementation item with `keel next --agent`.
-   - If no story is ready and the product objective is still incomplete, switch
+   - If no story is ready and the mission goals are still incomplete, switch
      to research or planning work immediately instead of stopping.
 3. **Check Story Coherence Before Coding**: Confirm acceptance criteria are traceable and verifiable:
    - Acceptance criteria are linked to source requirements (for example `[SRS-XX/AC-YY]`).
@@ -70,7 +66,7 @@ product work rather than a single bounded change.
    - If the story requires manual verification and you have directly performed
      that review, complete the acceptance step explicitly and keep moving.
 9. **Continue The Product**: After each completed story, re-run `keel flow` and
-   `keel next --agent`. If the queue is empty but the user objective is not,
+   `keel next --agent`. If the queue is empty but the mission goals are not,
    extend the board and continue.
 
 ## Verification-Driven Delivery Loop (Required)
@@ -105,13 +101,12 @@ cleanup step.
    - if manual review is required and you directly reviewed the result, run
      `keel story accept <story-id>` in the same workstream
 8. **Do Not Stop At A Clean Commit**: A passing test suite, a clean commit, or
-   an accepted story is not a stopping condition while `keel flow` or
-   `keel next --agent` still shows active product work.
+   an accepted story is not a stopping condition while mission goals remain.
 
 ## Planning Workflow (Architect)
 
 1. **Identify Gaps**: Use `keel flow` or `keel status` to find epics needing tactical decomposition.
-   - If execution is starved but the user objective is incomplete, create the
+   - If execution is starved but mission goals are incomplete, create the
      next planning unit instead of waiting for more instructions.
 2. **Scaffold Planning Unit**:
    - For new strategic work, create an Epic: `keel epic new "<Title>" --problem "<Problem>"`
