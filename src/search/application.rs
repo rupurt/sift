@@ -541,7 +541,7 @@ mod tests {
         assert_eq!(page_index.name, "page-index");
 
         let hybrid = registry.resolve("hybrid").unwrap();
-        // hybrid resolves to the champion which is currently page-index
-        assert_eq!(hybrid.name, "page-index");
+        // hybrid resolves to the champion which is currently page-index-hybrid
+        assert_eq!(hybrid.name, "page-index-hybrid");
     }
 }

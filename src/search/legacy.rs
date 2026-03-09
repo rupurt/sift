@@ -16,6 +16,9 @@ mod tests {
         #[test]
         fn bm25_ranks_recursive_utf8_files() {
             let corpus = sample_search_tree();
+            let cache_dir = tempdir().expect("cache dir");
+            unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+
             let response = run_search(
                 &SearchRequest {
                     strategy: "bm25".to_string(),
@@ -48,6 +51,9 @@ mod tests {
         #[test]
         fn json_output_contains_result_fields() {
             let corpus = sample_search_tree();
+            let cache_dir = tempdir().expect("cache dir");
+            unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+
             let response = run_search(
                 &SearchRequest {
                     strategy: "bm25".to_string(),
@@ -87,6 +93,9 @@ mod tests {
             #[test]
             fn prefers_best_segment_snippet_over_document_truncation() {
                 let corpus = sample_rich_search_tree();
+                let cache_dir = tempdir().expect("cache dir");
+                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+
                 let loaded = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("loaded corpus");
                 let document = loaded
                     .documents
@@ -140,6 +149,8 @@ mod tests {
         #[test]
         fn filtering_skips_invalid_utf8_without_crashing() {
             let corpus = sample_search_tree();
+            let cache_dir = tempdir().expect("cache dir");
+            unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
 
             let first = run_search(
                 &SearchRequest {
@@ -192,6 +203,9 @@ mod tests {
             #[test]
             fn routes_text_and_html_documents_through_shared_extractor() {
                 let corpus = sample_rich_search_tree();
+                let cache_dir = tempdir().expect("cache dir");
+                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+
                 let loaded = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("loaded corpus");
 
                 assert_eq!(loaded.indexed_files, 2);
@@ -222,6 +236,8 @@ mod tests {
             #[test]
             fn segment_identity_is_stable_for_supported_documents() {
                 let corpus = supported_fixture_tree();
+                let cache_dir = tempdir().expect("cache dir");
+                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
 
                 let first = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("first corpus load");
                 let second = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("second corpus load");
@@ -271,6 +287,9 @@ mod tests {
             #[test]
             fn structure_aware_segments_are_source_aware() {
                 let corpus = supported_fixture_tree();
+                let cache_dir = tempdir().expect("cache dir");
+                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+
                 let loaded = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("loaded corpus");
 
                 let html = loaded
@@ -316,6 +335,9 @@ mod tests {
             #[test]
             fn segment_text_preservation_keeps_section_local_text() {
                 let corpus = supported_fixture_tree();
+                let cache_dir = tempdir().expect("cache dir");
+                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+
                 let loaded = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("loaded corpus");
 
                 let html = loaded
@@ -393,6 +415,9 @@ mod tests {
             #[test]
             fn html_files_are_searchable_without_preprocessing() {
                 let corpus = sample_rich_search_tree();
+                let cache_dir = tempdir().expect("cache dir");
+                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+
                 let response = run_search(
                     &SearchRequest {
                         strategy: "bm25".to_string(),
@@ -433,6 +458,9 @@ mod tests {
             fn pdf_files_are_searchable_without_external_conversion() {
                 let fixture_root =
                     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
+                let cache_dir = tempdir().expect("cache dir");
+                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+
                 let response = run_search(
                     &SearchRequest {
                         strategy: "bm25".to_string(),
@@ -477,6 +505,9 @@ mod tests {
             fn office_documents_are_searchable_without_external_conversion() {
                 let fixture_root =
                     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
+                let cache_dir = tempdir().expect("cache dir");
+                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+
                 let response = run_search(
                     &SearchRequest {
                         strategy: "bm25".to_string(),
@@ -528,6 +559,8 @@ mod tests {
             fn mixed_format_search_results_are_deterministic() {
                 let fixture_root =
                     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
+                let cache_dir = tempdir().expect("cache dir");
+                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
 
                 let first = run_search(
                     &SearchRequest {
@@ -576,6 +609,8 @@ mod tests {
             #[test]
             fn invalid_binary_files_are_skipped_deterministically() {
                 let corpus = sample_rich_search_tree();
+                let cache_dir = tempdir().expect("cache dir");
+                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
 
                 let first = run_search(
                     &SearchRequest {
