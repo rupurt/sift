@@ -11,8 +11,8 @@ all *args: prepare
 
 hybrid *args: prepare
     @echo "Running comprehensive benchmark for 'hybrid' champion..."
-    cargo run --release --quiet -- bench quality --strategy "hybrid" --baseline "bm25" {{args}}
-    cargo run --release --quiet -- bench latency --strategy "hybrid" {{args}}
+    cargo run --release --quiet -- bench quality --strategy "page-index-hybrid" --baseline "bm25" {{args}}
+    cargo run --release --quiet -- bench latency --strategy "page-index-hybrid" {{args}}
 
 baseline *args: prepare
     @echo "Running comprehensive benchmark for 'bm25' baseline..."

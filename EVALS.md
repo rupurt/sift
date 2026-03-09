@@ -46,5 +46,5 @@ To add support for a new dataset:
 If materialization is slow, you can use verbose mode to trace the extraction process:
 
 ```bash
-sift eval materialize scifact -v
+just eval materialize-scifact --verbose
 ```

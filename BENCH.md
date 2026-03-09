@@ -13,27 +13,27 @@ just bench prepare
 
 ## Running Benchmarks via `just`
 
-The easiest way to run benchmarks is using the `just` module.
+The `just` recipes pass all arguments through to the underlying `sift bench` command.
 
 ### 1. Comparative Benchmark (`bench all`)
-Runs all available strategies (BM25, Vector, Hybrid, etc.) and compares their nDCG@10, MRR@10, Recall@10, and p50 latency.
+Runs all available strategies (BM25, Vector, Hybrid, etc.) and compares their metrics.
 
 ```bash
-just bench all
+just bench all --corpus ".cache/eval/scifact-files" --qrels ".cache/eval/scifact/qrels/test.tsv"
 ```
 
 ### 2. Champion Benchmark (`bench hybrid`)
 Runs a comprehensive quality and latency report for the current champion strategy (`page-index-hybrid`) against the `bm25` baseline.
 
 ```bash
-just bench hybrid
+just bench hybrid --corpus ".cache/eval/scifact-files" --qrels ".cache/eval/scifact/qrels/test.tsv" --queries ".cache/eval/scifact-files/test-queries.tsv"
 ```
 
 ### 3. Baseline Benchmark (`bench baseline`)
 Runs a report for the standard `bm25` strategy.
 
 ```bash
-just bench baseline
+just bench baseline --corpus ".cache/eval/scifact-files" --qrels ".cache/eval/scifact/qrels/test.tsv" --queries ".cache/eval/scifact-files/test-queries.tsv"
 ```
 
 ---
@@ -46,9 +46,9 @@ For more control, you can use the `sift bench` subcommand directly.
 Measures retrieval metrics (nDCG, MRR, Recall) using a Qrels file.
 
 ```bash
-sift bench quality 
-  --strategy page-index-hybrid 
-  --corpus .cache/eval/scifact-files 
+sift bench quality \
+  --strategy page-index-hybrid \
+  --corpus .cache/eval/scifact-files \
   --qrels .cache/eval/scifact/qrels/test.tsv
 ```
 
@@ -56,9 +56,9 @@ sift bench quality
 Measures p50, p90, and max latency over a set of queries.
 
 ```bash
-sift bench latency 
-  --strategy vector 
-  --corpus .cache/eval/scifact-files 
+sift bench latency \
+  --strategy vector \
+  --corpus .cache/eval/scifact-files \
   --queries .cache/eval/scifact-files/test-queries.tsv
 ```
 
@@ -67,10 +67,8 @@ sift bench latency
 Benchmarks support the standard verbosity flags (`-v`, `-vv`, `-vvv`). You can pass these through `just`:
 
 ```bash
-just bench all -v
+just bench all --corpus ".cache/eval/scifact-files" --qrels ".cache/eval/scifact/qrels/test.tsv" -v
 ```
-
-This will show high-level timings for query execution and index loading. Use `-vv` to see specific cache hits/misses and individual retriever timings.
 
 ## Interpreting Results
 
