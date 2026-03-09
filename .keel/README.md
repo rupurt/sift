@@ -44,9 +44,9 @@
 |--------|--------|
 | [Structure-Aware True Hybrid Retrieval](epics/1vzSne000/voyages/1vzSy6000/) | done |
 
-### [Composable Search Strategy Architecture](epics/1vzXLN000/) (active)
+### [Composable Search Strategy Architecture](epics/1vzXLN000/) (done)
 
 | Voyage | Status |
 |--------|--------|
-| [Layered Search Strategy Foundation](epics/1vzXLN000/voyages/1vzdCx000/) | in-progress |
+| [Layered Search Strategy Foundation](epics/1vzXLN000/voyages/1vzdCx000/) | done |
 
