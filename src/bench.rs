@@ -213,6 +213,7 @@ pub fn run_latency_benchmark(
                 limit: 10,
                 shortlist: request.shortlist,
                 dense_model: request.dense_model.clone(),
+                verbose: 0,
             },
             ignore,
         )?;
@@ -294,6 +295,7 @@ pub fn run_comparative_benchmark(
                     limit: 10,
                     shortlist: request.shortlist,
                     dense_model: request.dense_model.clone(),
+                    verbose: 0,
                 },
                 ignore,
             )?;
@@ -475,6 +477,7 @@ fn evaluate_quality(
                 limit: 10,
                 shortlist,
                 dense_model: dense_model.clone(),
+                verbose: 0,
             },
             ignore,
         )?;

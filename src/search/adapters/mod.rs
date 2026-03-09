@@ -13,6 +13,7 @@ impl Retriever for SegmentVectorRetriever {
         query_variants: &[QueryVariant],
         corpus: &PreparedCorpus,
         _limit: usize,
+        verbose: u8,
     ) -> Result<CandidateList> {
         // For now, we only use the first query variant for semantic search
         let query = query_variants
@@ -32,21 +33,25 @@ impl Retriever for SegmentVectorRetriever {
             });
         }
 
+        crate::trace!(2, verbose, "    vector: scoring {} segments", segments.len());
         let semantic =
             retrieve_semantic_documents(&self.dense, query, &segments, corpus.documents.len())?;
 
         let results = semantic
             .into_iter()
-            .map(|s| Candidate {
-                id: s.id,
-                path: s.path,
-                score: s.score,
-                contributors: vec![ContributorScore {
-                    retriever: RetrieverPolicy::SegmentVector,
+            .map(|s| {
+                crate::trace!(3, verbose, "      vector score: {:.4} for {}", s.score, s.path.display());
+                Candidate {
+                    id: s.id,
+                    path: s.path,
                     score: s.score,
-                }],
-                snippet: Some(s.best_segment_text),
-                snippet_location: Some(s.best_segment_label),
+                    contributors: vec![ContributorScore {
+                        retriever: RetrieverPolicy::SegmentVector,
+                        score: s.score,
+                    }],
+                    snippet: Some(s.best_segment_text),
+                    snippet_location: Some(s.best_segment_label),
+                }
             })
             .collect();
 
@@ -66,6 +71,7 @@ impl Retriever for PhraseRetriever {
         query_variants: &[QueryVariant],
         corpus: &PreparedCorpus,
         limit: usize,
+        verbose: u8,
     ) -> Result<CandidateList> {
         let query = query_variants
             .first()
@@ -78,10 +84,12 @@ impl Retriever for PhraseRetriever {
             });
         }
 
+        crate::trace!(2, verbose, "    phrase: scanning {} documents", corpus.documents.len());
         let mut results = Vec::new();
         for document in corpus.documents {
             let text = document.text.to_lowercase();
             if text.contains(&query) {
+                crate::trace!(3, verbose, "      phrase match: {}", document.path.display());
                 // For phrase search, we just give it a 1.0 score if it contains the phrase
                 // This is a very simple implementation
                 results.push(Candidate {
@@ -116,6 +124,7 @@ impl Retriever for Bm25Retriever {
         query_variants: &[QueryVariant],
         corpus: &PreparedCorpus,
         limit: usize,
+        verbose: u8,
     ) -> Result<CandidateList> {
         let index = corpus
             .bm25_index
@@ -127,20 +136,24 @@ impl Retriever for Bm25Retriever {
             .map(|q| q.text.as_str())
             .unwrap_or("");
 
+        crate::trace!(2, verbose, "    bm25: scoring {} documents", corpus.documents.len());
         let scored = index.score(query);
         let results = scored
             .into_iter()
             .take(limit)
-            .map(|s| Candidate {
-                id: s.id,
-                path: s.path,
-                score: s.score,
-                contributors: vec![ContributorScore {
-                    retriever: RetrieverPolicy::Bm25,
+            .map(|s| {
+                crate::trace!(3, verbose, "      bm25 score: {:.4} for {}", s.score, s.path.display());
+                Candidate {
+                    id: s.id,
+                    path: s.path,
                     score: s.score,
-                }],
-                snippet: None, // Snippet resolution happens later
-                snippet_location: None,
+                    contributors: vec![ContributorScore {
+                        retriever: RetrieverPolicy::Bm25,
+                        score: s.score,
+                    }],
+                    snippet: None, // Snippet resolution happens later
+                    snippet_location: None,
+                }
             })
             .collect();
 
@@ -155,7 +168,7 @@ impl Retriever for Bm25Retriever {
 pub struct RrfFuser;
 
 impl Fuser for RrfFuser {
-    fn fuse(&self, candidate_lists: &[CandidateList], limit: usize) -> Result<CandidateList> {
+    fn fuse(&self, candidate_lists: &[CandidateList], limit: usize, _verbose: u8) -> Result<CandidateList> {
         // Implement RRF fusion
         // This can be adapted from src/hybrid.rs
         // Wait, I need a f64 RRF_K constant.
@@ -278,7 +291,7 @@ mod tests {
             }],
         };
 
-        let fused = fuser.fuse(&[list1, list2], 10).unwrap();
+        let fused = fuser.fuse(&[list1, list2], 10, 0).unwrap();
         assert_eq!(fused.results.len(), 1);
         assert_eq!(fused.results[0].contributors.len(), 2);
         assert!(

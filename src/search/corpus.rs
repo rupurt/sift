@@ -84,7 +84,7 @@ fn is_benchmark_metadata_file(root: &Path, path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>) -> Result<LoadedCorpus> {
+pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>, verbose: u8) -> Result<LoadedCorpus> {
     if !root.exists() {
         bail!("search path '{}' does not exist", root.display());
     }
@@ -117,6 +117,7 @@ pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>) -> Result<Loaded
             &mut documents,
             &mut total_bytes,
             &mut skipped_files,
+            verbose,
         );
     } else if root.is_dir() {
         for entry in WalkDir::new(root).sort_by_file_name() {
@@ -137,6 +138,7 @@ pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>) -> Result<Loaded
                             &mut documents,
                             &mut total_bytes,
                             &mut skipped_files,
+                            verbose,
                         );
                     }
                 }
@@ -173,6 +175,7 @@ fn collect_search_file_cached(
     documents: &mut Vec<Document>,
     total_bytes: &mut u64,
     skipped_files: &mut usize,
+    verbose: u8,
 ) {
     let Ok(heuristics) = get_file_heuristics(path) else {
         *skipped_files += 1;
@@ -182,6 +185,7 @@ fn collect_search_file_cached(
     // Fast path: heuristics match manifest
     if let Some(hash) = manifest.check_heuristics(path, &heuristics) {
         if let Ok(mut doc) = load_blob(blobs_dir, &hash) {
+            crate::trace!(2, verbose, "    cache hit (heuristic): {}", path.display());
             // Update document ID to match current path, just in case file moved
             doc.id = path.display().to_string();
             doc.path = path.to_path_buf();
@@ -194,6 +198,7 @@ fn collect_search_file_cached(
     // Medium path: compute blake3 and check global blob store
     if let Ok(hash) = hash_file(path) {
         if let Ok(mut doc) = load_blob(blobs_dir, &hash) {
+            crate::trace!(2, verbose, "    cache hit (hash): {}", path.display());
             manifest.update(path.to_path_buf(), heuristics, hash);
             *manifest_updated = true;
             
@@ -205,6 +210,7 @@ fn collect_search_file_cached(
         }
 
         // Slow path: True miss, must extract and (later) embed
+        crate::trace!(2, verbose, "    cache miss: {}", path.display());
         if let Ok(Some(extracted)) = extract_path(path) {
             let id = path.display().to_string();
             let doc = index_document(id, path.to_path_buf(), extracted);

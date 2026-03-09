@@ -68,6 +68,9 @@ struct SearchCommand {
     #[arg(long)]
     max_length: Option<usize>,
 
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    verbose: u8,
+
     /// Provide QUERY to search the current directory, or PATH QUERY to search a specific corpus.
     #[arg(num_args = 1..=2, value_names = ["PATH", "QUERY"])]
     targets: Vec<String>,
@@ -346,6 +349,7 @@ fn main() -> Result<()> {
                             .or_else(|| config.model.model_revision.clone()),
                         search.max_length.or(config.model.max_length),
                     ),
+                    verbose: search.verbose,
                 },
                 Some(&ignore),
             )?;

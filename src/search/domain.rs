@@ -40,6 +40,7 @@ pub struct SearchRequest {
     pub limit: usize,
     pub shortlist: usize,
     pub dense_model: DenseModelSpec,
+    pub verbose: u8,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -398,12 +399,13 @@ pub trait Retriever {
         query_variants: &[QueryVariant],
         corpus: &PreparedCorpus,
         limit: usize,
+        verbose: u8,
     ) -> Result<CandidateList>;
     fn policy(&self) -> RetrieverPolicy;
 }
 
 pub trait Fuser {
-    fn fuse(&self, candidate_lists: &[CandidateList], limit: usize) -> Result<CandidateList>;
+    fn fuse(&self, candidate_lists: &[CandidateList], limit: usize, verbose: u8) -> Result<CandidateList>;
 }
 
 pub trait Expander {
