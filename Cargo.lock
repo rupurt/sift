@@ -2009,6 +2009,7 @@ dependencies = [
  "html2text",
  "ignore",
  "pdf-extract",
+ "rayon",
  "rust_tokenizers",
  "serde",
  "serde_json",

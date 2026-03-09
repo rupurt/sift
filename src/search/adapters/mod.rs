@@ -5,7 +5,7 @@ use anyhow::Result;
 use crate::vector::{aggregate_segment_hits, score_segments_manually, SegmentScorer};
 
 pub struct SegmentVectorRetriever {
-    pub dense: DenseReranker,
+    pub dense: std::sync::Arc<DenseReranker>,
 }
 
 impl Retriever for SegmentVectorRetriever {
@@ -338,6 +338,34 @@ impl Reranker for PositionAwareReranker {
         }
 
         // Re-sort after applying bonuses
+        candidates.results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+
+        Ok(CandidateList {
+            results: candidates.results.into_iter().take(limit).collect(),
+        })
+    }
+}
+
+pub struct MockLlmReranker;
+
+impl Reranker for MockLlmReranker {
+    fn rerank(
+        &self,
+        _query: &str,
+        mut candidates: CandidateList,
+        limit: usize,
+    ) -> Result<CandidateList> {
+        // A mock LLM reranker that slightly adjusts top scores to simulate "intelligent" re-scoring.
+        // It just adds a small random-ish bonus to the first few results.
+        for (i, candidate) in candidates.results.iter_mut().enumerate().take(3) {
+            candidate.score += 0.01 / (i + 1) as f64;
+        }
+
         candidates.results.sort_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)

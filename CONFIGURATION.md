@@ -55,6 +55,7 @@ data/raw/
 
 #### Available Strategies
 - **`page-index-hybrid`** (default): Our champion strategy. Combines BM25, Phrase matching, and Vector search, followed by Position-Aware reranking.
+- **`page-index-llm`**: Combines BM25, Phrase matching, and Vector search, followed by an LLM-based re-scoring pass (currently using a mock reranker for testing).
 - **`page-index`**: Lexical-focused strategy (inspired by qmd). Uses BM25 and Phrase matching with Position-Aware reranking (no vectors).
 - **`bm25`**: Lexical search only. Fast and strictly keyword-based.
 - **`vector`**: Semantic search only. Uses dense embeddings.

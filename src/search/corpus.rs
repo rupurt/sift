@@ -28,9 +28,7 @@ pub fn load_materialized_corpus(
         bail!("corpus path '{}' does not exist", corpus_dir.display());
     }
 
-    let mut documents = Vec::new();
-    let mut total_bytes = 0_u64;
-    let mut skipped_files = 0_usize;
+    let mut files_to_process = Vec::new();
 
     for entry in WalkDir::new(corpus_dir).sort_by_file_name() {
         match entry {
@@ -49,14 +47,45 @@ pub fn load_materialized_corpus(
                     }
                 }
 
-                collect_materialized_file(
-                    entry.path(),
-                    &mut documents,
-                    &mut total_bytes,
-                    &mut skipped_files,
-                );
+                files_to_process.push(entry.path().to_path_buf());
             }
-            Err(_) => skipped_files += 1,
+            Err(_) => {}
+        }
+    }
+
+    use rayon::prelude::*;
+
+    let results: Vec<Option<Document>> = files_to_process
+        .into_par_iter()
+        .map(|path| {
+            let extracted = match extract_path(&path) {
+                Ok(Some(extracted)) => extracted,
+                Ok(None) | Err(_) => {
+                    return None;
+                }
+            };
+
+            let id = match path.file_stem().and_then(|stem| stem.to_str()) {
+                Some(id) => id.to_string(),
+                None => {
+                    return None;
+                }
+            };
+
+            Some(index_document(id, path, extracted))
+        })
+        .collect();
+
+    let mut documents = Vec::new();
+    let mut total_bytes = 0_u64;
+    let mut skipped_files = 0_usize;
+
+    for result in results {
+        if let Some(doc) = result {
+            total_bytes += doc.text.len() as u64;
+            documents.push(doc);
+        } else {
+            skipped_files += 1;
         }
     }
 
@@ -96,72 +125,137 @@ pub fn load_search_corpus(
         bail!("search path '{}' does not exist", root.display());
     }
 
-    let mut documents = Vec::new();
-    let mut total_bytes = 0_u64;
-    let mut skipped_files = 0_usize;
-
     let manifest_path = get_project_manifest_path(root)?;
     let mut manifest = Manifest::load(&manifest_path).unwrap_or_default();
     let blobs_dir = cache_dir("blobs")?;
-    let mut manifest_updated = false;
+    
+    let mut files_to_process = Vec::new();
 
     if root.is_file() {
         if let Some(ignore) = ignore {
-            if ignore.is_ignored(root) {
-                return Ok(LoadedCorpus {
-                    documents: Vec::new(),
-                    total_bytes: 0,
-                    indexed_files: 0,
-                    skipped_files: 0,
-                });
+            if !ignore.is_ignored(root) {
+                files_to_process.push(root.to_path_buf());
             }
+        } else {
+            files_to_process.push(root.to_path_buf());
         }
-        collect_search_file_cached(
-            root,
-            &blobs_dir,
-            &mut manifest,
-            &mut manifest_updated,
-            &mut documents,
-            &mut total_bytes,
-            &mut skipped_files,
-            verbose,
-            dense,
-        );
     } else if root.is_dir() {
         let walk_start = std::time::Instant::now();
         for entry in WalkDir::new(root).sort_by_file_name() {
-            match entry {
-                Ok(entry) => {
-                    if let Some(ignore) = ignore {
-                        if ignore.is_ignored(entry.path()) {
-                            continue;
-                        }
-                    }
-
-                    if entry.file_type().is_file() {
-                        collect_search_file_cached(
-                            entry.path(),
-                            &blobs_dir,
-                            &mut manifest,
-                            &mut manifest_updated,
-                            &mut documents,
-                            &mut total_bytes,
-                            &mut skipped_files,
-                            verbose,
-                            dense,
-                        );
+            if let Ok(entry) = entry {
+                if let Some(ignore) = ignore {
+                    if ignore.is_ignored(entry.path()) {
+                        continue;
                     }
                 }
-                Err(_) => skipped_files += 1,
+                if entry.file_type().is_file() {
+                    files_to_process.push(entry.path().to_path_buf());
+                }
             }
         }
-        crate::trace!(2, verbose, "    directory walk and load took: {:.2?}", walk_start.elapsed());
+        crate::trace!(2, verbose, "    directory walk found {} files in {:.2?}", files_to_process.len(), walk_start.elapsed());
     } else {
         bail!(
             "search path '{}' is neither a regular file nor directory",
             root.display()
         );
     }
+
+    use rayon::prelude::*;
+
+    enum ProcessResult {
+        Hit(Document),
+        HashHit(Document, PathBuf, crate::cache::CacheEntry, String),
+        Miss(Document, PathBuf, crate::cache::CacheEntry, String),
+        Skip,
+    }
+
+    let process_start = std::time::Instant::now();
+    let results: Vec<ProcessResult> = files_to_process
+        .into_par_iter()
+        .map(|path| {
+            let Ok(heuristics) = get_file_heuristics(&path) else {
+                return ProcessResult::Skip;
+            };
+
+            // Fast path: heuristics match manifest
+            if let Some(hash) = manifest.check_heuristics(&path, &heuristics) {
+                if let Ok(mut doc) = load_blob(&blobs_dir, &hash) {
+                    crate::trace!(3, verbose, "      cache hit (heuristic): {}", path.display());
+                    doc.id = path.display().to_string();
+                    doc.path = path.to_path_buf();
+                    return ProcessResult::Hit(doc);
+                }
+            }
+
+            // Medium path: compute blake3 and check global blob store
+            if let Ok(hash) = hash_file(&path) {
+                if let Ok(mut doc) = load_blob(&blobs_dir, &hash) {
+                    crate::trace!(3, verbose, "      cache hit (hash): {}", path.display());
+                    doc.id = path.display().to_string();
+                    doc.path = path.to_path_buf();
+                    return ProcessResult::HashHit(doc, path, heuristics, hash);
+                }
+
+                // Slow path: True miss, must extract and embed
+                crate::trace!(3, verbose, "      cache miss: {}", path.display());
+                if let Ok(Some(extracted)) = extract_path(&path) {
+                    let id = path.display().to_string();
+                    let mut doc = index_document(id, path.clone(), extracted);
+                    
+                    if let Some(dense) = dense {
+                        let texts: Vec<_> = doc.segments.iter().map(|s| s.text.clone()).collect();
+                        if let Ok(embeddings) = dense.embed_batch(&texts) {
+                            for (i, embedding) in embeddings.into_iter().enumerate() {
+                                doc.segments[i].embedding = Some(embedding);
+                            }
+                        }
+                    }
+
+                    if save_blob(&blobs_dir, &hash, &doc).is_ok() {
+                        return ProcessResult::Miss(doc, path, heuristics, hash);
+                    } else {
+                        return ProcessResult::Hit(doc); // Still return it even if save failed
+                    }
+                } else {
+                    return ProcessResult::Skip;
+                }
+            } else {
+                return ProcessResult::Skip;
+            }
+        })
+        .collect();
+
+    let mut documents = Vec::new();
+    let mut total_bytes = 0_u64;
+    let mut skipped_files = 0_usize;
+    let mut manifest_updated = false;
+
+    for result in results {
+        match result {
+            ProcessResult::Hit(doc) => {
+                total_bytes += doc.text.len() as u64;
+                documents.push(doc);
+            }
+            ProcessResult::HashHit(doc, path, heuristics, hash) => {
+                manifest.update(path, heuristics, hash);
+                manifest_updated = true;
+                total_bytes += doc.text.len() as u64;
+                documents.push(doc);
+            }
+            ProcessResult::Miss(doc, path, heuristics, hash) => {
+                manifest.update(path, heuristics, hash);
+                manifest_updated = true;
+                total_bytes += doc.text.len() as u64;
+                documents.push(doc);
+            }
+            ProcessResult::Skip => {
+                skipped_files += 1;
+            }
+        }
+    }
+
+    crate::trace!(2, verbose, "    parallel processing took: {:.2?}", process_start.elapsed());
 
     if manifest_updated {
         let save_start = std::time::Instant::now();
@@ -180,106 +274,9 @@ pub fn load_search_corpus(
     })
 }
 
-fn collect_search_file_cached(
-    path: &Path,
-    blobs_dir: &Path,
-    manifest: &mut Manifest,
-    manifest_updated: &mut bool,
-    documents: &mut Vec<Document>,
-    total_bytes: &mut u64,
-    skipped_files: &mut usize,
-    verbose: u8,
-    dense: Option<&DenseReranker>,
-) {
-    let Ok(heuristics) = get_file_heuristics(path) else {
-        *skipped_files += 1;
-        return;
-    };
 
-    // Fast path: heuristics match manifest
-    if let Some(hash) = manifest.check_heuristics(path, &heuristics) {
-        if let Ok(mut doc) = load_blob(blobs_dir, &hash) {
-            crate::trace!(2, verbose, "    cache hit (heuristic): {}", path.display());
-            // Update document ID to match current path, just in case file moved
-            doc.id = path.display().to_string();
-            doc.path = path.to_path_buf();
-            *total_bytes += doc.text.len() as u64;
-            documents.push(doc);
-            return;
-        }
-    }
 
-    // Medium path: compute blake3 and check global blob store
-    if let Ok(hash) = hash_file(path) {
-        if let Ok(mut doc) = load_blob(blobs_dir, &hash) {
-            crate::trace!(2, verbose, "    cache hit (hash): {}", path.display());
-            manifest.update(path.to_path_buf(), heuristics, hash);
-            *manifest_updated = true;
-            
-            doc.id = path.display().to_string();
-            doc.path = path.to_path_buf();
-            *total_bytes += doc.text.len() as u64;
-            documents.push(doc);
-            return;
-        }
 
-        // Slow path: True miss, must extract and (later) embed
-        crate::trace!(2, verbose, "    cache miss: {}", path.display());
-        if let Ok(Some(extracted)) = extract_path(path) {
-            let id = path.display().to_string();
-            let mut doc = index_document(id, path.to_path_buf(), extracted);
-            
-            // NEW: Compute embeddings for segments if model is provided
-            if let Some(dense) = dense {
-                let texts: Vec<_> = doc.segments.iter().map(|s| s.text.clone()).collect();
-                if let Ok(embeddings) = dense.embed_batch(&texts) {
-                    for (i, embedding) in embeddings.into_iter().enumerate() {
-                        doc.segments[i].embedding = Some(embedding);
-                    }
-                }
-            }
-
-            // Pre-warm the cache.
-            if save_blob(blobs_dir, &hash, &doc).is_ok() {
-                manifest.update(path.to_path_buf(), heuristics, hash);
-                *manifest_updated = true;
-            }
-
-            *total_bytes += doc.text.len() as u64;
-            documents.push(doc);
-        } else {
-            *skipped_files += 1;
-        }
-    } else {
-        *skipped_files += 1;
-    }
-}
-
-fn collect_materialized_file(
-    path: &Path,
-    documents: &mut Vec<Document>,
-    total_bytes: &mut u64,
-    skipped_files: &mut usize,
-) {
-    let extracted = match extract_path(path) {
-        Ok(Some(extracted)) => extracted,
-        Ok(None) | Err(_) => {
-            *skipped_files += 1;
-            return;
-        }
-    };
-
-    let id = match path.file_stem().and_then(|stem| stem.to_str()) {
-        Some(id) => id.to_string(),
-        None => {
-            *skipped_files += 1;
-            return;
-        }
-    };
-
-    *total_bytes += extracted.text.len() as u64;
-    documents.push(index_document(id, path.to_path_buf(), extracted));
-}
 
 fn index_document(
     id: String,

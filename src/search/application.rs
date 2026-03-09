@@ -97,6 +97,22 @@ impl StrategyPresetRegistry {
             },
         );
 
+        // page-index-llm (lexical + vector + llm reranking)
+        registry.register(
+            "page-index-llm",
+            SearchPlan {
+                name: "page-index-llm".to_string(),
+                query_expansion: QueryExpansionPolicy::None,
+                retrievers: vec![
+                    RetrieverPolicy::Bm25,
+                    RetrieverPolicy::Phrase,
+                    RetrieverPolicy::Vector,
+                ],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::Llm,
+            },
+        );
+
         registry
     }
 
@@ -215,6 +231,92 @@ impl SearchService {
     }
 }
 
+pub struct SearchEnvironment<'a> {
+    pub service: SearchService,
+    pub plan: SearchPlan,
+    pub corpus: &'a LoadedCorpus,
+    pub prepared: PreparedCorpus<'a>,
+}
+
+impl<'a> SearchEnvironment<'a> {
+    pub fn new(
+        request: &SearchRequest,
+        corpus: &'a LoadedCorpus,
+        index: &'a Bm25Index,
+        dense: Option<std::sync::Arc<DenseReranker>>,
+    ) -> Result<Self> {
+        let mut service = SearchService::new();
+        let registry = StrategyPresetRegistry::default_registry();
+        let mut plan = registry.resolve(&request.strategy)?;
+
+        // Apply overrides from SearchRequest
+        if let Some(retrievers) = &request.retrievers {
+            plan.retrievers = retrievers.clone();
+        }
+        if let Some(fusion) = request.fusion {
+            plan.fusion = fusion;
+        }
+        if let Some(reranking) = request.reranking {
+            plan.reranking = reranking;
+        }
+
+        service.register_retriever(Box::new(Bm25Retriever));
+        service.register_retriever(Box::new(PhraseRetriever));
+        if let Some(dense) = dense {
+            service.register_retriever(Box::new(SegmentVectorRetriever { dense }));
+        }
+
+        service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
+        service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
+        service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
+        service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
+        service.register_reranker(RerankingPolicy::PositionAware, Box::new(PositionAwareReranker));
+        service.register_reranker(RerankingPolicy::Llm, Box::new(MockLlmReranker));
+
+        Ok(Self {
+            service,
+            plan,
+            corpus,
+            prepared: PreparedCorpus {
+                documents: &corpus.documents,
+                bm25_index: Some(index),
+            },
+        })
+    }
+
+    pub fn search(&self, query: &str, limit: usize, verbose: u8) -> Result<SearchResponse> {
+        let candidates = self.service.execute(&self.plan, query, &self.prepared, limit, verbose)?;
+
+        let results = candidates
+            .results
+            .into_iter()
+            .enumerate()
+            .map(|(index, result)| {
+                let mut path = result.path.display().to_string();
+                if path.starts_with("./") {
+                    path = path.chars().skip(2).collect();
+                }
+                SearchHit {
+                    path,
+                    rank: index + 1,
+                    score: result.score,
+                    confidence: self.plan.categorize_score(result.score),
+                    location: result.snippet_location.clone(),
+                    snippet: resolve_snippet_from_candidate(self.corpus, &result, query),
+                }
+            })
+            .collect();
+
+        Ok(SearchResponse {
+            strategy: self.plan.name.clone(),
+            root: String::new(), // Populated by caller
+            indexed_files: self.corpus.indexed_files,
+            skipped_files: self.corpus.skipped_files,
+            results,
+        })
+    }
+}
+
 pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<SearchResponse> {
     let mut service = SearchService::new();
     let verbose = request.verbose;
@@ -244,12 +346,12 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
     let mut dense_for_load = None;
     if plan.retrievers.contains(&RetrieverPolicy::Vector) {
         let model_start = std::time::Instant::now();
-        let dense = DenseReranker::load(request.dense_model.clone())?;
+        let dense = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
         crate::trace!(1, verbose, "→ dense model loaded in {:.2?}", model_start.elapsed());
         dense_for_load = Some(dense);
     }
 
-    let corpus = load_search_corpus(&request.path, ignore, verbose, dense_for_load.as_ref())?;
+    let corpus = load_search_corpus(&request.path, ignore, verbose, dense_for_load.as_deref())?;
     crate::trace!(1, verbose, "→ corpus loaded ({} files) in {:.2?}", corpus.indexed_files, corpus_start.elapsed());
 
     if let Some(dense) = dense_for_load {
@@ -261,6 +363,7 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
     service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
     service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
     service.register_reranker(RerankingPolicy::PositionAware, Box::new(PositionAwareReranker));
+    service.register_reranker(RerankingPolicy::Llm, Box::new(MockLlmReranker));
 
     let index_start = std::time::Instant::now();
     let index = Bm25Index::build(&corpus.documents);

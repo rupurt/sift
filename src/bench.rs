@@ -8,8 +8,8 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::config::Ignore;
-use crate::dense::DenseModelSpec;
-use crate::search::{LoadedCorpus, SearchRequest, load_materialized_corpus, run_search};
+use crate::dense::{DenseModelSpec, DenseReranker};
+use crate::search::{LoadedCorpus, SearchRequest, load_search_corpus};
 use crate::system::{HardwareSummary, current_git_sha, detect_hardware_summary};
 
 const LATENCY_TARGET_MS: f64 = 200.0;
@@ -109,7 +109,9 @@ pub fn run_quality_benchmark(
     ignore: Option<&Ignore>,
 ) -> Result<QualityBenchmarkReport> {
     let prepare_started = Instant::now();
-    let corpus = load_materialized_corpus(&request.corpus_dir, ignore)?;
+    let dense_for_load = DenseReranker::load(request.dense_model.clone()).ok().map(std::sync::Arc::new);
+    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, dense_for_load.as_deref())?;
+    let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
         .clone()
@@ -119,17 +121,32 @@ pub fn run_quality_benchmark(
     let _prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
 
     let registry = crate::search::StrategyPresetRegistry::default_registry();
-    let plan = registry.resolve(&request.strategy)?;
+    let champion_plan = registry.resolve("hybrid")?;
+    let champion_strategy_name = champion_plan.name.clone();
+
+    let env = crate::search::SearchEnvironment::new(
+        &SearchRequest {
+            strategy: request.strategy.clone(),
+            query: String::new(),
+            path: request.corpus_dir.clone(),
+            limit: request.shortlist,
+            shortlist: request.shortlist,
+            dense_model: request.dense_model.clone(),
+            verbose: request.verbose,
+            retrievers: None,
+            fusion: None,
+            reranking: None,
+        },
+        &corpus,
+        &index,
+        dense_for_load.clone(),
+    )?;
 
     let metrics = evaluate_quality(
-        &request.corpus_dir,
         &queries,
         &qrels,
-        &request.strategy,
-        request.shortlist,
-        &request.dense_model,
+        &env,
         request.verbose,
-        ignore,
     )?;
 
     let baseline_strategy = request
@@ -137,34 +154,57 @@ pub fn run_quality_benchmark(
         .clone()
         .or_else(|| Some("bm25".to_string()));
     let baseline_metrics = match &baseline_strategy {
-        Some(strategy) => Some(evaluate_quality(
-            &request.corpus_dir,
-            &queries,
-            &qrels,
-            strategy,
-            request.shortlist,
-            &request.dense_model,
-            request.verbose,
-            ignore,
-        )?),
+        Some(strategy) => {
+            let baseline_env = crate::search::SearchEnvironment::new(
+                &SearchRequest {
+                    strategy: strategy.clone(),
+                    query: String::new(),
+                    path: request.corpus_dir.clone(),
+                    limit: request.shortlist,
+                    shortlist: request.shortlist,
+                    dense_model: request.dense_model.clone(),
+                    verbose: request.verbose,
+                    retrievers: None,
+                    fusion: None,
+                    reranking: None,
+                },
+                &corpus,
+                &index,
+                dense_for_load.clone(),
+            )?;
+            Some(evaluate_quality(
+                &queries,
+                &qrels,
+                &baseline_env,
+                request.verbose,
+            )?)
+        },
         None => None,
     };
 
-    // Resolving "hybrid" gives us the champion plan
-    let champion_plan = registry.resolve("hybrid")?;
-    let champion_strategy_name = champion_plan.name.clone();
-    let champion_strategy = Some(champion_strategy_name.clone());
-
     let champion_metrics = if champion_strategy_name != request.strategy {
+        let champion_env = crate::search::SearchEnvironment::new(
+            &SearchRequest {
+                strategy: champion_strategy_name.clone(),
+                query: String::new(),
+                path: request.corpus_dir.clone(),
+                limit: request.shortlist,
+                shortlist: request.shortlist,
+                dense_model: request.dense_model.clone(),
+                verbose: request.verbose,
+                retrievers: None,
+                fusion: None,
+                reranking: None,
+            },
+            &corpus,
+            &index,
+            dense_for_load,
+        )?;
         Some(evaluate_quality(
-            &request.corpus_dir,
             &queries,
             &qrels,
-            &champion_strategy_name,
-            request.shortlist,
-            &request.dense_model,
+            &champion_env,
             request.verbose,
-            ignore,
         )?)
     } else {
         Some(metrics.clone())
@@ -177,9 +217,9 @@ pub fn run_quality_benchmark(
     Ok(QualityBenchmarkReport {
         metadata: build_metadata(
             &request.strategy,
-            plan,
+            env.plan.clone(),
             baseline_strategy,
-            champion_strategy,
+            Some(champion_strategy_name),
             &request.command,
             &corpus,
             Some(&request.dense_model),
@@ -196,7 +236,9 @@ pub fn run_latency_benchmark(
     ignore: Option<&Ignore>,
 ) -> Result<LatencyBenchmarkReport> {
     let prepare_started = Instant::now();
-    let corpus = load_materialized_corpus(&request.corpus_dir, ignore)?;
+    let dense_for_load = DenseReranker::load(request.dense_model.clone()).ok().map(std::sync::Arc::new);
+    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, dense_for_load.as_deref())?;
+    let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries = load_queries(&request.queries_path)?;
     let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
 
@@ -204,29 +246,38 @@ pub fn run_latency_benchmark(
         bail!("latency benchmark requires at least one query");
     }
 
-    let registry = crate::search::StrategyPresetRegistry::default_registry();
-    let plan = registry.resolve(&request.strategy)?;
+    let env = crate::search::SearchEnvironment::new(
+        &SearchRequest {
+            strategy: request.strategy.clone(),
+            query: String::new(),
+            path: request.corpus_dir.clone(),
+            limit: 10,
+            shortlist: request.shortlist,
+            dense_model: request.dense_model.clone(),
+            verbose: request.verbose,
+            retrievers: None,
+            fusion: None,
+            reranking: None,
+        },
+        &corpus,
+        &index,
+        dense_for_load,
+    )?;
 
-    let mut timings = Vec::with_capacity(queries.len());
-    for query_text in queries.values() {
-        let started = Instant::now();
-        let _ = run_search(
-            &SearchRequest {
-                strategy: request.strategy.clone(),
-                query: query_text.clone(),
-                path: request.corpus_dir.clone(),
-                limit: 10,
-                shortlist: request.shortlist,
-                dense_model: request.dense_model.clone(),
-                verbose: request.verbose,
-                retrievers: None,
-                fusion: None,
-                reranking: None,
-            },
-            ignore,
-        )?;
-        timings.push(started.elapsed().as_secs_f64() * 1000.0);
-    }
+    use rayon::prelude::*;
+
+    let timings_result: Result<Vec<f64>> = queries
+        .values()
+        .collect::<Vec<_>>()
+        .into_par_iter()
+        .map(|query_text| {
+            let started = Instant::now();
+            let _ = env.search(query_text, 10, request.verbose)?;
+            Ok(started.elapsed().as_secs_f64() * 1000.0)
+        })
+        .collect();
+
+    let mut timings = timings_result?;
 
     timings.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
     let p50_ms = percentile(&timings, 0.50);
@@ -236,7 +287,7 @@ pub fn run_latency_benchmark(
     Ok(LatencyBenchmarkReport {
         metadata: build_metadata(
             &request.strategy,
-            plan,
+            env.plan.clone(),
             None,
             None,
             &request.command,
@@ -265,54 +316,63 @@ pub fn run_comparative_benchmark(
     let mut results = Vec::new();
     let mut metadata = Vec::new();
 
-    // Prepare shared state for latency
-    let corpus = load_materialized_corpus(&request.corpus_dir, ignore)?;
+    let prepare_started = Instant::now();
+    let dense_for_load = DenseReranker::load(request.dense_model.clone()).ok().map(std::sync::Arc::new);
+    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, dense_for_load.as_deref())?;
+    let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
         .clone()
         .unwrap_or_else(|| request.corpus_dir.join("test-queries.tsv"));
     let queries = load_queries(&queries_path)?;
     let qrels = load_qrels(&request.qrels_path)?;
+    let _prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
 
     for name in names {
-        let plan = registry.resolve(&name)?;
+        let env = crate::search::SearchEnvironment::new(
+            &SearchRequest {
+                strategy: name.clone(),
+                query: String::new(),
+                path: request.corpus_dir.clone(),
+                limit: request.shortlist,
+                shortlist: request.shortlist,
+                dense_model: request.dense_model.clone(),
+                verbose: request.verbose,
+                retrievers: None,
+                fusion: None,
+                reranking: None,
+            },
+            &corpus,
+            &index,
+            dense_for_load.clone(),
+        )?;
 
         // Quality
         let quality = evaluate_quality(
-            &request.corpus_dir,
             &queries,
             &qrels,
-            &name,
-            request.shortlist,
-            &request.dense_model,
+            &env,
             request.verbose,
-            ignore,
         )?;
 
         // Latency
         let prepare_started = Instant::now();
         let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
 
-        let mut timings = Vec::with_capacity(queries.len());
-        for query_text in queries.values() {
-            let started = Instant::now();
-            let _ = run_search(
-                &SearchRequest {
-                    strategy: name.clone(),
-                    query: query_text.clone(),
-                    path: request.corpus_dir.clone(),
-                    limit: 10,
-                    shortlist: request.shortlist,
-                    dense_model: request.dense_model.clone(),
-                    verbose: request.verbose,
-                    retrievers: None,
-                    fusion: None,
-                    reranking: None,
-                },
-                ignore,
-            )?;
-            timings.push(started.elapsed().as_secs_f64() * 1000.0);
-        }
+        use rayon::prelude::*;
+
+        let timings_result: Result<Vec<f64>> = queries
+            .values()
+            .collect::<Vec<_>>()
+            .into_par_iter()
+            .map(|query_text| {
+                let started = Instant::now();
+                let _ = env.search(query_text, 10, request.verbose)?;
+                Ok(started.elapsed().as_secs_f64() * 1000.0)
+            })
+            .collect();
+
+        let mut timings = timings_result?;
         timings.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
 
         let latency = LatencyMetrics {
@@ -334,7 +394,7 @@ pub fn run_comparative_benchmark(
 
         metadata.push(build_metadata(
             &name,
-            plan,
+            env.plan.clone(),
             None,
             None,
             &request.command,
@@ -463,67 +523,58 @@ fn build_metadata(
 }
 
 fn evaluate_quality(
-    corpus_dir: &Path,
     queries: &HashMap<String, String>,
     qrels: &HashMap<String, HashMap<String, u32>>,
-    strategy: &str,
-    shortlist: usize,
-    dense_model: &DenseModelSpec,
+    env: &crate::search::SearchEnvironment,
     verbose: u8,
-    ignore: Option<&Ignore>,
 ) -> Result<QualityMetrics> {
-    let mut ndcg_total = 0.0;
-    let mut mrr_total = 0.0;
-    let mut recall_total = 0.0;
-    let mut counted_queries = 0_usize;
+    use rayon::prelude::*;
 
-    for (query_id, relevances) in qrels {
-        let query_text = queries
-            .get(query_id)
-            .with_context(|| format!("missing query text for qrels query-id '{query_id}'"))?;
+    let results: Result<Vec<(f64, f64, f64)>> = qrels
+        .par_iter()
+        .map(|(query_id, relevances)| {
+            let query_text = queries
+                .get(query_id)
+                .with_context(|| format!("missing query text for qrels query-id '{query_id}'"))?;
 
-        let response = run_search(
-            &SearchRequest {
-                strategy: strategy.to_string(),
-                query: query_text.clone(),
-                path: corpus_dir.to_path_buf(),
-                limit: 10,
-                shortlist,
-                dense_model: dense_model.clone(),
-                verbose,
-                retrievers: None,
-                fusion: None,
-                reranking: None,
-            },
-            ignore,
-        )?;
+            let response = env.search(query_text, 10, verbose)?;
 
-        // Map SearchHit to something we can use for metrics
-        // We need the ID, which is not currently in SearchHit.
-        // Wait, SearchHit.path is used as ID in some places or we need a way to get ID.
-        // In materialized corpus, ID is the file stem.
+            let ranked_ids: Vec<String> = response
+                .results
+                .iter()
+                .map(|hit| {
+                    Path::new(&hit.path)
+                        .file_stem()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string()
+                })
+                .collect();
 
-        let ranked_ids: Vec<String> = response
-            .results
-            .iter()
-            .map(|hit| {
-                Path::new(&hit.path)
-                    .file_stem()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_string()
-            })
-            .collect();
+            Ok((
+                ndcg_at_10(&ranked_ids, relevances),
+                mrr_at_10(&ranked_ids, relevances),
+                recall_at_10(&ranked_ids, relevances),
+            ))
+        })
+        .collect();
 
-        ndcg_total += ndcg_at_10(&ranked_ids, relevances);
-        mrr_total += mrr_at_10(&ranked_ids, relevances);
-        recall_total += recall_at_10(&ranked_ids, relevances);
-        counted_queries += 1;
-    }
+    let metrics_list = results?;
+    let counted_queries = metrics_list.len();
 
     if counted_queries == 0 {
         bail!("quality benchmark requires at least one qrels row");
+    }
+
+    let mut ndcg_total = 0.0;
+    let mut mrr_total = 0.0;
+    let mut recall_total = 0.0;
+
+    for (ndcg, mrr, recall) in metrics_list {
+        ndcg_total += ndcg;
+        mrr_total += mrr;
+        recall_total += recall;
     }
 
     Ok(QualityMetrics {

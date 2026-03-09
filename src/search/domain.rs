@@ -390,6 +390,7 @@ pub enum FusionPolicy {
 pub enum RerankingPolicy {
     None,
     PositionAware,
+    Llm,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -429,7 +430,7 @@ pub struct PreparedCorpus<'a> {
     pub bm25_index: Option<&'a Bm25Index>,
 }
 
-pub trait Retriever {
+pub trait Retriever: Send + Sync {
     fn retrieve(
         &self,
         query_variants: &[QueryVariant],
@@ -440,15 +441,15 @@ pub trait Retriever {
     fn policy(&self) -> RetrieverPolicy;
 }
 
-pub trait Fuser {
+pub trait Fuser: Send + Sync {
     fn fuse(&self, candidate_lists: &[CandidateList], limit: usize, verbose: u8) -> Result<CandidateList>;
 }
 
-pub trait Expander {
+pub trait Expander: Send + Sync {
     fn expand(&self, query: &str) -> Vec<QueryVariant>;
 }
 
-pub trait Reranker {
+pub trait Reranker: Send + Sync {
     fn rerank(&self, query: &str, candidates: CandidateList, limit: usize)
     -> Result<CandidateList>;
 }
