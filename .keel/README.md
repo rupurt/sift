@@ -9,6 +9,7 @@
 |---------|--------|--------|------------|------|
 | [Raw Document Retrieval Architecture Research](bearings/1vzJVa000/) | laid | ✓ | ✓ | ✓ |
 | [Rich Document Extraction Support](bearings/1vzMXf000/) | laid | ✓ | ✓ | ✓ |
+| [True Hybrid Retrieval Architecture](bearings/1vzSne000/) | laid | ✓ | ✓ | ✓ |
 
 ## Epics
 
@@ -35,4 +36,10 @@
 | Voyage | Status |
 |--------|--------|
 | [Implement Rich Document Extractors](epics/1vzMXf000/voyages/1vzMd0000/) | done |
+
+### [True Hybrid Retrieval Architecture](epics/1vzSne000/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Structure-Aware True Hybrid Retrieval](epics/1vzSne000/voyages/1vzSy6000/) | planned |
 
