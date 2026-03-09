@@ -64,6 +64,16 @@ pub struct SearchConfig {
     pub shortlist: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModelConfig {
+    #[serde(default = "default_model_id")]
+    pub model_id: String,
+    #[serde(default = "default_model_revision")]
+    pub model_revision: String,
+    #[serde(default = "default_max_length")]
+    pub max_length: usize,
+}
+
 fn default_strategy() -> String {
     "hybrid".to_string()
 }
@@ -72,6 +82,15 @@ fn default_limit() -> usize {
 }
 fn default_shortlist() -> usize {
     8
+}
+fn default_model_id() -> String {
+    crate::dense::DEFAULT_MODEL_ID.to_string()
+}
+fn default_model_revision() -> String {
+    crate::dense::DEFAULT_MODEL_REVISION.to_string()
+}
+fn default_max_length() -> usize {
+    crate::dense::DEFAULT_MAX_LENGTH
 }
 
 impl Default for SearchConfig {
@@ -84,19 +103,12 @@ impl Default for SearchConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelConfig {
-    pub model_id: Option<String>,
-    pub model_revision: Option<String>,
-    pub max_length: Option<usize>,
-}
-
 impl Default for ModelConfig {
     fn default() -> Self {
         Self {
-            model_id: None,
-            model_revision: None,
-            max_length: None,
+            model_id: default_model_id(),
+            model_revision: default_model_revision(),
+            max_length: default_max_length(),
         }
     }
 }
@@ -193,14 +205,14 @@ impl Config {
         }
 
         if let Some(model) = partial.model {
-            if model.model_id.is_some() {
-                self.model.model_id = model.model_id;
+            if let Some(model_id) = model.model_id {
+                self.model.model_id = model_id;
             }
-            if model.model_revision.is_some() {
-                self.model.model_revision = model.model_revision;
+            if let Some(model_revision) = model.model_revision {
+                self.model.model_revision = model_revision;
             }
-            if model.max_length.is_some() {
-                self.model.max_length = model.max_length;
+            if let Some(max_length) = model.max_length {
+                self.model.max_length = max_length;
             }
         }
 

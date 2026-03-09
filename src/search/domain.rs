@@ -383,6 +383,7 @@ pub enum FusionPolicy {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RerankingPolicy {
     None,
+    PositionAware,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

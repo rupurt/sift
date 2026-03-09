@@ -34,6 +34,8 @@
           rust
           pkgs.just
           pkgs.cargo-nextest
+          pkgs.xz
+          pkgs.zlib
           keelPkg
         ];
 

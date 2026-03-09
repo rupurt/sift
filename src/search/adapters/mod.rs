@@ -291,6 +291,66 @@ impl Reranker for NoReranker {
     }
 }
 
+pub struct PositionAwareReranker;
+
+impl Reranker for PositionAwareReranker {
+    fn rerank(
+        &self,
+        query: &str,
+        mut candidates: CandidateList,
+        limit: usize,
+    ) -> Result<CandidateList> {
+        let query_terms = super::domain::tokenize(query);
+        if query_terms.is_empty() {
+            return Ok(candidates);
+        }
+
+        for candidate in &mut candidates.results {
+            let mut bonus = 0.0;
+
+            // 1. Filename Bonus
+            let filename = candidate
+                .path
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            
+            for term in &query_terms {
+                if filename.contains(term) {
+                    bonus += 0.05;
+                    break; // Only one filename bonus
+                }
+            }
+
+            // 2. Heading (Location) Bonus
+            if let Some(location) = &candidate.snippet_location {
+                let location_lower = location.to_lowercase();
+                for term in &query_terms {
+                    if location_lower.contains(term) {
+                        bonus += 0.02;
+                        break; // Only one location bonus
+                    }
+                }
+            }
+
+            candidate.score += bonus;
+        }
+
+        // Re-sort after applying bonuses
+        candidates.results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+
+        Ok(CandidateList {
+            results: candidates.results.into_iter().take(limit).collect(),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

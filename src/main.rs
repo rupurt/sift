@@ -248,9 +248,9 @@ fn main() -> Result<()> {
                         qrels_path: qrels,
                         shortlist,
                         dense_model: DenseModelSpec::with_overrides(
-                            model_id.or_else(|| config.model.model_id.clone()),
-                            model_revision.or_else(|| config.model.model_revision.clone()),
-                            max_length.or(config.model.max_length),
+                            model_id.clone().or(Some(config.model.model_id.clone())),
+                            model_revision.clone().or(Some(config.model.model_revision.clone())),
+                            max_length.or(Some(config.model.max_length)),
                         ),
                     },
                     Some(&ignore),
@@ -285,9 +285,9 @@ fn main() -> Result<()> {
                         qrels_path: qrels,
                         shortlist,
                         dense_model: DenseModelSpec::with_overrides(
-                            model_id.or_else(|| config.model.model_id.clone()),
-                            model_revision.or_else(|| config.model.model_revision.clone()),
-                            max_length.or(config.model.max_length),
+                            model_id.clone().or(Some(config.model.model_id.clone())),
+                            model_revision.clone().or(Some(config.model.model_revision.clone())),
+                            max_length.or(Some(config.model.max_length)),
                         ),
                     },
                     Some(&ignore),
@@ -313,9 +313,9 @@ fn main() -> Result<()> {
                         queries_path: queries,
                         shortlist,
                         dense_model: DenseModelSpec::with_overrides(
-                            model_id.or_else(|| config.model.model_id.clone()),
-                            model_revision.or_else(|| config.model.model_revision.clone()),
-                            max_length.or(config.model.max_length),
+                            model_id.clone().or(Some(config.model.model_id.clone())),
+                            model_revision.clone().or(Some(config.model.model_revision.clone())),
+                            max_length.or(Some(config.model.max_length)),
                         ),
                     },
                     Some(&ignore),
@@ -343,11 +343,12 @@ fn main() -> Result<()> {
                     limit,
                     shortlist,
                     dense_model: DenseModelSpec::with_overrides(
-                        search.model_id.or_else(|| config.model.model_id.clone()),
+                        search.model_id.clone().or(Some(config.model.model_id.clone())),
                         search
                             .model_revision
-                            .or_else(|| config.model.model_revision.clone()),
-                        search.max_length.or(config.model.max_length),
+                            .clone()
+                            .or(Some(config.model.model_revision.clone())),
+                        search.max_length.or(Some(config.model.max_length)),
                     ),
                     verbose: search.verbose,
                 },

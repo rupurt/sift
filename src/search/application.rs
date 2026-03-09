@@ -66,7 +66,7 @@ impl StrategyPresetRegistry {
                     RetrieverPolicy::SegmentVector,
                 ],
                 fusion: FusionPolicy::Rrf,
-                reranking: RerankingPolicy::None,
+                reranking: RerankingPolicy::PositionAware,
             },
         );
 
@@ -222,6 +222,7 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
     service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
     service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
     service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
+    service.register_reranker(RerankingPolicy::PositionAware, Box::new(PositionAwareReranker));
 
     let index_start = std::time::Instant::now();
     let index = Bm25Index::build(&corpus.documents);
