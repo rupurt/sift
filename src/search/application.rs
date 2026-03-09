@@ -237,12 +237,19 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
         .results
         .into_iter()
         .enumerate()
-        .map(|(index, result)| SearchHit {
-            path: result.path.display().to_string(),
-            rank: index + 1,
-            score: result.score,
-            location: result.snippet_location.clone(),
-            snippet: resolve_snippet_from_candidate(&corpus, &result, &request.query),
+        .map(|(index, result)| {
+            let mut path = result.path.display().to_string();
+            if path.starts_with("./") {
+                path = path.chars().skip(2).collect();
+            }
+            SearchHit {
+                path,
+                rank: index + 1,
+                score: result.score,
+                confidence: plan.categorize_score(result.score),
+                location: result.snippet_location.clone(),
+                snippet: resolve_snippet_from_candidate(&corpus, &result, &request.query),
+            }
         })
         .collect();
 

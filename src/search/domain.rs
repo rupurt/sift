@@ -52,11 +52,19 @@ pub struct SearchResponse {
     pub results: Vec<SearchHit>,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ScoreConfidence {
+    High,
+    Medium,
+    Low,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SearchHit {
     pub path: String,
     pub rank: usize,
     pub score: f64,
+    pub confidence: ScoreConfidence,
     pub location: Option<String>,
     pub snippet: String,
 }
@@ -331,6 +339,27 @@ pub struct SearchPlan {
     pub retrievers: Vec<RetrieverPolicy>,
     pub fusion: FusionPolicy,
     pub reranking: RerankingPolicy,
+}
+
+impl SearchPlan {
+    pub fn categorize_score(&self, score: f64) -> ScoreConfidence {
+        // RRF_K is constant at 60.0 currently.
+        // Max score per retriever is 1 / (60 + 1) ~= 0.01639.
+        let max_possible = self.retrievers.len() as f64 / 61.0;
+        if max_possible == 0.0 {
+            return ScoreConfidence::Low;
+        }
+
+        let normalized = score / max_possible;
+
+        if normalized > 0.7 {
+            ScoreConfidence::High
+        } else if normalized > 0.3 {
+            ScoreConfidence::Medium
+        } else {
+            ScoreConfidence::Low
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

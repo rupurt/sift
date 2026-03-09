@@ -13,7 +13,11 @@ pub fn render_search_response(response: &SearchResponse, format: OutputFormat) -
 fn render_text_response(response: &SearchResponse) -> Result<String> {
     let mut output = String::new();
     writeln!(&mut output, "strategy: {}", response.strategy)?;
-    writeln!(&mut output, "root: {}", response.root)?;
+    let mut root = response.root.clone();
+    if root.starts_with("./") {
+        root = root.chars().skip(2).collect();
+    }
+    writeln!(&mut output, "root: {}", root)?;
     writeln!(&mut output, "indexed_files: {}", response.indexed_files)?;
     writeln!(&mut output, "skipped_files: {}", response.skipped_files)?;
 
@@ -28,11 +32,20 @@ fn render_text_response(response: &SearchResponse) -> Result<String> {
     writeln!(&mut output)?;
 
     for hit in &response.results {
-        writeln!(&mut output, "{}. {}", hit.rank, hit.path)?;
+        writeln!(&mut output, "{}. \x1b[1;32m{}\x1b[0m", hit.rank, hit.path)?;
         if let Some(location) = &hit.location {
             writeln!(&mut output, "   location: \x1b[36m{}\x1b[0m", location)?;
         }
-        writeln!(&mut output, "   score: {:.4}", hit.score)?;
+        let score_color = match hit.confidence {
+            ScoreConfidence::High => "\x1b[1;32m",   // Bold Green
+            ScoreConfidence::Medium => "\x1b[1;33m", // Bold Yellow
+            ScoreConfidence::Low => "\x1b[1;31m",    // Bold Red
+        };
+        writeln!(
+            &mut output,
+            "   score: {}{:.4}\x1b[0m ({:?})",
+            score_color, hit.score, hit.confidence
+        )?;
         if !hit.snippet.is_empty() {
             writeln!(&mut output, "   snippet: {}", hit.snippet)?;
         }

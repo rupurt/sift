@@ -51,6 +51,12 @@ Located in `~/.cache/sift/blobs/`, this stores binary serialized `Document` repr
 - **Atomic Writes:** New blobs are written to a `.tmp` file and then renamed for atomicity.
 - **Global Deduplication:** Identical files across different projects only occupy a single entry in the blob store.
 
+### 3. Score Interpretation Model
+Sift uses a multi-retriever pipeline with Reciprocal Rank Fusion (RRF). Scores are interpreted based on their proximity to the theoretical maximum for a given search plan:
+- **High Confidence (Green):** The result was ranked highly across most or all retrievers.
+- **Medium Confidence (Yellow):** The result appeared in at least one retriever with a strong rank, or multiple with lower ranks.
+- **Low Confidence (Red):** The result has minimal signal across the retrievers.
+
 ## Extraction Pipeline (`src/extract.rs`, `src/segment.rs`)
 
 Files are converted into standard `Document` objects before search begins.

@@ -59,8 +59,12 @@ impl Retriever for SegmentVectorRetriever {
             .into_iter()
             .map(|s| {
                 crate::trace!(3, verbose, "      vector score: {:.4} for {}", s.score, s.path.display());
+                let mut id = s.id.clone();
+                if id.starts_with("./") {
+                    id = id.chars().skip(2).collect();
+                }
                 Candidate {
-                    id: s.id,
+                    id,
                     path: s.path,
                     score: s.score,
                     contributors: vec![ContributorScore {
@@ -165,8 +169,12 @@ impl Retriever for Bm25Retriever {
             .take(limit)
             .map(|s| {
                 crate::trace!(3, verbose, "      bm25 score: {:.4} for {}", s.score, s.path.display());
+                let mut id = s.id.clone();
+                if id.starts_with("./") {
+                    id = id.chars().skip(2).collect();
+                }
                 Candidate {
-                    id: s.id,
+                    id,
                     path: s.path,
                     score: s.score,
                     contributors: vec![ContributorScore {
@@ -200,10 +208,14 @@ impl Fuser for RrfFuser {
 
         for list in candidate_lists {
             for (index, candidate) in list.results.iter().enumerate() {
+                let mut id = candidate.id.clone();
+                if id.starts_with("./") {
+                    id = id.chars().skip(2).collect();
+                }
                 let entry = documents
-                    .entry(candidate.id.clone())
+                    .entry(id.clone())
                     .or_insert_with(|| Candidate {
-                        id: candidate.id.clone(),
+                        id,
                         path: candidate.path.clone(),
                         score: 0.0,
                         contributors: Vec::new(),

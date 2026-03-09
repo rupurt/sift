@@ -102,10 +102,14 @@ pub fn aggregate_segment_hits(hits: &[SegmentHit]) -> Vec<SemanticDocumentHit> {
     let mut documents = HashMap::<String, DocAccumulator>::new();
 
     for hit in hits {
+        let mut doc_id = hit.doc_id.clone();
+        if doc_id.starts_with("./") {
+            doc_id = doc_id.chars().skip(2).collect();
+        }
         let entry = documents
-            .entry(hit.doc_id.clone())
+            .entry(doc_id.clone())
             .or_insert_with(|| DocAccumulator {
-                id: hit.doc_id.clone(),
+                id: doc_id,
                 path: hit.path.clone(),
                 total_score: 0.0,
                 segment_hits: 0,
