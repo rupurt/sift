@@ -92,6 +92,7 @@ pub struct QualityBenchmarkRequest {
     pub shortlist: usize,
     pub dense_model: DenseModelSpec,
     pub verbose: u8,
+    pub query_limit: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -103,6 +104,7 @@ pub struct LatencyBenchmarkRequest {
     pub shortlist: usize,
     pub dense_model: DenseModelSpec,
     pub verbose: u8,
+    pub query_limit: Option<usize>,
 }
 
 pub fn run_quality_benchmark(
@@ -147,7 +149,7 @@ pub fn run_quality_benchmark(
             retrievers: None,
             fusion: None,
             reranking: None,
-            telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
+            telemetry: telemetry_for_load.clone(),
             cache_dir: None,
         },
         &corpus,
@@ -160,6 +162,7 @@ pub fn run_quality_benchmark(
         &qrels,
         &env,
         request.verbose,
+        request.query_limit,
     )?;
 
     let baseline_strategy = request
@@ -180,7 +183,7 @@ pub fn run_quality_benchmark(
                     retrievers: None,
                     fusion: None,
                     reranking: None,
-                    telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
+                    telemetry: telemetry_for_load.clone(),
                     cache_dir: None,
                 },
                 &corpus,
@@ -192,6 +195,7 @@ pub fn run_quality_benchmark(
                 &qrels,
                 &baseline_env,
                 request.verbose,
+                request.query_limit,
             )?;
             Some(m)
         },
@@ -211,7 +215,7 @@ pub fn run_quality_benchmark(
                 retrievers: None,
                 fusion: None,
                 reranking: None,
-                telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
+                telemetry: telemetry_for_load.clone(),
                 cache_dir: None,
             },
             &corpus,
@@ -223,6 +227,7 @@ pub fn run_quality_benchmark(
             &qrels,
             &champion_env,
             request.verbose,
+            request.query_limit,
         )?;
         Some(m)
     } else {
@@ -287,7 +292,7 @@ pub fn run_latency_benchmark(
             retrievers: None,
             fusion: None,
             reranking: None,
-            telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
+            telemetry: telemetry_for_load.clone(),
             cache_dir: None,
         },
         &corpus,
@@ -296,7 +301,16 @@ pub fn run_latency_benchmark(
     )?;
 
     let mut timings = Vec::with_capacity(queries.len());
-    for query_text in queries.values() {
+    let mut queries_vec: Vec<_> = queries.values().collect();
+    queries_vec.sort(); // Deterministic order
+    
+    let total_queries = if let Some(limit) = request.query_limit {
+        limit.min(queries_vec.len())
+    } else {
+        queries_vec.len()
+    };
+
+    for query_text in queries_vec.iter().take(total_queries) {
         let started = Instant::now();
         let _ = env.search(query_text, 10, request.verbose)?;
         timings.push(started.elapsed().as_secs_f64() * 1000.0)
@@ -376,7 +390,7 @@ pub fn run_comparative_benchmark(
                 retrievers: None,
                 fusion: None,
                 reranking: None,
-                telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
+                telemetry: telemetry_for_load.clone(),
                 cache_dir: None,
             },
             &corpus,
@@ -390,6 +404,7 @@ pub fn run_comparative_benchmark(
             &qrels,
             &env,
             request.verbose,
+            request.query_limit,
         )?;
 
         // Latency
@@ -397,7 +412,16 @@ pub fn run_comparative_benchmark(
         let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
 
         let mut timings = Vec::with_capacity(queries.len());
-        for query_text in queries.values() {
+        let mut queries_vec: Vec<_> = queries.values().collect();
+        queries_vec.sort();
+
+        let total_queries = if let Some(limit) = request.query_limit {
+            limit.min(queries_vec.len())
+        } else {
+            queries_vec.len()
+        };
+
+        for query_text in queries_vec.iter().take(total_queries) {
             let started = Instant::now();
             let _ = env.search(query_text, 10, request.verbose)?;
             timings.push(started.elapsed().as_secs_f64() * 1000.0);
@@ -524,7 +548,7 @@ pub fn render_comparative_report(report: &ComparativeBenchmarkReport) -> String 
 }
 
 fn get_color(value: f64, all_values: &[f64], higher_is_better: bool) -> &'static str {
-    if all_values.len() < 2 {
+    if all_values.len() < 3 {
         return "";
     }
 
@@ -547,26 +571,16 @@ fn get_color(value: f64, all_values: &[f64], higher_is_better: bool) -> &'static
         return "\x1b[1;31m"; // Bold Red
     }
 
-    // Find median value
+    // Find the actual median value from the sorted list
     let len = sorted.len();
     let median = if len % 2 == 1 {
         sorted[len / 2]
     } else {
-        // Average of two middle values
-        (sorted[len / 2 - 1] + sorted[len / 2]) / 2.0
+        // For even length, we pick one of the two middle ones to avoid "closest" ambiguity
+        sorted[len / 2]
     };
 
-    // Highlight value closest to median
-    let closest_to_median = sorted
-        .iter()
-        .min_by(|a, b| {
-            let adiff = (*a - median).abs();
-            let bdiff = (*b - median).abs();
-            adiff.partial_cmp(&bdiff).unwrap_or(std::cmp::Ordering::Equal)
-        })
-        .unwrap();
-
-    if (value - *closest_to_median).abs() < f64::EPSILON {
+    if (value - median).abs() < f64::EPSILON {
         "\x1b[1;33m" // Bold Yellow/Orange
     } else {
         ""
@@ -624,19 +638,28 @@ fn evaluate_quality(
     qrels: &HashMap<String, HashMap<String, u32>>,
     env: &crate::search::SearchEnvironment,
     verbose: u8,
+    query_limit: Option<usize>,
 ) -> Result<(QualityMetrics, crate::search::SearchTelemetry)> {
     let mut ndcg_total = 0.0;
     let mut mrr_total = 0.0;
     let mut recall_total = 0.0;
     let mut counted_queries = 0_usize;
 
-    let total_queries = qrels.len();
-    for (i, (query_id, relevances)) in qrels.iter().enumerate() {
+    let mut qrels_vec: Vec<_> = qrels.iter().collect();
+    qrels_vec.sort_by_key(|(id, _)| *id);
+    
+    let total_queries = if let Some(limit) = query_limit {
+        limit.min(qrels_vec.len())
+    } else {
+        qrels_vec.len()
+    };
+
+    for (i, (query_id, relevances)) in qrels_vec.iter().take(total_queries).enumerate() {
         if verbose > 0 && i > 0 && i % 50 == 0 {
             tracing::info!("    evaluated {}/{} queries...", i, total_queries);
         }
         let query_text = queries
-            .get(query_id)
+            .get(*query_id)
             .with_context(|| format!("missing query text for qrels query-id '{query_id}'"))?;
 
         let response = env.search(query_text, 10, verbose)?;

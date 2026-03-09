@@ -145,6 +145,8 @@ enum EvalCommands {
         json: bool,
         #[arg(short, long, action = clap::ArgAction::Count)]
         verbose: u8,
+        #[arg(long)]
+        query_limit: Option<usize>,
     },
     /// Run quality evaluations
     Quality {
@@ -168,6 +170,8 @@ enum EvalCommands {
         max_length: Option<usize>,
         #[arg(short, long, action = clap::ArgAction::Count)]
         verbose: u8,
+        #[arg(long)]
+        query_limit: Option<usize>,
     },
     /// Run latency measurements
     Latency {
@@ -187,6 +191,8 @@ enum EvalCommands {
         max_length: Option<usize>,
         #[arg(short, long, action = clap::ArgAction::Count)]
         verbose: u8,
+        #[arg(long)]
+        query_limit: Option<usize>,
     },
 }
 
@@ -290,6 +296,7 @@ fn main() -> Result<()> {
                 max_length,
                 json,
                 verbose,
+                query_limit,
             } => {
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
                 let report = run_comparative_benchmark(
@@ -307,6 +314,7 @@ fn main() -> Result<()> {
                             max_length.or(Some(config.model.max_length)),
                         ),
                         verbose,
+                        query_limit,
                     },
                     Some(&ignore),
                 )?;
@@ -328,6 +336,7 @@ fn main() -> Result<()> {
                 model_revision,
                 max_length,
                 verbose,
+                query_limit,
             } => {
                 let strategy = strategy.unwrap_or_else(|| config.search.strategy.clone());
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
@@ -346,6 +355,7 @@ fn main() -> Result<()> {
                             max_length.or(Some(config.model.max_length)),
                         ),
                         verbose,
+                        query_limit,
                     },
                     Some(&ignore),
                 )?;
@@ -360,6 +370,7 @@ fn main() -> Result<()> {
                 model_revision,
                 max_length,
                 verbose,
+                query_limit,
             } => {
                 let strategy = strategy.unwrap_or_else(|| config.search.strategy.clone());
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
@@ -376,6 +387,7 @@ fn main() -> Result<()> {
                             max_length.or(Some(config.model.max_length)),
                         ),
                         verbose,
+                        query_limit,
                     },
                     Some(&ignore),
                 )?;
