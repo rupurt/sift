@@ -170,6 +170,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let command_line = std::env::args().collect::<Vec<_>>().join(" ");
     let config = Config::load().unwrap_or_default();
+    let ignore = sift::config::Ignore::load();
 
     match cli.command {
         Commands::Eval { command } => match command {
@@ -216,7 +217,7 @@ fn main() -> Result<()> {
                         model_revision.or_else(|| config.model.model_revision.clone()),
                         max_length.or(config.model.max_length),
                     ),
-                })?;
+                }, Some(&ignore))?;
 
                 if json {
                     println!("{}", serde_json::to_string_pretty(&report)?);
@@ -250,7 +251,7 @@ fn main() -> Result<()> {
                         model_revision.or_else(|| config.model.model_revision.clone()),
                         max_length.or(config.model.max_length),
                     ),
-                })?;
+                }, Some(&ignore))?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
             BenchCommands::Latency {
@@ -275,7 +276,7 @@ fn main() -> Result<()> {
                         model_revision.or_else(|| config.model.model_revision.clone()),
                         max_length.or(config.model.max_length),
                     ),
-                })?;
+                }, Some(&ignore))?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
         },
@@ -304,7 +305,7 @@ fn main() -> Result<()> {
                         .or_else(|| config.model.model_revision.clone()),
                     search.max_length.or(config.model.max_length),
                 ),
-            })?;
+            }, Some(&ignore))?;
             let output = render_search_response(
                 &response,
                 if search.json {

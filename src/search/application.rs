@@ -2,6 +2,7 @@ use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 
 use crate::dense::DenseReranker;
+use crate::config::Ignore;
 use super::adapters::*;
 use super::corpus::load_search_corpus;
 use super::domain::*;
@@ -168,7 +169,7 @@ impl SearchService {
     }
 }
 
-pub fn run_search(request: &SearchRequest) -> Result<SearchResponse> {
+pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<SearchResponse> {
     let mut service = SearchService::new();
     
     // Register adapters
@@ -189,7 +190,7 @@ pub fn run_search(request: &SearchRequest) -> Result<SearchResponse> {
     service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
     service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
 
-    let corpus = load_search_corpus(&request.path)?;
+    let corpus = load_search_corpus(&request.path, ignore)?;
     let index = Bm25Index::build(&corpus.documents);
     let prepared = PreparedCorpus {
         documents: &corpus.documents,

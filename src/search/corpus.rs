@@ -1,14 +1,14 @@
+use anyhow::{Result, bail};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-
-use anyhow::{Result, bail};
 use walkdir::WalkDir;
 
 use super::domain::*;
+use crate::config::Ignore;
 use crate::extract::extract_path;
 use crate::segment::build_segments;
 
-pub fn load_materialized_corpus(corpus_dir: &Path) -> Result<LoadedCorpus> {
+pub fn load_materialized_corpus(corpus_dir: &Path, ignore: Option<&Ignore>) -> Result<LoadedCorpus> {
     if !corpus_dir.exists() {
         bail!("corpus path '{}' does not exist", corpus_dir.display());
     }
@@ -26,6 +26,12 @@ pub fn load_materialized_corpus(corpus_dir: &Path) -> Result<LoadedCorpus> {
 
                 if is_benchmark_metadata_file(corpus_dir, entry.path()) {
                     continue;
+                }
+
+                if let Some(ignore) = ignore {
+                    if ignore.is_ignored(entry.path()) {
+                        continue;
+                    }
                 }
 
                 collect_materialized_file(
@@ -65,7 +71,7 @@ fn is_benchmark_metadata_file(root: &Path, path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-pub fn load_search_corpus(root: &Path) -> Result<LoadedCorpus> {
+pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>) -> Result<LoadedCorpus> {
     if !root.exists() {
         bail!("search path '{}' does not exist", root.display());
     }
@@ -75,11 +81,27 @@ pub fn load_search_corpus(root: &Path) -> Result<LoadedCorpus> {
     let mut skipped_files = 0_usize;
 
     if root.is_file() {
+        if let Some(ignore) = ignore {
+            if ignore.is_ignored(root) {
+                return Ok(LoadedCorpus {
+                    documents: Vec::new(),
+                    total_bytes: 0,
+                    indexed_files: 0,
+                    skipped_files: 0,
+                });
+            }
+        }
         collect_search_file(root, &mut documents, &mut total_bytes, &mut skipped_files);
     } else if root.is_dir() {
         for entry in WalkDir::new(root).sort_by_file_name() {
             match entry {
                 Ok(entry) => {
+                    if let Some(ignore) = ignore {
+                        if ignore.is_ignored(entry.path()) {
+                            continue;
+                        }
+                    }
+
                     if entry.file_type().is_file() {
                         collect_search_file(
                             entry.path(),

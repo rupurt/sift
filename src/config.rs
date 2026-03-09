@@ -1,8 +1,9 @@
-use std::path::{Path};
-use std::fs;
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
 use directories::ProjectDirs;
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::Path;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -10,6 +11,49 @@ pub struct Config {
     pub search: SearchConfig,
     #[serde(default)]
     pub model: ModelConfig,
+}
+
+pub struct Ignore {
+    inner: Gitignore,
+}
+
+impl Ignore {
+    pub fn load() -> Self {
+        let mut builder = GitignoreBuilder::new(".");
+
+        // 1. System-wide ignore
+        #[cfg(unix)]
+        let system_path = Path::new("/etc/siftignore");
+        #[cfg(windows)]
+        let system_path = Path::new(r"C:\ProgramData\sift\siftignore");
+        if system_path.exists() {
+            builder.add(system_path);
+        }
+
+        // 2. User-specific ignore
+        if let Some(proj_dirs) = ProjectDirs::from("com", "rupurt", "sift") {
+            let user_path = proj_dirs.config_dir().join("siftignore");
+            if user_path.exists() {
+                builder.add(user_path);
+            }
+        }
+
+        // 3. Local directory ignore
+        let local_path = Path::new("./.siftignore");
+        if local_path.exists() {
+            builder.add(local_path);
+        }
+
+        Self {
+            inner: builder.build().unwrap_or_else(|_| Gitignore::empty()),
+        }
+    }
+
+    pub fn is_ignored(&self, path: &Path) -> bool {
+        self.inner
+            .matched(path, path.is_dir())
+            .is_ignore()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

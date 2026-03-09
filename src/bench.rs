@@ -8,6 +8,7 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::dense::DenseModelSpec;
+use crate::config::Ignore;
 use crate::search::{LoadedCorpus, SearchRequest, load_materialized_corpus, run_search};
 use crate::system::{HardwareSummary, current_git_sha, detect_hardware_summary};
 
@@ -101,9 +102,12 @@ pub struct LatencyBenchmarkRequest {
     pub dense_model: DenseModelSpec,
 }
 
-pub fn run_quality_benchmark(request: &QualityBenchmarkRequest) -> Result<QualityBenchmarkReport> {
+pub fn run_quality_benchmark(
+    request: &QualityBenchmarkRequest,
+    ignore: Option<&Ignore>,
+) -> Result<QualityBenchmarkReport> {
     let prepare_started = Instant::now();
-    let corpus = load_materialized_corpus(&request.corpus_dir)?;
+    let corpus = load_materialized_corpus(&request.corpus_dir, ignore)?;
     let queries_path = request
         .queries_path
         .clone()
@@ -122,12 +126,10 @@ pub fn run_quality_benchmark(request: &QualityBenchmarkRequest) -> Result<Qualit
         &request.strategy,
         request.shortlist,
         &request.dense_model,
+        ignore,
     )?;
 
-    let baseline_strategy = request
-        .baseline
-        .clone()
-        .or_else(|| Some("bm25".to_string()));
+    let baseline_strategy = request.baseline.clone().or_else(|| Some("bm25".to_string()));
     let baseline_metrics = match &baseline_strategy {
         Some(strategy) => Some(evaluate_quality(
             &request.corpus_dir,
@@ -136,6 +138,7 @@ pub fn run_quality_benchmark(request: &QualityBenchmarkRequest) -> Result<Qualit
             strategy,
             request.shortlist,
             &request.dense_model,
+            ignore,
         )?),
         None => None,
     };
@@ -153,6 +156,7 @@ pub fn run_quality_benchmark(request: &QualityBenchmarkRequest) -> Result<Qualit
             &champion_strategy_name,
             request.shortlist,
             &request.dense_model,
+            ignore,
         )?)
     } else {
         Some(metrics.clone())
@@ -179,9 +183,12 @@ pub fn run_quality_benchmark(request: &QualityBenchmarkRequest) -> Result<Qualit
     })
 }
 
-pub fn run_latency_benchmark(request: &LatencyBenchmarkRequest) -> Result<LatencyBenchmarkReport> {
+pub fn run_latency_benchmark(
+    request: &LatencyBenchmarkRequest,
+    ignore: Option<&Ignore>,
+) -> Result<LatencyBenchmarkReport> {
     let prepare_started = Instant::now();
-    let corpus = load_materialized_corpus(&request.corpus_dir)?;
+    let corpus = load_materialized_corpus(&request.corpus_dir, ignore)?;
     let queries = load_queries(&request.queries_path)?;
     let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
 
@@ -202,7 +209,7 @@ pub fn run_latency_benchmark(request: &LatencyBenchmarkRequest) -> Result<Latenc
             limit: 10,
             shortlist: request.shortlist,
             dense_model: request.dense_model.clone(),
-        })?;
+        }, ignore)?;
         timings.push(started.elapsed().as_secs_f64() * 1000.0);
     }
 
@@ -236,6 +243,7 @@ pub fn run_latency_benchmark(request: &LatencyBenchmarkRequest) -> Result<Latenc
 
 pub fn run_comparative_benchmark(
     request: &QualityBenchmarkRequest,
+    ignore: Option<&Ignore>,
 ) -> Result<ComparativeBenchmarkReport> {
     let registry = crate::search::StrategyPresetRegistry::default_registry();
     let names = registry.names();
@@ -243,7 +251,7 @@ pub fn run_comparative_benchmark(
     let mut metadata = Vec::new();
 
     // Prepare shared state for latency
-    let corpus = load_materialized_corpus(&request.corpus_dir)?;
+    let corpus = load_materialized_corpus(&request.corpus_dir, ignore)?;
     let queries_path = request
         .queries_path
         .clone()
@@ -262,6 +270,7 @@ pub fn run_comparative_benchmark(
             &name,
             request.shortlist,
             &request.dense_model,
+            ignore,
         )?;
 
         // Latency
@@ -278,7 +287,7 @@ pub fn run_comparative_benchmark(
                 limit: 10,
                 shortlist: request.shortlist,
                 dense_model: request.dense_model.clone(),
-            })?;
+            }, ignore)?;
             timings.push(started.elapsed().as_secs_f64() * 1000.0);
         }
         timings.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
@@ -404,6 +413,7 @@ fn evaluate_quality(
     strategy: &str,
     shortlist: usize,
     dense_model: &DenseModelSpec,
+    ignore: Option<&Ignore>,
 ) -> Result<QualityMetrics> {
     let mut ndcg_total = 0.0;
     let mut mrr_total = 0.0;
@@ -422,7 +432,7 @@ fn evaluate_quality(
             limit: 10,
             shortlist,
             dense_model: dense_model.clone(),
-        })?;
+        }, ignore)?;
 
         // Map SearchHit to something we can use for metrics
         // We need the ID, which is not currently in SearchHit.

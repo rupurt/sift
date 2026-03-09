@@ -12,6 +12,7 @@ clap = { version = "4.5.60", features = ["derive"] }
 directories = "6.0.0"
 flate2 = "1.1.9"
 html2text = "0.15.3"
+ignore = "0.4.25"
 pdf-extract = "0.10.0"
 rust_tokenizers = { version = "8.1.1", default-features = false }
 serde = { version = "1.0.228", features = ["derive"] }
