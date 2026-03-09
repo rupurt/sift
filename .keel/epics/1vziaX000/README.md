@@ -18,8 +18,8 @@ created_at: 2026-03-09T14:57:29
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 1/3 stories done
+**Progress:** 1/1 voyages complete, 3/3 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Instrumentation Foundation](voyages/1vzibo000/) | in-progress | 1/3 |
+| [Instrumentation Foundation](voyages/1vzibo000/) | done | 3/3 |
 <!-- END GENERATED -->

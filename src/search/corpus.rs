@@ -116,6 +116,7 @@ pub fn load_search_corpus(
     ignore: Option<&Ignore>,
     verbose: u8,
     dense: Option<&DenseReranker>,
+    telemetry: &crate::system::Telemetry,
 ) -> Result<LoadedCorpus> {
     if !root.exists() {
         bail!("search path '{}' does not exist", root.display());
@@ -149,7 +150,7 @@ pub fn load_search_corpus(
                 }
             }
         }
-        crate::trace!(2, verbose, "    directory walk found {} files in {:.2?}", files_to_process.len(), walk_start.elapsed());
+        tracing::info!("directory walk found {} files in {:.2?}", files_to_process.len(), walk_start.elapsed());
     } else {
         bail!(
             "search path '{}' is neither a regular file nor directory",
@@ -159,6 +160,7 @@ pub fn load_search_corpus(
 
     let process_start = std::time::Instant::now();
     let total_files = files_to_process.len();
+    telemetry.total_files.fetch_add(total_files, std::sync::atomic::Ordering::Relaxed);
 
     // Stage 1: Sequential cache check and extraction (lexical only)
     let mut results = Vec::new();
@@ -174,13 +176,15 @@ pub fn load_search_corpus(
         // Fast path: heuristics match manifest
         if let Some(hash) = manifest.check_heuristics(&path, &heuristics) {
             if let Ok(mut doc) = load_blob(&blobs_dir, &hash) {
-                crate::trace!(3, verbose, "      cache hit (heuristic): {}", path.display());
+                tracing::debug!("cache hit (heuristic): {}", path.display());
                 doc.id = path.display().to_string();
                 doc.path = path.to_path_buf();
                 
+                telemetry.heuristic_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                
                 // If we need embeddings but they are missing, treat as a partial miss
                 if dense.is_some() && doc.segments.iter().any(|s| s.embedding.is_none()) {
-                    crate::trace!(2, verbose, "      cache hit but missing embeddings: {}", path.display());
+                    tracing::info!("cache hit but missing embeddings: {}", path.display());
                     results.push(ProcessResult::Miss(doc, path, heuristics, hash));
                 } else {
                     results.push(ProcessResult::Hit(doc));
@@ -192,13 +196,15 @@ pub fn load_search_corpus(
         // Medium path: compute blake3 and check global blob store
         if let Ok(hash) = hash_file(&path) {
             if let Ok(mut doc) = load_blob(&blobs_dir, &hash) {
-                crate::trace!(3, verbose, "      cache hit (hash): {}", path.display());
+                tracing::debug!("cache hit (hash): {}", path.display());
                 doc.id = path.display().to_string();
                 doc.path = path.to_path_buf();
 
+                telemetry.blob_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
                 // If we need embeddings but they are missing, treat as a partial miss
                 if dense.is_some() && doc.segments.iter().any(|s| s.embedding.is_none()) {
-                    crate::trace!(2, verbose, "      cache hit but missing embeddings: {}", path.display());
+                    tracing::info!("cache hit but missing embeddings: {}", path.display());
                     results.push(ProcessResult::Miss(doc, path, heuristics, hash));
                 } else {
                     results.push(ProcessResult::HashHit(doc, path, heuristics, hash));
@@ -225,8 +231,6 @@ pub fn load_search_corpus(
     
     // We'll collect documents that need embedding
     let mut docs_to_embed = Vec::new();
-    // Indices in the final 'documents' vector for the docs being embedded
-    let mut doc_indices = Vec::new();
 
     for result in results {
         match result {
@@ -244,7 +248,6 @@ pub fn load_search_corpus(
                 let idx = documents.len();
                 documents.push(doc);
                 docs_to_embed.push((idx, path, heuristics, hash));
-                doc_indices.push(idx);
             }
             ProcessResult::Skip => {
                 skipped_files += 1;
@@ -252,10 +255,16 @@ pub fn load_search_corpus(
         }
     }
 
+    for doc in &documents {
+        telemetry.total_segments.fetch_add(doc.segments.len(), std::sync::atomic::Ordering::Relaxed);
+        let embedded = doc.segments.iter().filter(|s| s.embedding.is_some()).count();
+        telemetry.embedding_hits.fetch_add(embedded, std::sync::atomic::Ordering::Relaxed);
+    }
+
     // Perform batch embedding if model is present and we have misses
     if let Some(dense) = dense {
         if !docs_to_embed.is_empty() {
-            crate::trace!(1, verbose, "    vectorizing {} new/changed documents...", docs_to_embed.len());
+            tracing::info!("vectorizing {} new/changed documents...", docs_to_embed.len());
             
             // Flatten all segments from all documents into a single batch
             let mut all_texts = Vec::new();
@@ -285,7 +294,7 @@ pub fn load_search_corpus(
                         current_idx += chunk.len();
                     }
                 }
-                crate::trace!(2, verbose, "    embedded {} segments in {:.2?}", all_texts.len(), embed_start.elapsed());
+                tracing::info!("embedded {} segments in {:.2?}", all_texts.len(), embed_start.elapsed());
             }
 
             // Save new blobs and update manifest after embedding
@@ -310,12 +319,12 @@ pub fn load_search_corpus(
         }
     }
 
-    crate::trace!(2, verbose, "    processing {} files took: {:.2?}", total_files, process_start.elapsed());
+    tracing::info!("processing {} files took: {:.2?}", total_files, process_start.elapsed());
 
     if manifest_updated {
         let save_start = std::time::Instant::now();
         let _ = manifest.save(&manifest_path);
-        crate::trace!(2, verbose, "    manifest updated in {:.2?}", save_start.elapsed());
+        tracing::debug!("manifest updated in {:.2?}", save_start.elapsed());
     }
 
     documents.sort_by(|left, right| left.id.cmp(&right.id));

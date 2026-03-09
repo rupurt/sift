@@ -29,6 +29,15 @@ fn render_text_response(response: &SearchResponse) -> Result<String> {
     }
 
     writeln!(&mut output, "results: {}", response.results.len())?;
+    if let Some(t) = &response.telemetry {
+        writeln!(
+            &mut output,
+            "cache_hits: heuristic={:.1}%, blob={:.1}%, embedding={:.1}%",
+            t.heuristic_hit_rate * 100.0,
+            t.blob_hit_rate * 100.0,
+            t.embedding_hit_rate * 100.0
+        )?;
+    }
     writeln!(&mut output)?;
 
     for hit in &response.results {

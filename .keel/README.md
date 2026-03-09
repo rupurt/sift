@@ -12,6 +12,7 @@
 | [True Hybrid Retrieval Architecture](bearings/1vzSne000/) | laid | ✓ | ✓ | decision-ready | 2.59 | ✓ |
 | [Composable Search Strategy Architecture](bearings/1vzXLN000/) | laid | ✓ | ✓ | decision-ready | 3.31 | ✓ |
 | [Zig-Style Global File Cache](bearings/1vzfew000/) | laid | ✓ | ✓ | decision-ready | 4.44 | ✓ |
+| [Comprehensive Performance Instrumentation](bearings/1vziaX000/) | laid | ✓ | ✓ | decision-ready | 6.56 | ✓ |
 
 ## Epics
 
@@ -58,9 +59,9 @@
 | [Incremental File Caching](epics/1vzfew000/voyages/1vzfjD000/) | done |
 | [Vector Embedding Caching](epics/1vzfew000/voyages/1vzgQK000/) | done |
 
-### [Comprehensive Performance Instrumentation](epics/1vziaX000/) (active)
+### [Comprehensive Performance Instrumentation](epics/1vziaX000/) (done)
 
 | Voyage | Status |
 |--------|--------|
-| [Instrumentation Foundation](epics/1vziaX000/voyages/1vzibo000/) | in-progress |
+| [Instrumentation Foundation](epics/1vziaX000/voyages/1vzibo000/) | done |
 

@@ -63,3 +63,9 @@ search *args:
 
 config:
     cargo run --release -- config
+
+bench-flamegraph *args:
+    cargo flamegraph -- {{args}}
+
+bench-micro:
+    cargo bench

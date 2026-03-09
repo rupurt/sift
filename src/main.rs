@@ -14,6 +14,9 @@ use sift::search::{
     FusionPolicy, OutputFormat, RerankingPolicy, RetrieverPolicy, SearchRequest,
     render_search_response, run_search,
 };
+use sift::system::Telemetry;
+use std::sync::Arc;
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 const SCIFACT_BASE_URL: &str = "https://huggingface.co/datasets/BeIR/scifact/resolve/main";
 const SCIFACT_QRELS_BASE_URL: &str =
@@ -194,9 +197,36 @@ enum Dataset {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    let verbose = match &cli.command {
+        Commands::Eval { command } => match command {
+            EvalCommands::Download { verbose, .. } => *verbose,
+            EvalCommands::Materialize { verbose, .. } => *verbose,
+        },
+        Commands::Bench { command } => match command {
+            BenchCommands::All { verbose, .. } => *verbose,
+            BenchCommands::Quality { verbose, .. } => *verbose,
+            BenchCommands::Latency { verbose, .. } => *verbose,
+        },
+        Commands::Search(search) => search.verbose,
+        Commands::Config => 0,
+    };
+
+    let filter = match verbose {
+        0 => EnvFilter::new("off"),
+        1 => EnvFilter::new("info"),
+        2 => EnvFilter::new("debug"),
+        _ => EnvFilter::new("trace"),
+    };
+
+    tracing_subscriber::registry()
+        .with(fmt::layer().with_writer(std::io::stderr).with_target(false))
+        .with(filter)
+        .init();
+
     let command_line = std::env::args().collect::<Vec<_>>().join(" ");
     let config = Config::load().unwrap_or_default();
     let ignore = sift::config::Ignore::load();
+    let telemetry = Arc::new(Telemetry::new());
 
     match cli.command {
         Commands::Eval { command } => match command {
@@ -383,6 +413,7 @@ fn main() -> Result<()> {
                     retrievers: search.retrievers.clone(),
                     fusion: search.fusion,
                     reranking: search.reranking,
+                    telemetry: telemetry.clone(),
                 },
                 Some(&ignore),
             )?;

@@ -32,6 +32,9 @@ pub enum OutputFormat {
     Json,
 }
 
+use crate::system::Telemetry;
+use std::sync::Arc;
+
 #[derive(Debug, Clone)]
 pub struct SearchRequest {
     pub strategy: String,
@@ -44,6 +47,7 @@ pub struct SearchRequest {
     pub retrievers: Option<Vec<RetrieverPolicy>>,
     pub fusion: Option<FusionPolicy>,
     pub reranking: Option<RerankingPolicy>,
+    pub telemetry: Arc<Telemetry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -53,6 +57,14 @@ pub struct SearchResponse {
     pub indexed_files: usize,
     pub skipped_files: usize,
     pub results: Vec<SearchHit>,
+    pub telemetry: Option<SearchTelemetry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SearchTelemetry {
+    pub heuristic_hit_rate: f64,
+    pub blob_hit_rate: f64,
+    pub embedding_hit_rate: f64,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

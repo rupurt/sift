@@ -172,10 +172,11 @@ impl SearchService {
         query: &str,
         corpus: &PreparedCorpus,
         limit: usize,
-        verbose: u8,
+        _verbose: u8,
+        telemetry: &crate::system::Telemetry,
     ) -> Result<CandidateList> {
         let start = std::time::Instant::now();
-        crate::trace!(1, verbose, "→ executing strategy: {}", plan.name);
+        tracing::info!("executing strategy: {} for query: '{}'", plan.name, query);
 
         // 1. Query Expansion
         let expand_start = std::time::Instant::now();
@@ -184,8 +185,8 @@ impl SearchService {
             .get(&plan.query_expansion)
             .ok_or_else(|| anyhow!("expander not found for policy: {:?}", plan.query_expansion))?;
         let query_variants = expander.expand(query);
-        crate::trace!(1, verbose, "  → expanded query into {} variants in {:.2?}", query_variants.len(), expand_start.elapsed());
-        crate::trace!(2, verbose, "    variants: {:?}", query_variants.iter().map(|v| &v.text).collect::<Vec<_>>());
+        tracing::info!("expanded query into {} variants in {:.2?}", query_variants.len(), expand_start.elapsed());
+        tracing::debug!("variants: {:?}", query_variants.iter().map(|v| &v.text).collect::<Vec<_>>());
 
         // 2. Retrieval
         let retrieval_start = std::time::Instant::now();
@@ -196,11 +197,12 @@ impl SearchService {
                 .retrievers
                 .get(policy)
                 .ok_or_else(|| anyhow!("retriever not found for policy: {:?}", policy))?;
-            let list = retriever.retrieve(&query_variants, corpus, limit, verbose)?;
-            crate::trace!(2, verbose, "    {:?}: found {} candidates in {:.2?}", policy, list.results.len(), retrieve_start.elapsed());
+            // Note: adapters will be updated to use tracing internally later, for now we pass 0 as verbose
+            let list = retriever.retrieve(&query_variants, corpus, limit, 0)?;
+            tracing::info!("{:?}: found {} candidates in {:.2?}", policy, list.results.len(), retrieve_start.elapsed());
             candidate_lists.push(list);
         }
-        crate::trace!(1, verbose, "  → retrieved candidates ({} retrievers) in {:.2?}", plan.retrievers.len(), retrieval_start.elapsed());
+        tracing::info!("retrieval complete in {:.2?}", retrieval_start.elapsed());
 
         if candidate_lists.is_empty() {
             return Ok(CandidateList {
@@ -214,8 +216,8 @@ impl SearchService {
             .fusers
             .get(&plan.fusion)
             .ok_or_else(|| anyhow!("fuser not found for policy: {:?}", plan.fusion))?;
-        let fused = fuser.fuse(&candidate_lists, limit, verbose)?;
-        crate::trace!(1, verbose, "  → fused into {} candidates in {:.2?}", fused.results.len(), fuse_start.elapsed());
+        let fused = fuser.fuse(&candidate_lists, limit, 0)?;
+        tracing::info!("fused into {} candidates in {:.2?}", fused.results.len(), fuse_start.elapsed());
 
         // 4. Reranking
         let rerank_start = std::time::Instant::now();
@@ -224,9 +226,10 @@ impl SearchService {
             .get(&plan.reranking)
             .ok_or_else(|| anyhow!("reranker not found for policy: {:?}", plan.reranking))?;
         let final_list = reranker.rerank(query, fused, limit)?;
-        crate::trace!(1, verbose, "  → reranked in {:.2?}", rerank_start.elapsed());
+        tracing::info!("reranking complete in {:.2?}", rerank_start.elapsed());
 
-        crate::trace!(1, verbose, "✓ search complete in {:.2?}", start.elapsed());
+        tracing::info!("search complete in {:.2?}", start.elapsed());
+        telemetry.trace_hit_rates();
         Ok(final_list)
     }
 }
@@ -236,6 +239,7 @@ pub struct SearchEnvironment<'a> {
     pub plan: SearchPlan,
     pub corpus: &'a LoadedCorpus,
     pub prepared: PreparedCorpus<'a>,
+    pub telemetry: std::sync::Arc<crate::system::Telemetry>,
 }
 
 impl<'a> SearchEnvironment<'a> {
@@ -281,12 +285,12 @@ impl<'a> SearchEnvironment<'a> {
                 documents: &corpus.documents,
                 bm25_index: Some(index),
             },
+            telemetry: request.telemetry.clone(),
         })
     }
 
     pub fn search(&self, query: &str, limit: usize, verbose: u8) -> Result<SearchResponse> {
-        crate::trace!(1, verbose, "→ search query: '{}'", query);
-        let candidates = self.service.execute(&self.plan, query, &self.prepared, limit, verbose)?;
+        let candidates = self.service.execute(&self.plan, query, &self.prepared, limit, verbose, &self.telemetry)?;
 
         let results = candidates
             .results
@@ -314,6 +318,11 @@ impl<'a> SearchEnvironment<'a> {
             indexed_files: self.corpus.indexed_files,
             skipped_files: self.corpus.skipped_files,
             results,
+            telemetry: Some(SearchTelemetry {
+                heuristic_hit_rate: self.telemetry.heuristic_hit_rate(),
+                blob_hit_rate: self.telemetry.blob_hit_rate(),
+                embedding_hit_rate: self.telemetry.embedding_hit_rate(),
+            }),
         })
     }
 }
@@ -348,12 +357,12 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
     if plan.retrievers.contains(&RetrieverPolicy::Vector) {
         let model_start = std::time::Instant::now();
         let dense = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
-        crate::trace!(1, verbose, "→ dense model loaded in {:.2?}", model_start.elapsed());
+        tracing::info!("dense model loaded in {:.2?}", model_start.elapsed());
         dense_for_load = Some(dense);
     }
 
-    let corpus = load_search_corpus(&request.path, ignore, verbose, dense_for_load.as_deref())?;
-    crate::trace!(1, verbose, "→ corpus loaded ({} files) in {:.2?}", corpus.indexed_files, corpus_start.elapsed());
+    let corpus = load_search_corpus(&request.path, ignore, verbose, dense_for_load.as_deref(), &request.telemetry)?;
+    tracing::info!("corpus loaded ({} files) in {:.2?}", corpus.indexed_files, corpus_start.elapsed());
 
     if let Some(dense) = dense_for_load {
         service.register_retriever(Box::new(SegmentVectorRetriever { dense }));
@@ -368,13 +377,13 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
 
     let index_start = std::time::Instant::now();
     let index = Bm25Index::build(&corpus.documents);
-    crate::trace!(2, verbose, "→ built bm25 index in {:.2?}", index_start.elapsed());
+    tracing::info!("built bm25 index in {:.2?}", index_start.elapsed());
     let prepared = PreparedCorpus {
         documents: &corpus.documents,
         bm25_index: Some(&index),
     };
 
-    let candidates = service.execute(&plan, &request.query, &prepared, request.limit, verbose)?;
+    let candidates = service.execute(&plan, &request.query, &prepared, request.limit, verbose, &request.telemetry)?;
 
     let results = candidates
         .results
@@ -402,6 +411,11 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
         indexed_files: corpus.indexed_files,
         skipped_files: corpus.skipped_files,
         results,
+        telemetry: Some(SearchTelemetry {
+            heuristic_hit_rate: request.telemetry.heuristic_hit_rate(),
+            blob_hit_rate: request.telemetry.blob_hit_rate(),
+            embedding_hit_rate: request.telemetry.embedding_hit_rate(),
+        }),
     })
 }
 

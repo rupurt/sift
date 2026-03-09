@@ -1,0 +1,11 @@
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use sift::search::tokenize;
+
+fn bench_tokenize(c: &mut Criterion) {
+    let text = "This is a sample text that we will use to benchmark our tokenizer. It should be long enough to provide meaningful results. Let's add some more words to make it even longer and more representative of a real document that sift might index during a search operation.";
+    
+    c.bench_function("tokenize", |b| b.iter(|| tokenize(black_box(text))));
+}
+
+criterion_group!(benches, bench_tokenize);
+criterion_main!(benches);

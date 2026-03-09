@@ -40,27 +40,27 @@ impl Retriever for SegmentVectorRetriever {
         let mut segment_hits = Vec::new();
 
         if !cached.is_empty() {
-            crate::trace!(2, verbose, "    vector: scoring {} segments from cache", cached.len());
+            tracing::info!("vector: scoring {} segments from cache", cached.len());
             let cached_start = std::time::Instant::now();
             segment_hits.extend(score_segments_manually(&self.dense, query, &cached)?);
-            crate::trace!(2, verbose, "    vector: cached scoring complete in {:.2?}", cached_start.elapsed());
+            tracing::debug!("vector: cached scoring complete in {:.2?}", cached_start.elapsed());
         }
 
         if !missing.is_empty() {
-            crate::trace!(1, verbose, "    vector: scoring {} missing segments via inference", missing.len());
+            tracing::info!("vector: scoring {} missing segments via inference", missing.len());
             let missing_start = std::time::Instant::now();
             segment_hits.extend(self.dense.score_segments(query, &missing)?);
-            crate::trace!(1, verbose, "    vector: inference complete in {:.2?}", missing_start.elapsed());
+            tracing::info!("vector: inference complete in {:.2?}", missing_start.elapsed());
         }
 
-        crate::trace!(3, verbose, "    vector: aggregating hits");
+        tracing::debug!("vector: aggregating hits");
         let document_hits = aggregate_segment_hits(&segment_hits);
-        crate::trace!(3, verbose, "    vector: aggregation complete");
+        tracing::debug!("vector: aggregation complete");
 
         let results = document_hits
             .into_iter()
             .map(|s| {
-                crate::trace!(3, verbose, "      vector score: {:.4} for {}", s.score, s.path.display());
+                tracing::debug!("vector score: {:.4} for {}", s.score, s.path.display());
                 let mut id = s.id.clone();
                 if id.starts_with("./") {
                     id = id.chars().skip(2).collect();
@@ -108,13 +108,13 @@ impl Retriever for PhraseRetriever {
             });
         }
 
-        crate::trace!(2, verbose, "    phrase: scanning {} documents", corpus.documents.len());
+        tracing::info!("phrase: scanning {} documents", corpus.documents.len());
         let phrase_start = std::time::Instant::now();
         let mut results = Vec::new();
         for document in corpus.documents {
             let text = document.text.to_lowercase();
             if text.contains(&query) {
-                crate::trace!(3, verbose, "      phrase match: {}", document.path.display());
+                tracing::debug!("phrase match: {}", document.path.display());
                 // For phrase search, we just give it a 1.0 score if it contains the phrase
                 // This is a very simple implementation
                 results.push(Candidate {
@@ -130,7 +130,7 @@ impl Retriever for PhraseRetriever {
                 });
             }
         }
-        crate::trace!(2, verbose, "    phrase: scan complete in {:.2?}", phrase_start.elapsed());
+        tracing::debug!("phrase: scan complete in {:.2?}", phrase_start.elapsed());
 
         Ok(CandidateList {
             results: results.into_iter().take(limit).collect(),
@@ -162,15 +162,15 @@ impl Retriever for Bm25Retriever {
             .map(|q| q.text.as_str())
             .unwrap_or("");
 
-        crate::trace!(2, verbose, "    bm25: scoring {} documents", corpus.documents.len());
+        tracing::info!("bm25: scoring {} documents", corpus.documents.len());
         let bm25_start = std::time::Instant::now();
         let scored = index.score(query);
-        crate::trace!(2, verbose, "    bm25: score complete in {:.2?}", bm25_start.elapsed());
+        tracing::debug!("bm25: score complete in {:.2?}", bm25_start.elapsed());
         let results = scored
             .into_iter()
             .take(limit)
             .map(|s| {
-                crate::trace!(3, verbose, "      bm25 score: {:.4} for {}", s.score, s.path.display());
+                tracing::debug!("bm25 score: {:.4} for {}", s.score, s.path.display());
                 let mut id = s.id.clone();
                 if id.starts_with("./") {
                     id = id.chars().skip(2).collect();
@@ -201,6 +201,7 @@ pub struct RrfFuser;
 
 impl Fuser for RrfFuser {
     fn fuse(&self, candidate_lists: &[CandidateList], limit: usize, _verbose: u8) -> Result<CandidateList> {
+        tracing::debug!("fusing {} candidate lists", candidate_lists.len());
         // Implement RRF fusion
         // This can be adapted from src/hybrid.rs
         // Wait, I need a f64 RRF_K constant.
@@ -241,6 +242,8 @@ impl Fuser for RrfFuser {
                 .unwrap_or(std::cmp::Ordering::Equal)
                 .then_with(|| a.id.cmp(&b.id))
         });
+
+        tracing::debug!("fusion complete, sorted {} unique candidates", results.len());
 
         Ok(CandidateList {
             results: results.into_iter().take(limit).collect(),

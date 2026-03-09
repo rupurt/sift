@@ -31,6 +31,11 @@ walkdir = "2.5.0"
 xz2 = { version = "0.1.7", features = ["static"] }
 
 [dev-dependencies]
+criterion = "0.8.2"
 tempfile = "3.26.0"
 
 [features]
+
+[[bench]]
+name = "search_bench"
+harness = false

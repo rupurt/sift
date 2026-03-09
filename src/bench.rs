@@ -10,7 +10,8 @@ use serde::{Deserialize, Serialize};
 use crate::config::Ignore;
 use crate::dense::{DenseModelSpec, DenseReranker};
 use crate::search::{LoadedCorpus, SearchRequest, load_search_corpus};
-use crate::system::{HardwareSummary, current_git_sha, detect_hardware_summary};
+use crate::system::{HardwareSummary, Telemetry, current_git_sha, detect_hardware_summary};
+use std::sync::Arc;
 
 const LATENCY_TARGET_MS: f64 = 200.0;
 
@@ -78,6 +79,7 @@ pub struct StrategyComparison {
     pub strategy: String,
     pub quality: QualityMetrics,
     pub latency: LatencyMetrics,
+    pub telemetry: Option<crate::search::SearchTelemetry>,
 }
 
 #[derive(Debug, Clone)]
@@ -109,7 +111,7 @@ pub fn run_quality_benchmark(
     ignore: Option<&Ignore>,
 ) -> Result<QualityBenchmarkReport> {
     let prepare_started = Instant::now();
-    crate::trace!(1, request.verbose, "→ loading dense model: {}", request.dense_model.model_id);
+    tracing::info!("→ loading dense model: {}", request.dense_model.model_id);
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load))?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
@@ -137,13 +139,14 @@ pub fn run_quality_benchmark(
             retrievers: None,
             fusion: None,
             reranking: None,
+            telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
         },
         &corpus,
         &index,
         Some(dense_for_load.clone()),
     )?;
 
-    let metrics = evaluate_quality(
+    let (metrics, _telemetry) = evaluate_quality(
         &queries,
         &qrels,
         &env,
@@ -168,17 +171,19 @@ pub fn run_quality_benchmark(
                     retrievers: None,
                     fusion: None,
                     reranking: None,
+                    telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
                 },
                 &corpus,
                 &index,
                 Some(dense_for_load.clone()),
             )?;
-            Some(evaluate_quality(
+            let (m, _) = evaluate_quality(
                 &queries,
                 &qrels,
                 &baseline_env,
                 request.verbose,
-            )?)
+            )?;
+            Some(m)
         },
         None => None,
     };
@@ -196,17 +201,19 @@ pub fn run_quality_benchmark(
                 retrievers: None,
                 fusion: None,
                 reranking: None,
+                telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
             },
             &corpus,
             &index,
             Some(dense_for_load.clone()),
         )?;
-        Some(evaluate_quality(
+        let (m, _) = evaluate_quality(
             &queries,
             &qrels,
             &champion_env,
             request.verbose,
-        )?)
+        )?;
+        Some(m)
     } else {
         Some(metrics.clone())
     };
@@ -237,7 +244,7 @@ pub fn run_latency_benchmark(
     ignore: Option<&Ignore>,
 ) -> Result<LatencyBenchmarkReport> {
     let prepare_started = Instant::now();
-    crate::trace!(1, request.verbose, "→ loading dense model: {}", request.dense_model.model_id);
+    tracing::info!("→ loading dense model: {}", request.dense_model.model_id);
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load))?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
@@ -260,6 +267,7 @@ pub fn run_latency_benchmark(
             retrievers: None,
             fusion: None,
             reranking: None,
+            telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
         },
         &corpus,
         &index,
@@ -311,7 +319,7 @@ pub fn run_comparative_benchmark(
     let mut metadata = Vec::new();
 
     let prepare_started = Instant::now();
-    crate::trace!(1, request.verbose, "→ loading dense model: {}", request.dense_model.model_id);
+    tracing::info!("→ loading dense model: {}", request.dense_model.model_id);
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load))?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
@@ -325,7 +333,7 @@ pub fn run_comparative_benchmark(
 
     let total_strategies = names.len();
     for (idx, name) in names.iter().enumerate() {
-        crate::trace!(1, request.verbose, "→ benchmark strategy {}/{} : {}", idx + 1, total_strategies, name);
+        tracing::info!("→ benchmark strategy {}/{} : {}", idx + 1, total_strategies, name);
         let env = crate::search::SearchEnvironment::new(
             &SearchRequest {
                 strategy: name.clone(),
@@ -338,6 +346,7 @@ pub fn run_comparative_benchmark(
                 retrievers: None,
                 fusion: None,
                 reranking: None,
+                telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
             },
             &corpus,
             &index,
@@ -345,7 +354,7 @@ pub fn run_comparative_benchmark(
         )?;
 
         // Quality
-        let quality = evaluate_quality(
+        let (quality, telemetry) = evaluate_quality(
             &queries,
             &qrels,
             &env,
@@ -379,6 +388,7 @@ pub fn run_comparative_benchmark(
             strategy: name.clone(),
             quality,
             latency,
+            telemetry: Some(telemetry),
         });
 
         metadata.push(build_metadata(
@@ -407,33 +417,39 @@ pub fn render_comparative_report(report: &ComparativeBenchmarkReport) -> String 
     .unwrap();
     writeln!(
         out,
-        "{:<20} {:>10} {:>10} {:>10} {:>12}",
-        "Strategy", "nDCG@10", "MRR@10", "Recall@10", "p50 (ms)"
+        "{:<20} {:>10} {:>10} {:>10} {:>12} {:>15}",
+        "Strategy", "nDCG@10", "MRR@10", "Recall@10", "p50 (ms)", "Cache Hits"
     )
     .unwrap();
     writeln!(
         out,
-        "────────────────────────────────────────────────────────────────────────────────"
+        "──────────────────────────────────────────────────────────────────────────────────────────────"
     )
     .unwrap();
 
     for res in &report.results {
         let bar = render_bar(res.quality.ndcg_at_10, 10);
+        let hits = if let Some(t) = &res.telemetry {
+            format!("{:.0}/{:.0}/{:.0}%", t.heuristic_hit_rate * 100.0, t.blob_hit_rate * 100.0, t.embedding_hit_rate * 100.0)
+        } else {
+            "-".to_string()
+        };
         writeln!(
             out,
-            "{:<20} {:>10.4} {:>10.4} {:>10.4} {:>12.2}  {}",
+            "{:<20} {:>10.4} {:>10.4} {:>10.4} {:>12.2} {:>15}  {}",
             res.strategy,
             res.quality.ndcg_at_10,
             res.quality.mrr_at_10,
             res.quality.recall_at_10,
             res.latency.p50_ms,
+            hits,
             bar
         )
         .unwrap();
     }
     writeln!(
         out,
-        "────────────────────────────────────────────────────────────────────────────────"
+        "──────────────────────────────────────────────────────────────────────────────────────────────"
     )
     .unwrap();
 
@@ -516,7 +532,7 @@ fn evaluate_quality(
     qrels: &HashMap<String, HashMap<String, u32>>,
     env: &crate::search::SearchEnvironment,
     verbose: u8,
-) -> Result<QualityMetrics> {
+) -> Result<(QualityMetrics, crate::search::SearchTelemetry)> {
     let mut ndcg_total = 0.0;
     let mut mrr_total = 0.0;
     let mut recall_total = 0.0;
@@ -525,7 +541,7 @@ fn evaluate_quality(
     let total_queries = qrels.len();
     for (i, (query_id, relevances)) in qrels.iter().enumerate() {
         if verbose > 0 && i > 0 && i % 50 == 0 {
-            crate::trace!(1, verbose, "    evaluated {}/{} queries...", i, total_queries);
+            tracing::info!("    evaluated {}/{} queries...", i, total_queries);
         }
         let query_text = queries
             .get(query_id)
@@ -556,11 +572,18 @@ fn evaluate_quality(
         bail!("quality benchmark requires at least one qrels row");
     }
 
-    Ok(QualityMetrics {
-        ndcg_at_10: ndcg_total / counted_queries as f64,
-        mrr_at_10: mrr_total / counted_queries as f64,
-        recall_at_10: recall_total / counted_queries as f64,
-    })
+    Ok((
+        QualityMetrics {
+            ndcg_at_10: ndcg_total / counted_queries as f64,
+            mrr_at_10: mrr_total / counted_queries as f64,
+            recall_at_10: recall_total / counted_queries as f64,
+        },
+        crate::search::SearchTelemetry {
+            heuristic_hit_rate: env.telemetry.heuristic_hit_rate(),
+            blob_hit_rate: env.telemetry.blob_hit_rate(),
+            embedding_hit_rate: env.telemetry.embedding_hit_rate(),
+        },
+    ))
 }
 
 fn quality_delta(metrics: &QualityMetrics, baseline: &QualityMetrics) -> QualityMetrics {

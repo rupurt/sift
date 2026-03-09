@@ -43,6 +43,15 @@ impl Telemetry {
             self.embedding_hits.load(Ordering::Relaxed) as f64 / total as f64
         }
     }
+
+    pub fn trace_hit_rates(&self) {
+        tracing::info!(
+            "cache hit rates: heuristic={:.1}%, blob={:.1}%, embedding={:.1}%",
+            self.heuristic_hit_rate() * 100.0,
+            self.blob_hit_rate() * 100.0,
+            self.embedding_hit_rate() * 100.0
+        );
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
