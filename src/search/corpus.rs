@@ -7,11 +7,21 @@ use super::domain::*;
 use crate::config::Ignore;
 use crate::extract::extract_path;
 use crate::segment::build_segments;
+use crate::cache::{Manifest, get_file_heuristics, hash_file, load_blob, save_blob, cache_dir};
+
+fn get_project_manifest_path(root: &Path) -> Result<PathBuf> {
+    let absolute = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
+    let path_str = absolute.to_string_lossy();
+    let hash = blake3::hash(path_str.as_bytes()).to_hex().to_string();
+    let manifests_dir = cache_dir("manifests")?;
+    Ok(manifests_dir.join(format!("{}.bin", hash)))
+}
 
 pub fn load_materialized_corpus(
     corpus_dir: &Path,
     ignore: Option<&Ignore>,
 ) -> Result<LoadedCorpus> {
+    // Kept standard for evaluation benchmarking (eval docs change less often and are isolated)
     if !corpus_dir.exists() {
         bail!("corpus path '{}' does not exist", corpus_dir.display());
     }
@@ -83,6 +93,11 @@ pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>) -> Result<Loaded
     let mut total_bytes = 0_u64;
     let mut skipped_files = 0_usize;
 
+    let manifest_path = get_project_manifest_path(root)?;
+    let mut manifest = Manifest::load(&manifest_path).unwrap_or_default();
+    let blobs_dir = cache_dir("blobs")?;
+    let mut manifest_updated = false;
+
     if root.is_file() {
         if let Some(ignore) = ignore {
             if ignore.is_ignored(root) {
@@ -94,7 +109,15 @@ pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>) -> Result<Loaded
                 });
             }
         }
-        collect_search_file(root, &mut documents, &mut total_bytes, &mut skipped_files);
+        collect_search_file_cached(
+            root,
+            &blobs_dir,
+            &mut manifest,
+            &mut manifest_updated,
+            &mut documents,
+            &mut total_bytes,
+            &mut skipped_files,
+        );
     } else if root.is_dir() {
         for entry in WalkDir::new(root).sort_by_file_name() {
             match entry {
@@ -106,8 +129,11 @@ pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>) -> Result<Loaded
                     }
 
                     if entry.file_type().is_file() {
-                        collect_search_file(
+                        collect_search_file_cached(
                             entry.path(),
+                            &blobs_dir,
+                            &mut manifest,
+                            &mut manifest_updated,
                             &mut documents,
                             &mut total_bytes,
                             &mut skipped_files,
@@ -124,6 +150,10 @@ pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>) -> Result<Loaded
         );
     }
 
+    if manifest_updated {
+        let _ = manifest.save(&manifest_path);
+    }
+
     documents.sort_by(|left, right| left.id.cmp(&right.id));
     let indexed_files = documents.len();
 
@@ -135,26 +165,65 @@ pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>) -> Result<Loaded
     })
 }
 
-fn collect_search_file(
+fn collect_search_file_cached(
     path: &Path,
+    blobs_dir: &Path,
+    manifest: &mut Manifest,
+    manifest_updated: &mut bool,
     documents: &mut Vec<Document>,
     total_bytes: &mut u64,
     skipped_files: &mut usize,
 ) {
-    let extracted = match extract_path(path) {
-        Ok(Some(extracted)) => extracted,
-        Ok(None) | Err(_) => {
-            *skipped_files += 1;
-            return;
-        }
+    let Ok(heuristics) = get_file_heuristics(path) else {
+        *skipped_files += 1;
+        return;
     };
 
-    *total_bytes += extracted.text.len() as u64;
-    documents.push(index_document(
-        path.display().to_string(),
-        path.to_path_buf(),
-        extracted,
-    ));
+    // Fast path: heuristics match manifest
+    if let Some(hash) = manifest.check_heuristics(path, &heuristics) {
+        if let Ok(mut doc) = load_blob(blobs_dir, &hash) {
+            // Update document ID to match current path, just in case file moved
+            doc.id = path.display().to_string();
+            doc.path = path.to_path_buf();
+            *total_bytes += doc.text.len() as u64;
+            documents.push(doc);
+            return;
+        }
+    }
+
+    // Medium path: compute blake3 and check global blob store
+    if let Ok(hash) = hash_file(path) {
+        if let Ok(mut doc) = load_blob(blobs_dir, &hash) {
+            manifest.update(path.to_path_buf(), heuristics, hash);
+            *manifest_updated = true;
+            
+            doc.id = path.display().to_string();
+            doc.path = path.to_path_buf();
+            *total_bytes += doc.text.len() as u64;
+            documents.push(doc);
+            return;
+        }
+
+        // Slow path: True miss, must extract and (later) embed
+        if let Ok(Some(extracted)) = extract_path(path) {
+            let id = path.display().to_string();
+            let doc = index_document(id, path.to_path_buf(), extracted);
+            
+            // Pre-warm the cache. Note: Segments don't have embeddings yet, 
+            // but the text extraction work is saved.
+            if save_blob(blobs_dir, &hash, &doc).is_ok() {
+                manifest.update(path.to_path_buf(), heuristics, hash);
+                *manifest_updated = true;
+            }
+
+            *total_bytes += doc.text.len() as u64;
+            documents.push(doc);
+        } else {
+            *skipped_files += 1;
+        }
+    } else {
+        *skipped_files += 1;
+    }
 }
 
 fn collect_materialized_file(
