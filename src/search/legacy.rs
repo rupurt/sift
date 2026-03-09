@@ -10,32 +10,45 @@ mod tests {
     use super::super::adapters::render_search_response;
     use super::super::*;
 
+    struct TestEnv {
+        pub corpus: tempfile::TempDir,
+        pub cache: tempfile::TempDir,
+    }
+
+    impl TestEnv {
+        fn new(corpus: tempfile::TempDir) -> Self {
+            Self {
+                corpus,
+                cache: tempdir().expect("cache dir"),
+            }
+        }
+
+        fn request(&self, strategy: &str, query: &str) -> SearchRequest {
+            SearchRequest {
+                strategy: strategy.to_string(),
+                query: query.to_string(),
+                path: self.corpus.path().to_path_buf(),
+                limit: 10,
+                shortlist: 10,
+                dense_model: DenseModelSpec::default(),
+                verbose: 0,
+                retrievers: None,
+                fusion: None,
+                reranking: None,
+                telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
+                cache_dir: Some(self.cache.path().to_path_buf()),
+            }
+        }
+    }
+
     mod search {
         use super::*;
 
         #[test]
         fn bm25_ranks_recursive_utf8_files() {
-            let corpus = sample_search_tree();
-            let cache_dir = tempdir().expect("cache dir");
-            unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
-
-            let response = run_search(
-                &SearchRequest {
-                    strategy: "bm25".to_string(),
-                    query: "retrieval architecture".to_string(),
-                    path: corpus.path().to_path_buf(),
-                    limit: 10,
-                    shortlist: 10,
-                    dense_model: DenseModelSpec::default(),
-                    verbose: 0,
-                    retrievers: None,
-                    fusion: None,
-                    reranking: None,
-                    telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
-                },
-                None,
-            )
-            .expect("search response");
+            let env = TestEnv::new(sample_search_tree());
+            let response = run_search(&env.request("bm25", "retrieval architecture"), None)
+                .expect("search response");
 
             assert_eq!(response.indexed_files, 3);
             assert_eq!(response.skipped_files, 1);
@@ -50,27 +63,9 @@ mod tests {
 
         #[test]
         fn json_output_contains_result_fields() {
-            let corpus = sample_search_tree();
-            let cache_dir = tempdir().expect("cache dir");
-            unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
-
-            let response = run_search(
-                &SearchRequest {
-                    strategy: "bm25".to_string(),
-                    query: "retrieval architecture".to_string(),
-                    path: corpus.path().to_path_buf(),
-                    limit: 10,
-                    shortlist: 10,
-                    dense_model: DenseModelSpec::default(),
-                    verbose: 0,
-                    retrievers: None,
-                    fusion: None,
-                    reranking: None,
-                    telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
-                },
-                None,
-            )
-            .expect("search response");
+            let env = TestEnv::new(sample_search_tree());
+            let response = run_search(&env.request("bm25", "retrieval architecture"), None)
+                .expect("search response");
 
             let output =
                 render_search_response(&response, OutputFormat::Json).expect("json rendering");
@@ -92,11 +87,17 @@ mod tests {
 
             #[test]
             fn prefers_best_segment_snippet_over_document_truncation() {
-                let corpus = sample_rich_search_tree();
-                let cache_dir = tempdir().expect("cache dir");
-                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+                let env = TestEnv::new(sample_rich_search_tree());
 
-                let loaded = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("loaded corpus");
+                let loaded = load_search_corpus(
+                    env.corpus.path(),
+                    None,
+                    0,
+                    None,
+                    &crate::system::Telemetry::new(),
+                    Some(env.cache.path()),
+                )
+                .expect("loaded corpus");
                 let document = loaded
                     .documents
                     .iter()
@@ -113,27 +114,12 @@ mod tests {
                     snippet_location: Some("slide 1".to_string()),
                 };
 
-                // run_search uses resolve_snippet_from_candidate internally
-                // We can test that via run_search or just check the resolve function if we exported it
-
-                let _response = run_search(
-                                    &SearchRequest {
-                                        strategy: "legacy-hybrid".to_string(),
-                                        query: "service catalog".to_string(),
-                                        path: corpus.path().to_path_buf(),
-                                        limit: 10,
-                                        shortlist: 10,
-                                        dense_model: DenseModelSpec::default(),
-                                        verbose: 0,
-                                        retrievers: None,
-                                        fusion: None,
-                                        reranking: None,
-                                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
-                                    },
-                    
-                    None,
-                )
-                .expect("search response");
+                                // run_search uses resolve_snippet_from_candidate internally
+                                // We can test that via run_search or just check the resolve function if we exported it
+                
+                                let _response = run_search(&env.request("legacy-hybrid", "service catalog"), None)
+                                    .expect("search response");
+                
 
                 // This is a bit hard to test precisely here without mock retrievers,
                 // but we check if any result has our expected snippet.
@@ -148,44 +134,12 @@ mod tests {
 
         #[test]
         fn filtering_skips_invalid_utf8_without_crashing() {
-            let corpus = sample_search_tree();
-            let cache_dir = tempdir().expect("cache dir");
-            unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+            let env = TestEnv::new(sample_search_tree());
 
-            let first = run_search(
-                &SearchRequest {
-                    strategy: "bm25".to_string(),
-                    query: "agent memory".to_string(),
-                    path: corpus.path().to_path_buf(),
-                    limit: 10,
-                    shortlist: 10,
-                    dense_model: DenseModelSpec::default(),
-                    verbose: 0,
-                    retrievers: None,
-                    fusion: None,
-                    reranking: None,
-                    telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
-                },
-                None,
-            )
-            .expect("first search");
-            let second = run_search(
-                &SearchRequest {
-                    strategy: "bm25".to_string(),
-                    query: "agent memory".to_string(),
-                    path: corpus.path().to_path_buf(),
-                    limit: 10,
-                    shortlist: 10,
-                    dense_model: DenseModelSpec::default(),
-                    verbose: 0,
-                    retrievers: None,
-                    fusion: None,
-                    reranking: None,
-                    telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
-                },
-                None,
-            )
-            .expect("second search");
+            let first = run_search(&env.request("bm25", "agent memory"), None)
+                .expect("first search");
+            let second = run_search(&env.request("bm25", "agent memory"), None)
+                .expect("second search");
 
             assert_eq!(first.indexed_files, 3);
             assert_eq!(first.skipped_files, 1);
@@ -202,11 +156,16 @@ mod tests {
 
             #[test]
             fn routes_text_and_html_documents_through_shared_extractor() {
-                let corpus = sample_rich_search_tree();
-                let cache_dir = tempdir().expect("cache dir");
-                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
-
-                let loaded = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("loaded corpus");
+                let env = TestEnv::new(sample_rich_search_tree());
+                let loaded = load_search_corpus(
+                    env.corpus.path(),
+                    None,
+                    0,
+                    None,
+                    &crate::system::Telemetry::new(),
+                    Some(env.cache.path()),
+                )
+                .expect("loaded corpus");
 
                 assert_eq!(loaded.indexed_files, 2);
                 assert_eq!(loaded.skipped_files, 1);
@@ -235,12 +194,26 @@ mod tests {
 
             #[test]
             fn segment_identity_is_stable_for_supported_documents() {
-                let corpus = supported_fixture_tree();
-                let cache_dir = tempdir().expect("cache dir");
-                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+                let env = TestEnv::new(supported_fixture_tree());
 
-                let first = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("first corpus load");
-                let second = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("second corpus load");
+                let first = load_search_corpus(
+                    env.corpus.path(),
+                    None,
+                    0,
+                    None,
+                    &crate::system::Telemetry::new(),
+                    Some(env.cache.path()),
+                )
+                .expect("first corpus load");
+                let second = load_search_corpus(
+                    env.corpus.path(),
+                    None,
+                    0,
+                    None,
+                    &crate::system::Telemetry::new(),
+                    Some(env.cache.path()),
+                )
+                .expect("second corpus load");
 
                 assert_eq!(first.indexed_files, 6);
                 assert_eq!(second.indexed_files, 6);
@@ -286,11 +259,16 @@ mod tests {
 
             #[test]
             fn structure_aware_segments_are_source_aware() {
-                let corpus = supported_fixture_tree();
-                let cache_dir = tempdir().expect("cache dir");
-                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
-
-                let loaded = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("loaded corpus");
+                let env = TestEnv::new(supported_fixture_tree());
+                let loaded = load_search_corpus(
+                    env.corpus.path(),
+                    None,
+                    0,
+                    None,
+                    &crate::system::Telemetry::new(),
+                    Some(env.cache.path()),
+                )
+                .expect("loaded corpus");
 
                 let html = loaded
                     .documents
@@ -334,11 +312,16 @@ mod tests {
 
             #[test]
             fn segment_text_preservation_keeps_section_local_text() {
-                let corpus = supported_fixture_tree();
-                let cache_dir = tempdir().expect("cache dir");
-                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
-
-                let loaded = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("loaded corpus");
+                let env = TestEnv::new(supported_fixture_tree());
+                let loaded = load_search_corpus(
+                    env.corpus.path(),
+                    None,
+                    0,
+                    None,
+                    &crate::system::Telemetry::new(),
+                    Some(env.cache.path()),
+                )
+                .expect("loaded corpus");
 
                 let html = loaded
                     .documents
@@ -414,27 +397,9 @@ mod tests {
 
             #[test]
             fn html_files_are_searchable_without_preprocessing() {
-                let corpus = sample_rich_search_tree();
-                let cache_dir = tempdir().expect("cache dir");
-                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
-
-                let response = run_search(
-                    &SearchRequest {
-                        strategy: "bm25".to_string(),
-                        query: "html heading".to_string(),
-                        path: corpus.path().to_path_buf(),
-                        limit: 10,
-                        shortlist: 10,
-                        dense_model: DenseModelSpec::default(),
-                        verbose: 0,
-                        retrievers: None,
-                        fusion: None,
-                        reranking: None,
-                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
-                    },
-                    None,
-                )
-                .expect("search response");
+                let env = TestEnv::new(sample_rich_search_tree());
+                let response = run_search(&env.request("bm25", "html heading"), None)
+                    .expect("search response");
 
                 assert_eq!(response.results[0].rank, 1);
                 assert!(response.results[0].path.ends_with("docs/service.html"));
@@ -450,34 +415,14 @@ mod tests {
         }
 
         mod pdf {
-            use std::path::Path;
 
             use super::*;
 
             #[test]
             fn pdf_files_are_searchable_without_external_conversion() {
-                let fixture_root =
-                    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
-                let cache_dir = tempdir().expect("cache dir");
-                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
-
-                let response = run_search(
-                    &SearchRequest {
-                        strategy: "bm25".to_string(),
-                        query: "architecture decision".to_string(),
-                        path: fixture_root,
-                        limit: 10,
-                        shortlist: 10,
-                        dense_model: DenseModelSpec::default(),
-                        verbose: 0,
-                        retrievers: None,
-                        fusion: None,
-                        reranking: None,
-                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
-                    },
-                    None,
-                )
-                .expect("search response");
+                let env = TestEnv::new(supported_fixture_tree());
+                let response = run_search(&env.request("bm25", "architecture decision"), None)
+                    .expect("search response");
 
                 assert_eq!(response.results[0].rank, 1);
                 assert!(response.results[0].path.ends_with("docs/architecture.pdf"));
@@ -497,34 +442,14 @@ mod tests {
         }
 
         mod office {
-            use std::path::Path;
 
             use super::*;
 
             #[test]
             fn office_documents_are_searchable_without_external_conversion() {
-                let fixture_root =
-                    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
-                let cache_dir = tempdir().expect("cache dir");
-                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
-
-                let response = run_search(
-                    &SearchRequest {
-                        strategy: "bm25".to_string(),
-                        query: "quarterly roadmap".to_string(),
-                        path: fixture_root,
-                        limit: 10,
-                        shortlist: 10,
-                        dense_model: DenseModelSpec::default(),
-                        verbose: 0,
-                        retrievers: None,
-                        fusion: None,
-                        reranking: None,
-                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
-                    },
-                    None,
-                )
-                .expect("search response");
+                let env = TestEnv::new(supported_fixture_tree());
+                let response = run_search(&env.request("bm25", "quarterly roadmap"), None)
+                    .expect("search response");
 
                 let paths = response
                     .results
@@ -551,51 +476,17 @@ mod tests {
         }
 
         mod determinism {
-            use std::path::Path;
 
             use super::*;
 
             #[test]
             fn mixed_format_search_results_are_deterministic() {
-                let fixture_root =
-                    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
-                let cache_dir = tempdir().expect("cache dir");
-                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+                let env = TestEnv::new(supported_fixture_tree());
 
-                let first = run_search(
-                    &SearchRequest {
-                        strategy: "bm25".to_string(),
-                        query: "quarterly roadmap".to_string(),
-                        path: fixture_root.clone(),
-                        limit: 10,
-                        shortlist: 10,
-                        dense_model: DenseModelSpec::default(),
-                        verbose: 0,
-                        retrievers: None,
-                        fusion: None,
-                        reranking: None,
-                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
-                    },
-                    None,
-                )
-                .expect("first search");
-                let second = run_search(
-                    &SearchRequest {
-                        strategy: "bm25".to_string(),
-                        query: "quarterly roadmap".to_string(),
-                        path: fixture_root,
-                        limit: 10,
-                        shortlist: 10,
-                        dense_model: DenseModelSpec::default(),
-                        verbose: 0,
-                        retrievers: None,
-                        fusion: None,
-                        reranking: None,
-                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
-                    },
-                    None,
-                )
-                .expect("second search");
+                let first = run_search(&env.request("bm25", "quarterly roadmap"), None)
+                    .expect("first search");
+                let second = run_search(&env.request("bm25", "quarterly roadmap"), None)
+                    .expect("second search");
 
                 assert_eq!(first.indexed_files, second.indexed_files);
                 assert_eq!(first.skipped_files, second.skipped_files);
@@ -608,44 +499,12 @@ mod tests {
 
             #[test]
             fn invalid_binary_files_are_skipped_deterministically() {
-                let corpus = sample_rich_search_tree();
-                let cache_dir = tempdir().expect("cache dir");
-                unsafe { std::env::set_var("SIFT_BLOBS_CACHE", cache_dir.path().join("blobs")); std::env::set_var("SIFT_MANIFESTS_CACHE", cache_dir.path().join("manifests")); }
+                let env = TestEnv::new(sample_rich_search_tree());
 
-                let first = run_search(
-                    &SearchRequest {
-                        strategy: "bm25".to_string(),
-                        query: "service catalog".to_string(),
-                        path: corpus.path().to_path_buf(),
-                        limit: 10,
-                        shortlist: 10,
-                        dense_model: DenseModelSpec::default(),
-                        verbose: 0,
-                        retrievers: None,
-                        fusion: None,
-                        reranking: None,
-                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
-                    },
-                    None,
-                )
-                .expect("first search");
-                let second = run_search(
-                    &SearchRequest {
-                        strategy: "bm25".to_string(),
-                        query: "service catalog".to_string(),
-                        path: corpus.path().to_path_buf(),
-                        limit: 10,
-                        shortlist: 10,
-                        dense_model: DenseModelSpec::default(),
-                        verbose: 0,
-                        retrievers: None,
-                        fusion: None,
-                        reranking: None,
-                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
-                    },
-                    None,
-                )
-                .expect("second search");
+                let first = run_search(&env.request("bm25", "service catalog"), None)
+                    .expect("first search");
+                let second = run_search(&env.request("bm25", "service catalog"), None)
+                    .expect("second search");
 
                 assert_eq!(first.indexed_files, 2);
                 assert_eq!(first.skipped_files, 1);

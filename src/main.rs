@@ -414,6 +414,7 @@ fn main() -> Result<()> {
                     fusion: search.fusion,
                     reranking: search.reranking,
                     telemetry: telemetry.clone(),
+                    cache_dir: None,
                 },
                 Some(&ignore),
             )?;

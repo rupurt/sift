@@ -113,7 +113,7 @@ pub fn run_quality_benchmark(
     tracing::info!("→ loading dense model: {}", request.dense_model.model_id);
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load), &telemetry_for_load)?;
+    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load), &telemetry_for_load, None)?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
@@ -140,6 +140,7 @@ pub fn run_quality_benchmark(
             fusion: None,
             reranking: None,
             telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
+            cache_dir: None,
         },
         &corpus,
         &index,
@@ -172,6 +173,7 @@ pub fn run_quality_benchmark(
                     fusion: None,
                     reranking: None,
                     telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
+                    cache_dir: None,
                 },
                 &corpus,
                 &index,
@@ -202,6 +204,7 @@ pub fn run_quality_benchmark(
                 fusion: None,
                 reranking: None,
                 telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
+                cache_dir: None,
             },
             &corpus,
             &index,
@@ -247,7 +250,7 @@ pub fn run_latency_benchmark(
     tracing::info!("→ loading dense model: {}", request.dense_model.model_id);
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load), &telemetry_for_load)?;
+    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load), &telemetry_for_load, None)?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries = load_queries(&request.queries_path)?;
     let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
@@ -269,6 +272,7 @@ pub fn run_latency_benchmark(
             fusion: None,
             reranking: None,
             telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
+            cache_dir: None,
         },
         &corpus,
         &index,
@@ -323,7 +327,7 @@ pub fn run_comparative_benchmark(
     tracing::info!("→ loading dense model: {}", request.dense_model.model_id);
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load), &telemetry_for_load)?;
+    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load), &telemetry_for_load, None)?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
@@ -349,6 +353,7 @@ pub fn run_comparative_benchmark(
                 fusion: None,
                 reranking: None,
                 telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
+                cache_dir: None,
             },
             &corpus,
             &index,

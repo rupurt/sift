@@ -48,6 +48,7 @@ pub struct SearchRequest {
     pub fusion: Option<FusionPolicy>,
     pub reranking: Option<RerankingPolicy>,
     pub telemetry: Arc<Telemetry>,
+    pub cache_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

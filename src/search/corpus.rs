@@ -18,11 +18,15 @@ enum ProcessResult {
     Skip,
 }
 
-fn get_project_manifest_path(root: &Path) -> Result<PathBuf> {
+fn get_project_manifest_path(root: &Path, cache_base: Option<&Path>) -> Result<PathBuf> {
     let absolute = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let path_str = absolute.to_string_lossy();
     let hash = blake3::hash(path_str.as_bytes()).to_hex().to_string();
-    let manifests_dir = cache_dir("manifests")?;
+    let manifests_dir = if let Some(base) = cache_base {
+        base.join("manifests")
+    } else {
+        cache_dir("manifests")?
+    };
     Ok(manifests_dir.join(format!("{}.bin", hash)))
 }
 
@@ -117,14 +121,19 @@ pub fn load_search_corpus(
     _verbose: u8,
     dense: Option<&DenseReranker>,
     telemetry: &crate::system::Telemetry,
+    cache_base: Option<&Path>,
 ) -> Result<LoadedCorpus> {
     if !root.exists() {
         bail!("search path '{}' does not exist", root.display());
     }
 
-    let manifest_path = get_project_manifest_path(root)?;
+    let manifest_path = get_project_manifest_path(root, cache_base)?;
     let mut manifest = Manifest::load(&manifest_path).unwrap_or_default();
-    let blobs_dir = cache_dir("blobs")?;
+    let blobs_dir = if let Some(base) = cache_base {
+        base.join("blobs")
+    } else {
+        cache_dir("blobs")?
+    };
     
     let mut files_to_process = Vec::new();
 

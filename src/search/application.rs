@@ -356,7 +356,7 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
         dense_for_load = Some(dense);
     }
 
-    let corpus = load_search_corpus(&request.path, ignore, verbose, dense_for_load.as_deref(), &request.telemetry)?;
+    let corpus = load_search_corpus(&request.path, ignore, verbose, dense_for_load.as_deref(), &request.telemetry, request.cache_dir.as_deref())?;
     tracing::info!("corpus loaded ({} files) in {:.2?}", corpus.indexed_files, corpus_start.elapsed());
 
     if let Some(dense) = dense_for_load {
