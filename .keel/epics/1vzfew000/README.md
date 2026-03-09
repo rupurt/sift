@@ -6,7 +6,7 @@ created_at: 2026-03-09T11:52:42
 
 # Zig-Style Global File Cache
 
-> {{problem}}
+> sift currently extracts text and computes dense embeddings (which is expensive) for every file on every run. As the corpus grows, this transient approach becomes a massive performance bottleneck. We need a way to reuse extraction and vectorization work across runs and across different projects, but we must strictly avoid the complexity of traditional sidecar databases or daemons.
 
 ## Documents
 

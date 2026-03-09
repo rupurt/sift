@@ -2,10 +2,12 @@
 id: 1vzfji000
 title: Add Blake3 Bincode And Cache Models
 type: feat
-status: backlog
+status: needs-human-verification
 scope: 1vzfew000/1vzfjD000
 created_at: 2026-03-09T11:21:45
-updated_at: 2026-03-09T11:54:55
+updated_at: 2026-03-09T11:57:49
+started_at: 2026-03-09T11:55:20
+submitted_at: 2026-03-09T11:57:49
 ---
 
 # Add Blake3 Bincode And Cache Models
@@ -16,6 +18,6 @@ We are implementing a Zig-style file cache. We need the data structures and depe
 
 ## Acceptance Criteria
 
-- [ ] [SRS-02/AC-01] Add `blake3`, `bincode`, and `fs2` to `Cargo.toml`.
-- [ ] [SRS-02/AC-02] Define `CacheEntry` and `Manifest` structs in a new `src/cache/model.rs` (or similar) file.
-- [ ] [SRS-02/AC-03] Ensure `Document` and `Segment` derive `Serialize` and `Deserialize` using `bincode`.
+- [x] [SRS-02/AC-01] Add `blake3`, `bincode`, and `fs2` to `Cargo.toml`. <!-- verify: manual, SRS-02:start:end, proof: ac-1.log -->
+- [x] [SRS-02/AC-02] Define `CacheEntry` and `Manifest` structs in a new `src/cache/model.rs` (or similar) file. <!-- verify: manual, SRS-02:start:end, proof: ac-2.log -->
+- [x] [SRS-02/AC-03] Ensure `Document` and `Segment` derive `Serialize` and `Deserialize` using `bincode`. <!-- verify: manual, SRS-02:start:end, proof: ac-3.log -->

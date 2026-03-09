@@ -74,7 +74,7 @@ impl LoadedCorpus {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Document {
     pub id: String,
     pub path: PathBuf,

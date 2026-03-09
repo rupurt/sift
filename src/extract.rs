@@ -3,9 +3,11 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 
+use serde::{Serialize, Deserialize};
+
 const HTML_RENDER_WIDTH: usize = 200;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SourceKind {
     Text,
     Html,

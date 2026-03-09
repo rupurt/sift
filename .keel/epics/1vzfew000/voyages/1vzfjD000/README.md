@@ -29,7 +29,7 @@ started_at: 2026-03-09T11:55:00
 
 | Title | Type | Status |
 |-------|------|--------|
-| [Add Blake3 Bincode And Cache Models](../../../../stories/1vzfji000/README.md) | feat | backlog |
+| [Add Blake3 Bincode And Cache Models](../../../../stories/1vzfji000/README.md) | feat | needs-human-verification |
 | [Implement Blob Store And Manifest Logic](../../../../stories/1vzfjv000/README.md) | feat | backlog |
 | [Wire Cache Into Prepared Corpus](../../../../stories/1vzfkD000/README.md) | feat | backlog |
 <!-- END GENERATED -->

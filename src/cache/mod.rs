@@ -1,3 +1,7 @@
+pub mod model;
+
+pub use model::*;
+
 use anyhow::{Result, bail};
 use directories::ProjectDirs;
 use std::env;

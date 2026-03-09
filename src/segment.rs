@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 use crate::extract::SourceKind;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Segment {
     pub id: String,
     pub doc_id: String,
