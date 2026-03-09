@@ -48,7 +48,7 @@ pub fn load_materialized_corpus(
     corpus_dir: &Path,
     ignore: Option<&Ignore>,
 ) -> Result<LoadedCorpus> {
-    // Kept standard for evaluation benchmarking (eval docs change less often and are isolated)
+    // Kept standard for evaluation evaluationing (eval docs change less often and are isolated)
     if !corpus_dir.exists() {
         bail!("corpus path '{}' does not exist", corpus_dir.display());
     }
@@ -62,7 +62,7 @@ pub fn load_materialized_corpus(
                     continue;
                 }
 
-                if is_benchmark_metadata_file(corpus_dir, entry.path()) {
+                if is_evaluation_metadata_file(corpus_dir, entry.path()) {
                     continue;
                 }
 
@@ -114,7 +114,7 @@ pub fn load_materialized_corpus(
     })
 }
 
-fn is_benchmark_metadata_file(root: &Path, path: &Path) -> bool {
+fn is_evaluation_metadata_file(root: &Path, path: &Path) -> bool {
     if path.extension().and_then(|ext| ext.to_str()) == Some("tsv") {
         return true;
     }

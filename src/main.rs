@@ -2,14 +2,14 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
-use sift::bench::{
-    LatencyBenchmarkRequest, QualityBenchmarkRequest, render_comparative_report,
-    run_comparative_benchmark, run_latency_benchmark, run_quality_benchmark,
-};
 use sift::cache::cache_dir;
 use sift::config::Config;
 use sift::dense::{DenseModelSpec, DenseReranker};
-use sift::eval::{download_scifact_dataset, materialize_scifact_dir};
+use sift::eval::{
+    download_scifact_dataset, materialize_scifact_dir,
+    LatencyEvaluationRequest, QualityEvaluationRequest, render_comparative_report,
+    run_comparative_evaluation, run_latency_evaluation, run_quality_evaluation,
+};
 use sift::search::{
     Embedder, FusionPolicy, LocalFileCorpusRepository, OutputFormat, RerankingPolicy,
     RetrieverPolicy, SearchRequest, StrategyPresetRegistry, render_search_response, run_search,
@@ -299,8 +299,8 @@ fn main() -> Result<()> {
                 query_limit,
             } => {
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
-                let report = run_comparative_benchmark(
-                    &QualityBenchmarkRequest {
+                let report = run_comparative_evaluation(
+                    &QualityEvaluationRequest {
                         strategy: String::new(), // Not used for All
                         baseline: None,
                         command: command_line,
@@ -340,8 +340,8 @@ fn main() -> Result<()> {
             } => {
                 let strategy = strategy.unwrap_or_else(|| config.search.strategy.clone());
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
-                let report = run_quality_benchmark(
-                    &QualityBenchmarkRequest {
+                let report = run_quality_evaluation(
+                    &QualityEvaluationRequest {
                         strategy,
                         baseline,
                         command: command_line,
@@ -374,8 +374,8 @@ fn main() -> Result<()> {
             } => {
                 let strategy = strategy.unwrap_or_else(|| config.search.strategy.clone());
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
-                let report = run_latency_benchmark(
-                    &LatencyBenchmarkRequest {
+                let report = run_latency_evaluation(
+                    &LatencyEvaluationRequest {
                         strategy,
                         command: command_line,
                         corpus_dir: corpus,
