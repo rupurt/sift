@@ -13,7 +13,7 @@ Sift uses standard Information Retrieval (IR) evaluation datasets to ensure sear
 Currently, Sift primarily uses the SciFact dataset for evaluation. All files are stored in your standard user cache directory (e.g., `~/.cache/sift/eval` on Linux).
 
 ### Download
-Downloads the dataset from HuggingFace to `~/.cache/sift/eval/scifact`.
+Downloads the dataset from HuggingFace to `$HOME/.cache/sift/eval/scifact`.
 
 ```bash
 # Via just
@@ -24,7 +24,7 @@ sift eval download scifact
 ```
 
 ### Materialize
-Converts the JSONL corpus into a directory of `.txt` files at `~/.cache/sift/eval/scifact-files`. This is necessary for `sift` to walk the "project" and index it normally.
+Converts the JSONL corpus into a directory of `.txt` files at `$HOME/.cache/sift/eval/scifact-files`. This is necessary for `sift` to walk the "project" and index it normally.
 
 ```bash
 # Via just

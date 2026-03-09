@@ -8,7 +8,7 @@ Before running benchmarks, you must download and materialize an evaluation datas
 
 ```bash
 # Downloads and prepares the SciFact dataset automatically
-# Files will be placed in ~/.cache/sift/eval/
+# Files will be placed in $HOME/.cache/sift/eval/
 just bench prepare
 ```
 
@@ -20,21 +20,21 @@ The `just` recipes pass all arguments through to the underlying `sift bench` com
 Runs all available strategies (BM25, Vector, Hybrid, etc.) and compares their metrics.
 
 ```bash
-just bench all --corpus ~/.cache/sift/eval/scifact-files --qrels ~/.cache/sift/eval/scifact/qrels/test.tsv
+just bench all --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv
 ```
 
 ### 2. Champion Benchmark (`bench hybrid`)
 Runs a comprehensive quality and latency report for the current champion strategy (`page-index-hybrid`) against the `bm25` baseline.
 
 ```bash
-just bench hybrid --corpus ~/.cache/sift/eval/scifact-files --qrels ~/.cache/sift/eval/scifact/qrels/test.tsv --queries ~/.cache/sift/eval/scifact-files/test-queries.tsv
+just bench hybrid --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv --queries $HOME/.cache/sift/eval/scifact-files/test-queries.tsv
 ```
 
 ### 3. Baseline Benchmark (`bench baseline`)
 Runs a report for the standard `bm25` strategy.
 
 ```bash
-just bench baseline --corpus ~/.cache/sift/eval/scifact-files --qrels ~/.cache/sift/eval/scifact/qrels/test.tsv --queries ~/.cache/sift/eval/scifact-files/test-queries.tsv
+just bench baseline --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv --queries $HOME/.cache/sift/eval/scifact-files/test-queries.tsv
 ```
 
 ---
@@ -49,8 +49,8 @@ Measures retrieval metrics (nDCG, MRR, Recall) using a Qrels file.
 ```bash
 sift bench quality \
   --strategy page-index-hybrid \
-  --corpus ~/.cache/sift/eval/scifact-files \
-  --qrels ~/.cache/sift/eval/scifact/qrels/test.tsv
+  --corpus $HOME/.cache/sift/eval/scifact-files \
+  --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv
 ```
 
 ### Latency Benchmark
@@ -59,8 +59,8 @@ Measures p50, p90, and max latency over a set of queries.
 ```bash
 sift bench latency \
   --strategy vector \
-  --corpus ~/.cache/sift/eval/scifact-files \
-  --queries ~/.cache/sift/eval/scifact-files/test-queries.tsv
+  --corpus $HOME/.cache/sift/eval/scifact-files \
+  --queries $HOME/.cache/sift/eval/scifact-files/test-queries.tsv
 ```
 
 ## Debugging Benchmarks (`--verbose`)
@@ -68,7 +68,7 @@ sift bench latency \
 Benchmarks support the standard verbosity flags (`-v`, `-vv`, `-vvv`). You can pass these through `just`:
 
 ```bash
-just bench all --corpus ~/.cache/sift/eval/scifact-files --qrels ~/.cache/sift/eval/scifact/qrels/test.tsv -v
+just bench all --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv -v
 ```
 
 ## Interpreting Results
