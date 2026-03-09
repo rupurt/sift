@@ -56,7 +56,13 @@ fn render_text_response(response: &SearchResponse) -> Result<String> {
             score_color, hit.score, hit.confidence
         )?;
         if !hit.snippet.is_empty() {
-            writeln!(&mut output, "   snippet: {}", hit.snippet)?;
+            for (i, line) in hit.snippet.lines().enumerate() {
+                if i == 0 {
+                    writeln!(&mut output, "   snippet: {}", line)?;
+                } else {
+                    writeln!(&mut output, "            {}", line)?;
+                }
+            }
         }
         writeln!(&mut output)?;
     }

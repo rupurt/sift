@@ -247,7 +247,12 @@ pub fn build_snippet(text: &str, query: &str) -> String {
         return build_simple_snippet(text, 160);
     }
 
-    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let collapsed = text
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
     let lowercase_text = collapsed.to_lowercase();
 
     // Find the first occurrence of any query term
@@ -297,7 +302,12 @@ pub fn build_snippet(text: &str, query: &str) -> String {
 }
 
 fn build_simple_snippet(text: &str, limit: usize) -> String {
-    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let collapsed = text
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
     if collapsed.is_empty() {
         return String::new();
     }
