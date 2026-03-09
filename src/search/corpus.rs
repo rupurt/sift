@@ -8,7 +8,10 @@ use crate::config::Ignore;
 use crate::extract::extract_path;
 use crate::segment::build_segments;
 
-pub fn load_materialized_corpus(corpus_dir: &Path, ignore: Option<&Ignore>) -> Result<LoadedCorpus> {
+pub fn load_materialized_corpus(
+    corpus_dir: &Path,
+    ignore: Option<&Ignore>,
+) -> Result<LoadedCorpus> {
     if !corpus_dir.exists() {
         bail!("corpus path '{}' does not exist", corpus_dir.display());
     }

@@ -1,4 +1,3 @@
-use std::env;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
@@ -9,6 +8,7 @@ use candle_transformers::models::bert::{BertModel, Config as BertConfig, DTYPE};
 use rust_tokenizers::tokenizer::{BertTokenizer, Tokenizer, TruncationStrategy};
 use serde::Deserialize;
 
+use crate::cache::cache_dir;
 use crate::segment::Segment;
 use crate::vector::{SegmentHit, SegmentScorer};
 
@@ -309,22 +309,7 @@ fn validate_repo_path(label: &str, value: &str) -> Result<()> {
 }
 
 fn model_cache_root() -> Result<PathBuf> {
-    if let Some(path) = env::var_os("SIFT_MODEL_CACHE") {
-        return Ok(PathBuf::from(path));
-    }
-    if let Some(path) = env::var_os("XDG_CACHE_HOME") {
-        return Ok(PathBuf::from(path).join("sift").join("models"));
-    }
-    if let Some(path) = env::var_os("HOME") {
-        return Ok(PathBuf::from(path)
-            .join(".cache")
-            .join("sift")
-            .join("models"));
-    }
-
-    bail!(
-        "unable to determine a model cache directory; set SIFT_MODEL_CACHE, XDG_CACHE_HOME, or HOME"
-    )
+    cache_dir("models")
 }
 
 fn ensure_asset(

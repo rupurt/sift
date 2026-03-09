@@ -1,11 +1,11 @@
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 
-use crate::dense::DenseReranker;
-use crate::config::Ignore;
 use super::adapters::*;
 use super::corpus::load_search_corpus;
 use super::domain::*;
+use crate::config::Ignore;
+use crate::dense::DenseReranker;
 
 pub struct SearchService {
     retrievers: HashMap<RetrieverPolicy, Box<dyn Retriever>>,
@@ -148,7 +148,9 @@ impl SearchService {
         }
 
         if candidate_lists.is_empty() {
-            return Ok(CandidateList { results: Vec::new() });
+            return Ok(CandidateList {
+                results: Vec::new(),
+            });
         }
 
         // 3. Fusion
@@ -171,20 +173,20 @@ impl SearchService {
 
 pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<SearchResponse> {
     let mut service = SearchService::new();
-    
+
     // Register adapters
     service.register_retriever(Box::new(Bm25Retriever));
     service.register_retriever(Box::new(PhraseRetriever));
-    
+
     // For SegmentVectorRetriever, we need to load the model if the plan requires it
     let registry = StrategyPresetRegistry::default_registry();
     let plan = registry.resolve(&request.strategy)?;
-    
+
     if plan.retrievers.contains(&RetrieverPolicy::SegmentVector) {
         let dense = DenseReranker::load(request.dense_model.clone())?;
         service.register_retriever(Box::new(SegmentVectorRetriever { dense }));
     }
-    
+
     service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
     service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
     service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
@@ -221,7 +223,11 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
     })
 }
 
-fn resolve_snippet_from_candidate(corpus: &LoadedCorpus, candidate: &Candidate, query: &str) -> String {
+fn resolve_snippet_from_candidate(
+    corpus: &LoadedCorpus,
+    candidate: &Candidate,
+    query: &str,
+) -> String {
     if let Some(snippet) = candidate.snippet.as_deref() {
         return build_snippet(snippet, query);
     }
@@ -237,15 +243,20 @@ fn resolve_snippet_from_candidate(corpus: &LoadedCorpus, candidate: &Candidate, 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::adapters::*;
+    use super::*;
 
     struct MockRetriever {
         policy: RetrieverPolicy,
     }
 
     impl Retriever for MockRetriever {
-        fn retrieve(&self, variants: &[QueryVariant], _corpus: &PreparedCorpus, _limit: usize) -> Result<CandidateList> {
+        fn retrieve(
+            &self,
+            variants: &[QueryVariant],
+            _corpus: &PreparedCorpus,
+            _limit: usize,
+        ) -> Result<CandidateList> {
             let mut results = Vec::new();
             for variant in variants {
                 results.push(Candidate {
@@ -259,14 +270,18 @@ mod tests {
             }
             Ok(CandidateList { results })
         }
-        fn policy(&self) -> RetrieverPolicy { self.policy }
+        fn policy(&self) -> RetrieverPolicy {
+            self.policy
+        }
     }
 
     #[test]
     fn search_service_orchestrates_multiple_variants_and_retrievers() {
         let mut service = SearchService::new();
         service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
-        service.register_retriever(Box::new(MockRetriever { policy: RetrieverPolicy::Bm25 }));
+        service.register_retriever(Box::new(MockRetriever {
+            policy: RetrieverPolicy::Bm25,
+        }));
         service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
         service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
 
@@ -278,9 +293,12 @@ mod tests {
             reranking: RerankingPolicy::None,
         };
 
-        let corpus = PreparedCorpus { documents: &[], bm25_index: None };
+        let corpus = PreparedCorpus {
+            documents: &[],
+            bm25_index: None,
+        };
         let results = service.execute(&plan, "search", &corpus, 10).unwrap();
-        
+
         // "search" expansion with SynonymExpander gives "search" and "retrieval"
         // MockRetriever returns them as candidates
         assert!(results.results.iter().any(|c| c.id == "search"));
@@ -291,8 +309,12 @@ mod tests {
     fn search_service_fuses_results_from_multiple_retrievers() {
         let mut service = SearchService::new();
         service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
-        service.register_retriever(Box::new(MockRetriever { policy: RetrieverPolicy::Bm25 }));
-        service.register_retriever(Box::new(MockRetriever { policy: RetrieverPolicy::Phrase }));
+        service.register_retriever(Box::new(MockRetriever {
+            policy: RetrieverPolicy::Bm25,
+        }));
+        service.register_retriever(Box::new(MockRetriever {
+            policy: RetrieverPolicy::Phrase,
+        }));
         service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
         service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
 
@@ -304,9 +326,12 @@ mod tests {
             reranking: RerankingPolicy::None,
         };
 
-        let corpus = PreparedCorpus { documents: &[], bm25_index: None };
+        let corpus = PreparedCorpus {
+            documents: &[],
+            bm25_index: None,
+        };
         let results = service.execute(&plan, "query", &corpus, 10).unwrap();
-        
+
         // Both retrievers should return "query"
         // RRF should fuse them
         assert_eq!(results.results.len(), 1);
@@ -319,13 +344,13 @@ mod tests {
     #[test]
     fn strategy_preset_registry_resolves_named_presets_and_hybrid_alias() {
         let registry = StrategyPresetRegistry::default_registry();
-        
+
         let bm25 = registry.resolve("bm25").unwrap();
         assert_eq!(bm25.name, "bm25");
-        
+
         let page_index = registry.resolve("page-index").unwrap();
         assert_eq!(page_index.name, "page-index");
-        
+
         let hybrid = registry.resolve("hybrid").unwrap();
         // hybrid resolves to the champion which is currently page-index
         assert_eq!(hybrid.name, "page-index");

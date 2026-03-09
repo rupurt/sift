@@ -7,8 +7,8 @@ use std::time::Instant;
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
-use crate::dense::DenseModelSpec;
 use crate::config::Ignore;
+use crate::dense::DenseModelSpec;
 use crate::search::{LoadedCorpus, SearchRequest, load_materialized_corpus, run_search};
 use crate::system::{HardwareSummary, current_git_sha, detect_hardware_summary};
 
@@ -129,7 +129,10 @@ pub fn run_quality_benchmark(
         ignore,
     )?;
 
-    let baseline_strategy = request.baseline.clone().or_else(|| Some("bm25".to_string()));
+    let baseline_strategy = request
+        .baseline
+        .clone()
+        .or_else(|| Some("bm25".to_string()));
     let baseline_metrics = match &baseline_strategy {
         Some(strategy) => Some(evaluate_quality(
             &request.corpus_dir,
@@ -202,14 +205,17 @@ pub fn run_latency_benchmark(
     let mut timings = Vec::with_capacity(queries.len());
     for query_text in queries.values() {
         let started = Instant::now();
-        let _ = run_search(&SearchRequest {
-            strategy: request.strategy.clone(),
-            query: query_text.clone(),
-            path: request.corpus_dir.clone(),
-            limit: 10,
-            shortlist: request.shortlist,
-            dense_model: request.dense_model.clone(),
-        }, ignore)?;
+        let _ = run_search(
+            &SearchRequest {
+                strategy: request.strategy.clone(),
+                query: query_text.clone(),
+                path: request.corpus_dir.clone(),
+                limit: 10,
+                shortlist: request.shortlist,
+                dense_model: request.dense_model.clone(),
+            },
+            ignore,
+        )?;
         timings.push(started.elapsed().as_secs_f64() * 1000.0);
     }
 
@@ -261,7 +267,7 @@ pub fn run_comparative_benchmark(
 
     for name in names {
         let plan = registry.resolve(&name)?;
-        
+
         // Quality
         let quality = evaluate_quality(
             &request.corpus_dir,
@@ -276,22 +282,25 @@ pub fn run_comparative_benchmark(
         // Latency
         let prepare_started = Instant::now();
         let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
-        
+
         let mut timings = Vec::with_capacity(queries.len());
         for query_text in queries.values() {
             let started = Instant::now();
-            let _ = run_search(&SearchRequest {
-                strategy: name.clone(),
-                query: query_text.clone(),
-                path: request.corpus_dir.clone(),
-                limit: 10,
-                shortlist: request.shortlist,
-                dense_model: request.dense_model.clone(),
-            }, ignore)?;
+            let _ = run_search(
+                &SearchRequest {
+                    strategy: name.clone(),
+                    query: query_text.clone(),
+                    path: request.corpus_dir.clone(),
+                    limit: 10,
+                    shortlist: request.shortlist,
+                    dense_model: request.dense_model.clone(),
+                },
+                ignore,
+            )?;
             timings.push(started.elapsed().as_secs_f64() * 1000.0);
         }
         timings.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
-        
+
         let latency = LatencyMetrics {
             prepare_ms,
             p50_ms: percentile(&timings, 0.50),
@@ -328,9 +337,22 @@ pub fn render_comparative_report(report: &ComparativeBenchmarkReport) -> String 
     let mut out = String::new();
 
     writeln!(out, "\x1b[1mComparative Search Strategy Benchmark\x1b[0m").unwrap();
-    writeln!(out, "────────────────────────────────────────────────────────────────────────────────").unwrap();
-    writeln!(out, "{:<20} {:>10} {:>10} {:>10} {:>12}", "Strategy", "nDCG@10", "MRR@10", "Recall@10", "p50 (ms)").unwrap();
-    writeln!(out, "────────────────────────────────────────────────────────────────────────────────").unwrap();
+    writeln!(
+        out,
+        "────────────────────────────────────────────────────────────────────────────────"
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "{:<20} {:>10} {:>10} {:>10} {:>12}",
+        "Strategy", "nDCG@10", "MRR@10", "Recall@10", "p50 (ms)"
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "────────────────────────────────────────────────────────────────────────────────"
+    )
+    .unwrap();
 
     for res in &report.results {
         let bar = render_bar(res.quality.ndcg_at_10, 10);
@@ -343,15 +365,35 @@ pub fn render_comparative_report(report: &ComparativeBenchmarkReport) -> String 
             res.quality.recall_at_10,
             res.latency.p50_ms,
             bar
-        ).unwrap();
+        )
+        .unwrap();
     }
-    writeln!(out, "────────────────────────────────────────────────────────────────────────────────").unwrap();
-    
+    writeln!(
+        out,
+        "────────────────────────────────────────────────────────────────────────────────"
+    )
+    .unwrap();
+
     if let Some(meta) = report.metadata.first() {
         writeln!(out, "\n\x1b[1mEnvironment\x1b[0m").unwrap();
-        writeln!(out, "  OS:       {} ({})", meta.hardware.os, meta.hardware.arch).unwrap();
-        writeln!(out, "  CPU:      {}", meta.hardware.cpu_brand.as_deref().unwrap_or("unknown")).unwrap();
-        writeln!(out, "  Corpus:   {} documents, {} bytes", meta.corpus_documents, meta.corpus_bytes).unwrap();
+        writeln!(
+            out,
+            "  OS:       {} ({})",
+            meta.hardware.os, meta.hardware.arch
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "  CPU:      {}",
+            meta.hardware.cpu_brand.as_deref().unwrap_or("unknown")
+        )
+        .unwrap();
+        writeln!(
+            out,
+            "  Corpus:   {} documents, {} bytes",
+            meta.corpus_documents, meta.corpus_bytes
+        )
+        .unwrap();
         if let Some(sha) = &meta.git_sha {
             writeln!(out, "  Git SHA:  {}", sha).unwrap();
         }
@@ -425,14 +467,17 @@ fn evaluate_quality(
             .get(query_id)
             .with_context(|| format!("missing query text for qrels query-id '{query_id}'"))?;
 
-        let response = run_search(&SearchRequest {
-            strategy: strategy.to_string(),
-            query: query_text.clone(),
-            path: corpus_dir.to_path_buf(),
-            limit: 10,
-            shortlist,
-            dense_model: dense_model.clone(),
-        }, ignore)?;
+        let response = run_search(
+            &SearchRequest {
+                strategy: strategy.to_string(),
+                query: query_text.clone(),
+                path: corpus_dir.to_path_buf(),
+                limit: 10,
+                shortlist,
+                dense_model: dense_model.clone(),
+            },
+            ignore,
+        )?;
 
         // Map SearchHit to something we can use for metrics
         // We need the ID, which is not currently in SearchHit.

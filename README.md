@@ -130,7 +130,7 @@ sift search --json tests/fixtures/rich-docs "quarterly roadmap"
 Force lexical-only BM25 search when you want a baseline:
 
 ```bash
-sift search --engine bm25 tests/fixtures/rich-docs "service catalog"
+sift search --strategy bm25 tests/fixtures/rich-docs "service catalog"
 ```
 
 Override dense model settings explicitly:
@@ -139,7 +139,7 @@ Override dense model settings explicitly:
 sift search \
   --model-id sentence-transformers/all-MiniLM-L6-v2 \
   --max-length 40 \
-  .cache/eval/scifact-files \
+  ~/.cache/sift/eval/scifact-materialized \
   "retrieval architecture"
 ```
 
@@ -162,32 +162,30 @@ flowchart LR
   F --> H[latency report + hardware metadata]
 ```
 
-Download and materialize the SciFact evaluation corpus:
+Download and materialize the SciFact evaluation corpus (defaults to `~/.cache/sift/eval`):
 
 ```bash
-sift eval download scifact --out .cache/eval/scifact
-sift eval materialize scifact \
-  --source .cache/eval/scifact \
-  --out .cache/eval/scifact-files
+sift eval download scifact
+sift eval materialize scifact
 ```
 
 Measure hybrid quality against BM25:
 
 ```bash
 sift bench quality \
-  --engine hybrid \
+  --strategy hybrid \
   --baseline bm25 \
-  --corpus .cache/eval/scifact-files \
-  --qrels .cache/eval/scifact/qrels/test.tsv
+  --corpus ~/.cache/sift/eval/scifact-materialized \
+  --qrels ~/.cache/sift/eval/scifact/qrels/test.tsv
 ```
 
 Measure search latency:
 
 ```bash
 sift bench latency \
-  --engine hybrid \
-  --corpus .cache/eval/scifact-files \
-  --queries .cache/eval/scifact-files/test-queries.tsv
+  --strategy hybrid \
+  --corpus ~/.cache/sift/eval/scifact-materialized \
+  --queries ~/.cache/sift/eval/scifact-materialized/test-queries.tsv
 ```
 
 Benchmark reports include the exact command, corpus size, git SHA, hardware

@@ -7,8 +7,8 @@ mod tests {
 
     use crate::dense::DenseModelSpec;
 
-    use super::super::*;
     use super::super::adapters::render_search_response;
+    use super::super::*;
 
     mod search {
         use super::*;
@@ -16,14 +16,17 @@ mod tests {
         #[test]
         fn bm25_ranks_recursive_utf8_files() {
             let corpus = sample_search_tree();
-            let response = run_search(&SearchRequest {
-                strategy: "bm25".to_string(),
-                query: "retrieval architecture".to_string(),
-                path: corpus.path().to_path_buf(),
-                limit: 10,
-                shortlist: 10,
-                dense_model: DenseModelSpec::default(),
-            }, None)
+            let response = run_search(
+                &SearchRequest {
+                    strategy: "bm25".to_string(),
+                    query: "retrieval architecture".to_string(),
+                    path: corpus.path().to_path_buf(),
+                    limit: 10,
+                    shortlist: 10,
+                    dense_model: DenseModelSpec::default(),
+                },
+                None,
+            )
             .expect("search response");
 
             assert_eq!(response.indexed_files, 3);
@@ -40,14 +43,17 @@ mod tests {
         #[test]
         fn json_output_contains_result_fields() {
             let corpus = sample_search_tree();
-            let response = run_search(&SearchRequest {
-                strategy: "bm25".to_string(),
-                query: "retrieval architecture".to_string(),
-                path: corpus.path().to_path_buf(),
-                limit: 10,
-                shortlist: 10,
-                dense_model: DenseModelSpec::default(),
-            }, None)
+            let response = run_search(
+                &SearchRequest {
+                    strategy: "bm25".to_string(),
+                    query: "retrieval architecture".to_string(),
+                    path: corpus.path().to_path_buf(),
+                    limit: 10,
+                    shortlist: 10,
+                    dense_model: DenseModelSpec::default(),
+                },
+                None,
+            )
             .expect("search response");
 
             let output =
@@ -77,7 +83,7 @@ mod tests {
                     .iter()
                     .find(|document| document.path.ends_with("docs/service.html"))
                     .expect("html document");
-                
+
                 // Construct a Candidate with snippet
                 let _candidate = Candidate {
                     id: document.id.clone(),
@@ -90,16 +96,20 @@ mod tests {
 
                 // run_search uses resolve_snippet_from_candidate internally
                 // We can test that via run_search or just check the resolve function if we exported it
-                
-                let _response = run_search(&SearchRequest {
-                    strategy: "legacy-hybrid".to_string(),
-                    query: "service catalog".to_string(),
-                    path: corpus.path().to_path_buf(),
-                    limit: 10,
-                    shortlist: 10,
-                    dense_model: DenseModelSpec::default(),
-                }, None).expect("search response");
-                
+
+                let _response = run_search(
+                    &SearchRequest {
+                        strategy: "legacy-hybrid".to_string(),
+                        query: "service catalog".to_string(),
+                        path: corpus.path().to_path_buf(),
+                        limit: 10,
+                        shortlist: 10,
+                        dense_model: DenseModelSpec::default(),
+                    },
+                    None,
+                )
+                .expect("search response");
+
                 // This is a bit hard to test precisely here without mock retrievers,
                 // but we check if any result has our expected snippet.
                 // Actually, the original test was mocking RankedDocument.
@@ -115,23 +125,29 @@ mod tests {
         fn filtering_skips_invalid_utf8_without_crashing() {
             let corpus = sample_search_tree();
 
-            let first = run_search(&SearchRequest {
-                strategy: "bm25".to_string(),
-                query: "agent memory".to_string(),
-                path: corpus.path().to_path_buf(),
-                limit: 10,
-                shortlist: 10,
-                dense_model: DenseModelSpec::default(),
-            }, None)
+            let first = run_search(
+                &SearchRequest {
+                    strategy: "bm25".to_string(),
+                    query: "agent memory".to_string(),
+                    path: corpus.path().to_path_buf(),
+                    limit: 10,
+                    shortlist: 10,
+                    dense_model: DenseModelSpec::default(),
+                },
+                None,
+            )
             .expect("first search");
-            let second = run_search(&SearchRequest {
-                strategy: "bm25".to_string(),
-                query: "agent memory".to_string(),
-                path: corpus.path().to_path_buf(),
-                limit: 10,
-                shortlist: 10,
-                dense_model: DenseModelSpec::default(),
-            }, None)
+            let second = run_search(
+                &SearchRequest {
+                    strategy: "bm25".to_string(),
+                    query: "agent memory".to_string(),
+                    path: corpus.path().to_path_buf(),
+                    limit: 10,
+                    shortlist: 10,
+                    dense_model: DenseModelSpec::default(),
+                },
+                None,
+            )
             .expect("second search");
 
             assert_eq!(first.indexed_files, 3);
@@ -351,21 +367,29 @@ mod tests {
             #[test]
             fn html_files_are_searchable_without_preprocessing() {
                 let corpus = sample_rich_search_tree();
-                let response = run_search(&SearchRequest {
-                    strategy: "bm25".to_string(),
-                    query: "html heading".to_string(),
-                    path: corpus.path().to_path_buf(),
-                    limit: 10,
-                    shortlist: 10,
-                    dense_model: DenseModelSpec::default(),
-                }, None)
+                let response = run_search(
+                    &SearchRequest {
+                        strategy: "bm25".to_string(),
+                        query: "html heading".to_string(),
+                        path: corpus.path().to_path_buf(),
+                        limit: 10,
+                        shortlist: 10,
+                        dense_model: DenseModelSpec::default(),
+                    },
+                    None,
+                )
                 .expect("search response");
 
                 assert_eq!(response.results[0].rank, 1);
                 assert!(response.results[0].path.ends_with("docs/service.html"));
                 // The snippet is highlighted, so we check for substring or strip codes.
                 assert!(response.results[0].snippet.to_lowercase().contains("html"));
-                assert!(response.results[0].snippet.to_lowercase().contains("heading"));
+                assert!(
+                    response.results[0]
+                        .snippet
+                        .to_lowercase()
+                        .contains("heading")
+                );
             }
         }
 
@@ -378,14 +402,17 @@ mod tests {
             fn pdf_files_are_searchable_without_external_conversion() {
                 let fixture_root =
                     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
-                let response = run_search(&SearchRequest {
-                    strategy: "bm25".to_string(),
-                    query: "architecture decision".to_string(),
-                    path: fixture_root,
-                    limit: 10,
-                    shortlist: 10,
-                    dense_model: DenseModelSpec::default(),
-                }, None)
+                let response = run_search(
+                    &SearchRequest {
+                        strategy: "bm25".to_string(),
+                        query: "architecture decision".to_string(),
+                        path: fixture_root,
+                        limit: 10,
+                        shortlist: 10,
+                        dense_model: DenseModelSpec::default(),
+                    },
+                    None,
+                )
                 .expect("search response");
 
                 assert_eq!(response.results[0].rank, 1);
@@ -414,14 +441,17 @@ mod tests {
             fn office_documents_are_searchable_without_external_conversion() {
                 let fixture_root =
                     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
-                let response = run_search(&SearchRequest {
-                    strategy: "bm25".to_string(),
-                    query: "quarterly roadmap".to_string(),
-                    path: fixture_root,
-                    limit: 10,
-                    shortlist: 10,
-                    dense_model: DenseModelSpec::default(),
-                }, None)
+                let response = run_search(
+                    &SearchRequest {
+                        strategy: "bm25".to_string(),
+                        query: "quarterly roadmap".to_string(),
+                        path: fixture_root,
+                        limit: 10,
+                        shortlist: 10,
+                        dense_model: DenseModelSpec::default(),
+                    },
+                    None,
+                )
                 .expect("search response");
 
                 let paths = response
@@ -458,23 +488,29 @@ mod tests {
                 let fixture_root =
                     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
 
-                let first = run_search(&SearchRequest {
-                    strategy: "bm25".to_string(),
-                    query: "quarterly roadmap".to_string(),
-                    path: fixture_root.clone(),
-                    limit: 10,
-                    shortlist: 10,
-                    dense_model: DenseModelSpec::default(),
-                }, None)
+                let first = run_search(
+                    &SearchRequest {
+                        strategy: "bm25".to_string(),
+                        query: "quarterly roadmap".to_string(),
+                        path: fixture_root.clone(),
+                        limit: 10,
+                        shortlist: 10,
+                        dense_model: DenseModelSpec::default(),
+                    },
+                    None,
+                )
                 .expect("first search");
-                let second = run_search(&SearchRequest {
-                    strategy: "bm25".to_string(),
-                    query: "quarterly roadmap".to_string(),
-                    path: fixture_root,
-                    limit: 10,
-                    shortlist: 10,
-                    dense_model: DenseModelSpec::default(),
-                }, None)
+                let second = run_search(
+                    &SearchRequest {
+                        strategy: "bm25".to_string(),
+                        query: "quarterly roadmap".to_string(),
+                        path: fixture_root,
+                        limit: 10,
+                        shortlist: 10,
+                        dense_model: DenseModelSpec::default(),
+                    },
+                    None,
+                )
                 .expect("second search");
 
                 assert_eq!(first.indexed_files, second.indexed_files);
@@ -490,23 +526,29 @@ mod tests {
             fn invalid_binary_files_are_skipped_deterministically() {
                 let corpus = sample_rich_search_tree();
 
-                let first = run_search(&SearchRequest {
-                    strategy: "bm25".to_string(),
-                    query: "service catalog".to_string(),
-                    path: corpus.path().to_path_buf(),
-                    limit: 10,
-                    shortlist: 10,
-                    dense_model: DenseModelSpec::default(),
-                }, None)
+                let first = run_search(
+                    &SearchRequest {
+                        strategy: "bm25".to_string(),
+                        query: "service catalog".to_string(),
+                        path: corpus.path().to_path_buf(),
+                        limit: 10,
+                        shortlist: 10,
+                        dense_model: DenseModelSpec::default(),
+                    },
+                    None,
+                )
                 .expect("first search");
-                let second = run_search(&SearchRequest {
-                    strategy: "bm25".to_string(),
-                    query: "service catalog".to_string(),
-                    path: corpus.path().to_path_buf(),
-                    limit: 10,
-                    shortlist: 10,
-                    dense_model: DenseModelSpec::default(),
-                }, None)
+                let second = run_search(
+                    &SearchRequest {
+                        strategy: "bm25".to_string(),
+                        query: "service catalog".to_string(),
+                        path: corpus.path().to_path_buf(),
+                        limit: 10,
+                        shortlist: 10,
+                        dense_model: DenseModelSpec::default(),
+                    },
+                    None,
+                )
                 .expect("second search");
 
                 assert_eq!(first.indexed_files, 2);

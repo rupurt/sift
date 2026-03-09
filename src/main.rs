@@ -6,6 +6,7 @@ use sift::bench::{
     LatencyBenchmarkRequest, QualityBenchmarkRequest, render_comparative_report,
     run_comparative_benchmark, run_latency_benchmark, run_quality_benchmark,
 };
+use sift::cache::cache_dir;
 use sift::config::Config;
 use sift::dense::DenseModelSpec;
 use sift::eval::{download_scifact_dataset, materialize_scifact_dir};
@@ -88,15 +89,15 @@ enum EvalCommands {
     Download {
         dataset: Dataset,
         #[arg(long)]
-        out: PathBuf,
+        out: Option<PathBuf>,
     },
     /// Materialize a downloaded dataset as local text files
     Materialize {
         dataset: Dataset,
         #[arg(long)]
-        source: PathBuf,
+        source: Option<PathBuf>,
         #[arg(long)]
-        out: PathBuf,
+        out: Option<PathBuf>,
     },
 }
 
@@ -174,23 +175,53 @@ fn main() -> Result<()> {
 
     match cli.command {
         Commands::Eval { command } => match command {
-            EvalCommands::Download { dataset, out } => match dataset {
-                Dataset::Scifact => {
-                    let summary =
-                        download_scifact_dataset(SCIFACT_BASE_URL, SCIFACT_QRELS_BASE_URL, &out)?;
-                    println!("{}", serde_json::to_string_pretty(&summary)?);
+            EvalCommands::Download { dataset, out } => {
+                let dataset_name = match dataset {
+                    Dataset::Scifact => "scifact",
+                };
+                let out = out.unwrap_or_else(|| {
+                    cache_dir("eval")
+                        .expect("resolve eval cache dir")
+                        .join(dataset_name)
+                });
+
+                match dataset {
+                    Dataset::Scifact => {
+                        let summary = download_scifact_dataset(
+                            SCIFACT_BASE_URL,
+                            SCIFACT_QRELS_BASE_URL,
+                            &out,
+                        )?;
+                        println!("{}", serde_json::to_string_pretty(&summary)?);
+                    }
                 }
-            },
+            }
             EvalCommands::Materialize {
                 dataset,
                 source,
                 out,
-            } => match dataset {
-                Dataset::Scifact => {
-                    let summary = materialize_scifact_dir(&source, &out)?;
-                    println!("{}", serde_json::to_string_pretty(&summary)?);
+            } => {
+                let dataset_name = match dataset {
+                    Dataset::Scifact => "scifact",
+                };
+                let source = source.unwrap_or_else(|| {
+                    cache_dir("eval")
+                        .expect("resolve eval cache dir")
+                        .join(dataset_name)
+                });
+                let out = out.unwrap_or_else(|| {
+                    cache_dir("eval")
+                        .expect("resolve eval cache dir")
+                        .join(format!("{}-materialized", dataset_name))
+                });
+
+                match dataset {
+                    Dataset::Scifact => {
+                        let summary = materialize_scifact_dir(&source, &out)?;
+                        println!("{}", serde_json::to_string_pretty(&summary)?);
+                    }
                 }
-            },
+            }
         },
         Commands::Bench { command } => match command {
             BenchCommands::All {
@@ -204,20 +235,23 @@ fn main() -> Result<()> {
                 json,
             } => {
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
-                let report = run_comparative_benchmark(&QualityBenchmarkRequest {
-                    strategy: String::new(), // Not used for All
-                    baseline: None,
-                    command: command_line,
-                    corpus_dir: corpus,
-                    queries_path: queries,
-                    qrels_path: qrels,
-                    shortlist,
-                    dense_model: DenseModelSpec::with_overrides(
-                        model_id.or_else(|| config.model.model_id.clone()),
-                        model_revision.or_else(|| config.model.model_revision.clone()),
-                        max_length.or(config.model.max_length),
-                    ),
-                }, Some(&ignore))?;
+                let report = run_comparative_benchmark(
+                    &QualityBenchmarkRequest {
+                        strategy: String::new(), // Not used for All
+                        baseline: None,
+                        command: command_line,
+                        corpus_dir: corpus,
+                        queries_path: queries,
+                        qrels_path: qrels,
+                        shortlist,
+                        dense_model: DenseModelSpec::with_overrides(
+                            model_id.or_else(|| config.model.model_id.clone()),
+                            model_revision.or_else(|| config.model.model_revision.clone()),
+                            max_length.or(config.model.max_length),
+                        ),
+                    },
+                    Some(&ignore),
+                )?;
 
                 if json {
                     println!("{}", serde_json::to_string_pretty(&report)?);
@@ -238,20 +272,23 @@ fn main() -> Result<()> {
             } => {
                 let strategy = strategy.unwrap_or_else(|| config.search.strategy.clone());
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
-                let report = run_quality_benchmark(&QualityBenchmarkRequest {
-                    strategy,
-                    baseline,
-                    command: command_line,
-                    corpus_dir: corpus,
-                    queries_path: queries,
-                    qrels_path: qrels,
-                    shortlist,
-                    dense_model: DenseModelSpec::with_overrides(
-                        model_id.or_else(|| config.model.model_id.clone()),
-                        model_revision.or_else(|| config.model.model_revision.clone()),
-                        max_length.or(config.model.max_length),
-                    ),
-                }, Some(&ignore))?;
+                let report = run_quality_benchmark(
+                    &QualityBenchmarkRequest {
+                        strategy,
+                        baseline,
+                        command: command_line,
+                        corpus_dir: corpus,
+                        queries_path: queries,
+                        qrels_path: qrels,
+                        shortlist,
+                        dense_model: DenseModelSpec::with_overrides(
+                            model_id.or_else(|| config.model.model_id.clone()),
+                            model_revision.or_else(|| config.model.model_revision.clone()),
+                            max_length.or(config.model.max_length),
+                        ),
+                    },
+                    Some(&ignore),
+                )?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
             BenchCommands::Latency {
@@ -265,18 +302,21 @@ fn main() -> Result<()> {
             } => {
                 let strategy = strategy.unwrap_or_else(|| config.search.strategy.clone());
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
-                let report = run_latency_benchmark(&LatencyBenchmarkRequest {
-                    strategy,
-                    command: command_line,
-                    corpus_dir: corpus,
-                    queries_path: queries,
-                    shortlist,
-                    dense_model: DenseModelSpec::with_overrides(
-                        model_id.or_else(|| config.model.model_id.clone()),
-                        model_revision.or_else(|| config.model.model_revision.clone()),
-                        max_length.or(config.model.max_length),
-                    ),
-                }, Some(&ignore))?;
+                let report = run_latency_benchmark(
+                    &LatencyBenchmarkRequest {
+                        strategy,
+                        command: command_line,
+                        corpus_dir: corpus,
+                        queries_path: queries,
+                        shortlist,
+                        dense_model: DenseModelSpec::with_overrides(
+                            model_id.or_else(|| config.model.model_id.clone()),
+                            model_revision.or_else(|| config.model.model_revision.clone()),
+                            max_length.or(config.model.max_length),
+                        ),
+                    },
+                    Some(&ignore),
+                )?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
         },
@@ -292,20 +332,23 @@ fn main() -> Result<()> {
             let limit = search.limit.unwrap_or(config.search.limit);
             let shortlist = search.shortlist.unwrap_or(config.search.shortlist);
 
-            let response = run_search(&SearchRequest {
-                strategy,
-                query,
-                path,
-                limit,
-                shortlist,
-                dense_model: DenseModelSpec::with_overrides(
-                    search.model_id.or_else(|| config.model.model_id.clone()),
-                    search
-                        .model_revision
-                        .or_else(|| config.model.model_revision.clone()),
-                    search.max_length.or(config.model.max_length),
-                ),
-            }, Some(&ignore))?;
+            let response = run_search(
+                &SearchRequest {
+                    strategy,
+                    query,
+                    path,
+                    limit,
+                    shortlist,
+                    dense_model: DenseModelSpec::with_overrides(
+                        search.model_id.or_else(|| config.model.model_id.clone()),
+                        search
+                            .model_revision
+                            .or_else(|| config.model.model_revision.clone()),
+                        search.max_length.or(config.model.max_length),
+                    ),
+                },
+                Some(&ignore),
+            )?;
             let output = render_search_response(
                 &response,
                 if search.json {

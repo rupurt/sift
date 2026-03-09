@@ -50,9 +50,7 @@ impl Ignore {
     }
 
     pub fn is_ignored(&self, path: &Path) -> bool {
-        self.inner
-            .matched(path, path.is_dir())
-            .is_ignore()
+        self.inner.matched(path, path.is_dir()).is_ignore()
     }
 }
 
@@ -66,9 +64,15 @@ pub struct SearchConfig {
     pub shortlist: usize,
 }
 
-fn default_strategy() -> String { "hybrid".to_string() }
-fn default_limit() -> usize { 10 }
-fn default_shortlist() -> usize { 8 }
+fn default_strategy() -> String {
+    "hybrid".to_string()
+}
+fn default_limit() -> usize {
+    10
+}
+fn default_shortlist() -> usize {
+    8
+}
 
 impl Default for SearchConfig {
     fn default() -> Self {
@@ -115,7 +119,7 @@ impl Config {
         let system_path = Path::new("/etc/sift.toml");
         #[cfg(windows)]
         let system_path = Path::new(r"C:\ProgramData\sift\config.toml");
-        
+
         config.merge_file(system_path)?;
 
         // 2. User-specific config
@@ -175,7 +179,7 @@ impl Config {
 
         let content = fs::read_to_string(path)?;
         let partial: PartialConfig = toml::from_str(&content)?;
-        
+
         if let Some(search) = partial.search {
             if let Some(strategy) = search.strategy {
                 self.search.strategy = strategy;

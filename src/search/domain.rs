@@ -251,8 +251,12 @@ pub fn build_snippet(text: &str, query: &str) -> String {
     };
 
     let limit = 240; // Show more content
-    let mut snippet = collapsed.chars().skip(context_start).take(limit).collect::<String>();
-    
+    let mut snippet = collapsed
+        .chars()
+        .skip(context_start)
+        .take(limit)
+        .collect::<String>();
+
     if context_start > 0 {
         snippet = format!("...{}", snippet);
     }
@@ -293,7 +297,7 @@ fn highlight_matches(text: &str, terms: &[String]) -> String {
         let mut result = String::new();
         let mut last_pos = 0;
         let lowercase_h = highlighted.to_lowercase();
-        
+
         while let Some(pos) = lowercase_h[last_pos..].find(&term) {
             let actual_pos = last_pos + pos;
             result.push_str(&highlighted[last_pos..actual_pos]);
