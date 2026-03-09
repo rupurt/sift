@@ -1,5 +1,7 @@
 # sift
 
+[![CI](https://github.com/rupurt/sift/actions/workflows/ci.yml/badge.svg)](https://github.com/rupurt/sift/actions/workflows/ci.yml)
+
 `sift` is a standalone Rust CLI for local document retrieval in agentic
 workflows. It searches raw local corpora without a long-running daemon, uses a 
 composable search strategy architecture, and employs a Zig-style heuristic 
