@@ -2018,6 +2018,7 @@ dependencies = [
  "undoc",
  "ureq",
  "walkdir",
+ "xz2",
 ]
 
 [[package]]
