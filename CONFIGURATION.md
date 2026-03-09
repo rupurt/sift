@@ -17,6 +17,32 @@ sift config
 
 ---
 
+## Ignoring Files (`.siftignore`)
+
+Sift supports ignoring files using standard `gitignore` pattern syntax. This is useful for excluding large data directories, build artifacts, or sensitive files from being indexed and searched.
+
+Similar to configuration, `.siftignore` files are loaded from multiple locations:
+
+1.  **System-wide:** `/etc/siftignore`
+2.  **User-specific:** `~/.config/sift/siftignore` (or platform equivalent)
+3.  **Local Project:** `./.siftignore` (in the directory where you run `sift`)
+
+**Example `.siftignore`:**
+```ignore
+# Ignore build directories
+target/
+dist/
+
+# Ignore specific file types
+*.log
+*.tmp
+
+# Ignore a specific large data folder
+data/raw/
+```
+
+---
+
 ## Configuration Options (`sift.toml`)
 
 ### `[search]` Section
