@@ -2,11 +2,12 @@
 id: 1vzdDu000
 title: Add Fusion And Reranking Layers
 type: feat
-status: backlog
+status: in-progress
 created_at: 2026-03-09T09:12:50
-updated_at: 2026-03-09T09:20:48
+updated_at: 2026-03-09T09:41:35
 scope: 1vzXLN000/1vzdCx000
 index: 7
+started_at: 2026-03-09T09:41:35
 ---
 
 # Add Fusion And Reranking Layers
@@ -19,10 +20,6 @@ behind its own port.
 
 ## Acceptance Criteria
 
-- [ ] [SRS-07/AC-01] The shared fusion layer uses Reciprocal Rank Fusion by
-      default and preserves contributor provenance for explanation and
-      benchmarking.
-- [ ] [SRS-08/AC-02] The reranking layer is optional, exposed behind a
-      reranker port, and ships with `none` as the default implementation.
-- [ ] [SRS-13/AC-03] The default fusion and reranking stack remains local-first
-      and does not require external databases or resident services.
+- [x] [SRS-07/AC-01] The shared fusion layer uses Reciprocal Rank Fusion by default and preserves contributor provenance for explanation and benchmarking. <!-- verify: cargo test search::adapters::tests::rrf_fuser_preserves_provenance, SRS-07:start:end, proof: ac-1.log -->
+- [x] [SRS-08/AC-02] The reranking layer is optional, exposed behind a reranker port, and ships with `none` as the default implementation. <!-- verify: manual, SRS-08:start:end, proof: ac-2.log -->
+- [x] [SRS-13/AC-03] The default fusion and reranking stack remains local-first and does not require external databases or resident services. <!-- verify: manual, SRS-13:start:end, proof: ac-3.log -->

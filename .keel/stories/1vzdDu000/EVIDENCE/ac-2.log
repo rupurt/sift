@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T09:42:39.122287599-07:00
+mode: manual
+---
+Reranker trait is in src/search/domain.rs and NoReranker is in src/search/adapters/mod.rs

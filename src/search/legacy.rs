@@ -8,6 +8,7 @@ mod tests {
     use crate::dense::DenseModelSpec;
 
     use super::super::*;
+    use super::super::adapters::render_search_response;
 
     mod search {
         use super::*;

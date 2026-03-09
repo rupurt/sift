@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T09:42:39.132136895-07:00
+mode: manual
+---
+Fusion and Reranking are implemented as pure Rust functions/structs within the crate.

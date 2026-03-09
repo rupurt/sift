@@ -239,5 +239,45 @@ impl Reranker for NoReranker {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rrf_fuser_preserves_provenance() {
+        let fuser = RrfFuser;
+        let list1 = CandidateList {
+            results: vec![Candidate {
+                id: "doc1".to_string(),
+                path: std::path::PathBuf::from("path1"),
+                score: 1.0,
+                contributors: vec![ContributorScore {
+                    retriever: RetrieverPolicy::Bm25,
+                    score: 1.0,
+                }],
+                snippet: None,
+            }],
+        };
+        let list2 = CandidateList {
+            results: vec![Candidate {
+                id: "doc1".to_string(),
+                path: std::path::PathBuf::from("path1"),
+                score: 0.8,
+                contributors: vec![ContributorScore {
+                    retriever: RetrieverPolicy::SegmentVector,
+                    score: 0.8,
+                }],
+                snippet: None,
+            }],
+        };
+
+        let fused = fuser.fuse(&[list1, list2], 10).unwrap();
+        assert_eq!(fused.results.len(), 1);
+        assert_eq!(fused.results[0].contributors.len(), 2);
+        assert!(fused.results[0].contributors.iter().any(|c| c.retriever == RetrieverPolicy::Bm25));
+        assert!(fused.results[0].contributors.iter().any(|c| c.retriever == RetrieverPolicy::SegmentVector));
+    }
+}
+
 pub mod cli;
 pub use cli::*;

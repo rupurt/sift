@@ -2,12 +2,14 @@
 id: 1vzdDn000
 title: Add Query Expansion And Phrase Retrieval
 type: feat
-status: in-progress
+status: done
 created_at: 2026-03-09T09:12:43
-updated_at: 2026-03-09T09:40:10
+updated_at: 2026-03-09T09:41:22
 scope: 1vzXLN000/1vzdCx000
 index: 6
 started_at: 2026-03-09T09:40:10
+submitted_at: 2026-03-09T09:41:22
+completed_at: 2026-03-09T09:41:22
 ---
 
 # Add Query Expansion And Phrase Retrieval
