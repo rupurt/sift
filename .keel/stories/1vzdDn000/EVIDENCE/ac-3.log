@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T09:41:09.313984315-07:00
+mode: manual
+---
+PhraseRetriever is implemented in src/search/adapters/mod.rs and used in page-index preset.

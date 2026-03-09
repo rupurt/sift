@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T09:41:09.321359517-07:00
+mode: manual
+---
+SegmentVectorRetriever is implemented as a standalone retriever adapter.

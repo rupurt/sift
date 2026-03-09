@@ -205,6 +205,27 @@ impl Expander for NoExpander {
     }
 }
 
+pub struct SynonymExpander;
+
+impl Expander for SynonymExpander {
+    fn expand(&self, query: &str) -> Vec<QueryVariant> {
+        // A very simple mock synonym expander
+        let mut variants = vec![QueryVariant {
+            text: query.to_string(),
+            weight: 1.0,
+        }];
+        
+        if query.contains("search") {
+            variants.push(QueryVariant {
+                text: query.replace("search", "retrieval"),
+                weight: 0.8,
+            });
+        }
+        
+        variants
+    }
+}
+
 pub struct NoReranker;
 
 impl Reranker for NoReranker {

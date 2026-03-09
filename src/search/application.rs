@@ -1,10 +1,10 @@
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 
+use crate::dense::DenseReranker;
 use super::adapters::*;
 use super::corpus::load_search_corpus;
 use super::domain::*;
-use crate::dense::DenseReranker;
 
 pub struct SearchService {
     retrievers: HashMap<RetrieverPolicy, Box<dyn Retriever>>,
@@ -141,9 +141,7 @@ impl SearchService {
         }
 
         if candidate_lists.is_empty() {
-            return Ok(CandidateList {
-                results: Vec::new(),
-            });
+            return Ok(CandidateList { results: Vec::new() });
         }
 
         // 3. Fusion
@@ -166,22 +164,23 @@ impl SearchService {
 
 pub fn run_search(request: &SearchRequest) -> Result<SearchResponse> {
     let mut service = SearchService::new();
-
+    
     // Register adapters
     service.register_retriever(Box::new(Bm25Retriever));
     service.register_retriever(Box::new(PhraseRetriever));
-
+    
     // For SegmentVectorRetriever, we need to load the model if the plan requires it
     let registry = StrategyPresetRegistry::default_registry();
     let plan = registry.resolve(&request.strategy)?;
-
+    
     if plan.retrievers.contains(&RetrieverPolicy::SegmentVector) {
         let dense = DenseReranker::load(request.dense_model.clone())?;
         service.register_retriever(Box::new(SegmentVectorRetriever { dense }));
     }
-
+    
     service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
     service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
+    service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
     service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
 
     let corpus = load_search_corpus(&request.path)?;
@@ -225,4 +224,85 @@ fn resolve_snippet_from_candidate(corpus: &LoadedCorpus, candidate: &Candidate) 
             .map(Document::text)
             .unwrap_or_default(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::adapters::*;
+
+    struct MockRetriever {
+        policy: RetrieverPolicy,
+    }
+
+    impl Retriever for MockRetriever {
+        fn retrieve(&self, variants: &[QueryVariant], _corpus: &PreparedCorpus, _limit: usize) -> Result<CandidateList> {
+            let mut results = Vec::new();
+            for variant in variants {
+                results.push(Candidate {
+                    id: variant.text.clone(),
+                    path: std::path::PathBuf::from("mock"),
+                    score: variant.weight,
+                    contributors: vec![],
+                    snippet: None,
+                });
+            }
+            Ok(CandidateList { results })
+        }
+        fn policy(&self) -> RetrieverPolicy { self.policy }
+    }
+
+    #[test]
+    fn search_service_orchestrates_multiple_variants_and_retrievers() {
+        let mut service = SearchService::new();
+        service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
+        service.register_retriever(Box::new(MockRetriever { policy: RetrieverPolicy::Bm25 }));
+        service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
+        service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
+
+        let plan = SearchPlan {
+            name: "test".to_string(),
+            query_expansion: QueryExpansionPolicy::Synonym,
+            retrievers: vec![RetrieverPolicy::Bm25],
+            fusion: FusionPolicy::Rrf,
+            reranking: RerankingPolicy::None,
+        };
+
+        let corpus = PreparedCorpus { documents: &[], bm25_index: None };
+        let results = service.execute(&plan, "search", &corpus, 10).unwrap();
+        
+        // "search" expansion with SynonymExpander gives "search" and "retrieval"
+        // MockRetriever returns them as candidates
+        assert!(results.results.iter().any(|c| c.id == "search"));
+        assert!(results.results.iter().any(|c| c.id == "retrieval"));
+    }
+
+    #[test]
+    fn search_service_fuses_results_from_multiple_retrievers() {
+        let mut service = SearchService::new();
+        service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
+        service.register_retriever(Box::new(MockRetriever { policy: RetrieverPolicy::Bm25 }));
+        service.register_retriever(Box::new(MockRetriever { policy: RetrieverPolicy::Phrase }));
+        service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
+        service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
+
+        let plan = SearchPlan {
+            name: "test".to_string(),
+            query_expansion: QueryExpansionPolicy::None,
+            retrievers: vec![RetrieverPolicy::Bm25, RetrieverPolicy::Phrase],
+            fusion: FusionPolicy::Rrf,
+            reranking: RerankingPolicy::None,
+        };
+
+        let corpus = PreparedCorpus { documents: &[], bm25_index: None };
+        let results = service.execute(&plan, "query", &corpus, 10).unwrap();
+        
+        // Both retrievers should return "query"
+        // RRF should fuse them
+        assert_eq!(results.results.len(), 1);
+        assert_eq!(results.results[0].id, "query");
+        // Score for 1 list: 1/(60+1) = 0.01639
+        // Score for 2 lists: 1/61 + 1/61 = 0.03278
+        assert!(results.results[0].score > 0.03);
+    }
 }
