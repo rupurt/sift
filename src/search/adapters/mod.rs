@@ -46,6 +46,7 @@ impl Retriever for SegmentVectorRetriever {
                     score: s.score,
                 }],
                 snippet: Some(s.best_segment_text),
+                snippet_location: Some(s.best_segment_label),
             })
             .collect();
 
@@ -92,6 +93,7 @@ impl Retriever for PhraseRetriever {
                         score: 1.0,
                     }],
                     snippet: None,
+                    snippet_location: None,
                 });
             }
         }
@@ -138,6 +140,7 @@ impl Retriever for Bm25Retriever {
                     score: s.score,
                 }],
                 snippet: None, // Snippet resolution happens later
+                snippet_location: None,
             })
             .collect();
 
@@ -170,12 +173,14 @@ impl Fuser for RrfFuser {
                         score: 0.0,
                         contributors: Vec::new(),
                         snippet: candidate.snippet.clone(),
+                        snippet_location: candidate.snippet_location.clone(),
                     });
 
                 entry.score += 1.0 / (RRF_K + (index + 1) as f64);
                 entry.contributors.extend(candidate.contributors.clone());
                 if entry.snippet.is_none() {
                     entry.snippet = candidate.snippet.clone();
+                    entry.snippet_location = candidate.snippet_location.clone();
                 }
             }
         }
@@ -256,6 +261,7 @@ mod tests {
                     score: 1.0,
                 }],
                 snippet: None,
+                snippet_location: None,
             }],
         };
         let list2 = CandidateList {
@@ -268,6 +274,7 @@ mod tests {
                     score: 0.8,
                 }],
                 snippet: None,
+                snippet_location: None,
             }],
         };
 

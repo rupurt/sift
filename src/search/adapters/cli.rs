@@ -29,6 +29,9 @@ fn render_text_response(response: &SearchResponse) -> Result<String> {
 
     for hit in &response.results {
         writeln!(&mut output, "{}. {}", hit.rank, hit.path)?;
+        if let Some(location) = &hit.location {
+            writeln!(&mut output, "   location: \x1b[36m{}\x1b[0m", location)?;
+        }
         writeln!(&mut output, "   score: {:.4}", hit.score)?;
         if !hit.snippet.is_empty() {
             writeln!(&mut output, "   snippet: {}", hit.snippet)?;

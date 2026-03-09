@@ -207,6 +207,7 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
             path: result.path.display().to_string(),
             rank: index + 1,
             score: result.score,
+            location: result.snippet_location.clone(),
             snippet: resolve_snippet_from_candidate(&corpus, &result, &request.query),
         })
         .collect();
@@ -253,6 +254,7 @@ mod tests {
                     score: variant.weight,
                     contributors: vec![],
                     snippet: None,
+                    snippet_location: None,
                 });
             }
             Ok(CandidateList { results })

@@ -56,6 +56,7 @@ pub struct SearchHit {
     pub path: String,
     pub rank: usize,
     pub score: f64,
+    pub location: Option<String>,
     pub snippet: String,
 }
 
@@ -349,6 +350,7 @@ pub struct Candidate {
     pub score: f64,
     pub contributors: Vec<ContributorScore>,
     pub snippet: Option<String>,
+    pub snippet_location: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
