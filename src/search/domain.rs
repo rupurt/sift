@@ -240,20 +240,25 @@ pub fn build_snippet(text: &str, query: &str) -> String {
 
     let start_pos = first_match_pos.unwrap_or(0);
     // Move back a bit to get some context, but don't split words
-    let context_start = if start_pos > 40 {
-        // Find a space around start_pos - 40
-        collapsed[..start_pos - 40]
-            .rfind(' ')
-            .map(|p| p + 1)
-            .unwrap_or(0)
-    } else {
-        0
-    };
+    let mut context_start = 0;
+    if start_pos > 40 {
+        // Find a space around start_pos - 40 safely
+        let target_pos = start_pos - 40;
+        // Find the nearest char boundary at or before target_pos safely
+        let boundary = collapsed
+            .char_indices()
+            .map(|(idx, _)| idx)
+            .take_while(|&idx| idx <= target_pos)
+            .last()
+            .unwrap_or(0);
+
+        context_start = collapsed[..boundary].rfind(' ').map(|p| p + 1).unwrap_or(0);
+    }
 
     let limit = 240; // Show more content
     let mut snippet = collapsed
         .chars()
-        .skip(context_start)
+        .skip(collapsed[..context_start].chars().count())
         .take(limit)
         .collect::<String>();
 
@@ -285,29 +290,32 @@ fn highlight_matches(text: &str, terms: &[String]) -> String {
         return text.to_string();
     }
 
-    let mut highlighted = text.to_string();
-    // Use a regex-like replacement or simple string replace for each term.
-    // To avoid nested highlighting or partial matches, we sort terms by length descending.
+    let lowercase_text = text.to_lowercase();
+    let mut highlights = Vec::new();
+
     let mut sorted_terms = terms.to_vec();
     sorted_terms.sort_by_key(|b| std::cmp::Reverse(b.len()));
 
     for term in sorted_terms {
-        // We need case-insensitive replacement but preserving original case.
-        // This is a simple but slightly inefficient approach for a CLI.
-        let mut result = String::new();
-        let mut last_pos = 0;
-        let lowercase_h = highlighted.to_lowercase();
-
-        while let Some(pos) = lowercase_h[last_pos..].find(&term) {
-            let actual_pos = last_pos + pos;
-            result.push_str(&highlighted[last_pos..actual_pos]);
-            result.push_str("\x1b[1;33m"); // Bold Yellow
-            result.push_str(&highlighted[actual_pos..actual_pos + term.len()]);
-            result.push_str("\x1b[0m"); // Reset
-            last_pos = actual_pos + term.len();
+        if term.is_empty() { continue; }
+        for (pos, _) in lowercase_text.match_indices(&term) {
+            let end = pos + term.len();
+            // Check if this range overlaps with an existing highlight
+            if !highlights.iter().any(|(h_start, h_end)| {
+                (pos >= *h_start && pos < *h_end) || (end > *h_start && end <= *h_end)
+            }) {
+                highlights.push((pos, end));
+            }
         }
-        result.push_str(&highlighted[last_pos..]);
-        highlighted = result;
+    }
+
+    // Sort highlights by start position descending to apply from back to front
+    highlights.sort_by_key(|&(start, _)| std::cmp::Reverse(start));
+
+    let mut highlighted = text.to_string();
+    for (start, end) in highlights {
+        highlighted.insert_str(end, "\x1b[0m");
+        highlighted.insert_str(start, "\x1b[1;33m");
     }
 
     highlighted
