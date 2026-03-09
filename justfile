@@ -60,3 +60,6 @@ check:
 
 search *args:
     cargo run -- search {{args}}
+
+config:
+    cargo run -- config

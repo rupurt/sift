@@ -3,9 +3,8 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use sift::bench::{
-    ComparativeBenchmarkReport, LatencyBenchmarkRequest, QualityBenchmarkRequest,
-    render_comparative_report, run_comparative_benchmark, run_latency_benchmark,
-    run_quality_benchmark,
+    LatencyBenchmarkRequest, QualityBenchmarkRequest, render_comparative_report,
+    run_comparative_benchmark, run_latency_benchmark, run_quality_benchmark,
 };
 use sift::config::Config;
 use sift::dense::DenseModelSpec;
