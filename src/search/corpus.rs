@@ -114,7 +114,7 @@ fn is_benchmark_metadata_file(root: &Path, path: &Path) -> bool {
 pub fn load_search_corpus(
     root: &Path,
     ignore: Option<&Ignore>,
-    verbose: u8,
+    _verbose: u8,
     dense: Option<&DenseReranker>,
     telemetry: &crate::system::Telemetry,
 ) -> Result<LoadedCorpus> {

@@ -14,7 +14,7 @@ impl Retriever for SegmentVectorRetriever {
         query_variants: &[QueryVariant],
         corpus: &PreparedCorpus,
         _limit: usize,
-        verbose: u8,
+        _verbose: u8,
     ) -> Result<CandidateList> {
         // For now, we only use the first query variant for semantic search
         let query = query_variants
@@ -95,7 +95,7 @@ impl Retriever for PhraseRetriever {
         query_variants: &[QueryVariant],
         corpus: &PreparedCorpus,
         limit: usize,
-        verbose: u8,
+        _verbose: u8,
     ) -> Result<CandidateList> {
         let query = query_variants
             .first()
@@ -150,7 +150,7 @@ impl Retriever for Bm25Retriever {
         query_variants: &[QueryVariant],
         corpus: &PreparedCorpus,
         limit: usize,
-        verbose: u8,
+        _verbose: u8,
     ) -> Result<CandidateList> {
         let index = corpus
             .bm25_index

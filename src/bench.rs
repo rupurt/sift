@@ -10,8 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Ignore;
 use crate::dense::{DenseModelSpec, DenseReranker};
 use crate::search::{LoadedCorpus, SearchRequest, load_search_corpus};
-use crate::system::{HardwareSummary, Telemetry, current_git_sha, detect_hardware_summary};
-use std::sync::Arc;
+use crate::system::{HardwareSummary, current_git_sha, detect_hardware_summary};
 
 const LATENCY_TARGET_MS: f64 = 200.0;
 
@@ -113,7 +112,8 @@ pub fn run_quality_benchmark(
     let prepare_started = Instant::now();
     tracing::info!("→ loading dense model: {}", request.dense_model.model_id);
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load))?;
+    let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
+    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load), &telemetry_for_load)?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
@@ -246,7 +246,8 @@ pub fn run_latency_benchmark(
     let prepare_started = Instant::now();
     tracing::info!("→ loading dense model: {}", request.dense_model.model_id);
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load))?;
+    let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
+    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load), &telemetry_for_load)?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries = load_queries(&request.queries_path)?;
     let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
@@ -321,7 +322,8 @@ pub fn run_comparative_benchmark(
     let prepare_started = Instant::now();
     tracing::info!("→ loading dense model: {}", request.dense_model.model_id);
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load))?;
+    let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
+    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load), &telemetry_for_load)?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
@@ -412,7 +414,7 @@ pub fn render_comparative_report(report: &ComparativeBenchmarkReport) -> String 
     writeln!(out, "\x1b[1mComparative Search Strategy Benchmark\x1b[0m").unwrap();
     writeln!(
         out,
-        "────────────────────────────────────────────────────────────────────────────────"
+        "──────────────────────────────────────────────────────────────────────────────────────────────"
     )
     .unwrap();
     writeln!(
@@ -427,6 +429,11 @@ pub fn render_comparative_report(report: &ComparativeBenchmarkReport) -> String 
     )
     .unwrap();
 
+    let ndcgs: Vec<f64> = report.results.iter().map(|r| r.quality.ndcg_at_10).collect();
+    let mrrs: Vec<f64> = report.results.iter().map(|r| r.quality.mrr_at_10).collect();
+    let recalls: Vec<f64> = report.results.iter().map(|r| r.quality.recall_at_10).collect();
+    let latencies: Vec<f64> = report.results.iter().map(|r| r.latency.p50_ms).collect();
+
     for res in &report.results {
         let bar = render_bar(res.quality.ndcg_at_10, 10);
         let hits = if let Some(t) = &res.telemetry {
@@ -434,14 +441,20 @@ pub fn render_comparative_report(report: &ComparativeBenchmarkReport) -> String 
         } else {
             "-".to_string()
         };
+
+        let ndcg_c = get_color(res.quality.ndcg_at_10, &ndcgs, true);
+        let mrr_c = get_color(res.quality.mrr_at_10, &mrrs, true);
+        let recall_c = get_color(res.quality.recall_at_10, &recalls, true);
+        let lat_c = get_color(res.latency.p50_ms, &latencies, false);
+
         writeln!(
             out,
-            "{:<20} {:>10.4} {:>10.4} {:>10.4} {:>12.2} {:>15}  {}",
-            res.strategy,
-            res.quality.ndcg_at_10,
-            res.quality.mrr_at_10,
-            res.quality.recall_at_10,
-            res.latency.p50_ms,
+            "{}{:<20}\x1b[0m {}{:>10.4}\x1b[0m {}{:>10.4}\x1b[0m {}{:>10.4}\x1b[0m {}{:>12.2}\x1b[0m {:>15}  {}",
+            ndcg_c, res.strategy, // Use nDCG color for strategy name
+            ndcg_c, res.quality.ndcg_at_10,
+            mrr_c, res.quality.mrr_at_10,
+            recall_c, res.quality.recall_at_10,
+            lat_c, res.latency.p50_ms,
             hits,
             bar
         )
@@ -479,6 +492,56 @@ pub fn render_comparative_report(report: &ComparativeBenchmarkReport) -> String 
     }
 
     out
+}
+
+fn get_color(value: f64, all_values: &[f64], higher_is_better: bool) -> &'static str {
+    if all_values.len() < 2 {
+        return "";
+    }
+
+    let mut sorted = all_values.to_vec();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    let min = sorted[0];
+    let max = *sorted.last().unwrap();
+
+    if (max - min).abs() < f64::EPSILON {
+        return "";
+    }
+
+    let (best, worst) = if higher_is_better { (max, min) } else { (min, max) };
+
+    if (value - best).abs() < f64::EPSILON {
+        return "\x1b[1;32m"; // Bold Green
+    }
+    if (value - worst).abs() < f64::EPSILON {
+        return "\x1b[1;31m"; // Bold Red
+    }
+
+    // Find median value
+    let len = sorted.len();
+    let median = if len % 2 == 1 {
+        sorted[len / 2]
+    } else {
+        // Average of two middle values
+        (sorted[len / 2 - 1] + sorted[len / 2]) / 2.0
+    };
+
+    // Highlight value closest to median
+    let closest_to_median = sorted
+        .iter()
+        .min_by(|a, b| {
+            let adiff = (*a - median).abs();
+            let bdiff = (*b - median).abs();
+            adiff.partial_cmp(&bdiff).unwrap_or(std::cmp::Ordering::Equal)
+        })
+        .unwrap();
+
+    if (value - *closest_to_median).abs() < f64::EPSILON {
+        "\x1b[1;33m" // Bold Yellow/Orange
+    } else {
+        ""
+    }
 }
 
 fn render_bar(value: f64, width: usize) -> String {
