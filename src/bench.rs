@@ -264,20 +264,12 @@ pub fn run_latency_benchmark(
         dense_for_load,
     )?;
 
-    use rayon::prelude::*;
-
-    let timings_result: Result<Vec<f64>> = queries
-        .values()
-        .collect::<Vec<_>>()
-        .into_par_iter()
-        .map(|query_text| {
-            let started = Instant::now();
-            let _ = env.search(query_text, 10, request.verbose)?;
-            Ok(started.elapsed().as_secs_f64() * 1000.0)
-        })
-        .collect();
-
-    let mut timings = timings_result?;
+    let mut timings = Vec::with_capacity(queries.len());
+    for query_text in queries.values() {
+        let started = Instant::now();
+        let _ = env.search(query_text, 10, request.verbose)?;
+        timings.push(started.elapsed().as_secs_f64() * 1000.0)
+    }
 
     timings.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
     let p50_ms = percentile(&timings, 0.50);
@@ -359,20 +351,12 @@ pub fn run_comparative_benchmark(
         let prepare_started = Instant::now();
         let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
 
-        use rayon::prelude::*;
-
-        let timings_result: Result<Vec<f64>> = queries
-            .values()
-            .collect::<Vec<_>>()
-            .into_par_iter()
-            .map(|query_text| {
-                let started = Instant::now();
-                let _ = env.search(query_text, 10, request.verbose)?;
-                Ok(started.elapsed().as_secs_f64() * 1000.0)
-            })
-            .collect();
-
-        let mut timings = timings_result?;
+        let mut timings = Vec::with_capacity(queries.len());
+        for query_text in queries.values() {
+            let started = Instant::now();
+            let _ = env.search(query_text, 10, request.verbose)?;
+            timings.push(started.elapsed().as_secs_f64() * 1000.0);
+        }
         timings.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
 
         let latency = LatencyMetrics {
@@ -528,53 +512,39 @@ fn evaluate_quality(
     env: &crate::search::SearchEnvironment,
     verbose: u8,
 ) -> Result<QualityMetrics> {
-    use rayon::prelude::*;
-
-    let results: Result<Vec<(f64, f64, f64)>> = qrels
-        .par_iter()
-        .map(|(query_id, relevances)| {
-            let query_text = queries
-                .get(query_id)
-                .with_context(|| format!("missing query text for qrels query-id '{query_id}'"))?;
-
-            let response = env.search(query_text, 10, verbose)?;
-
-            let ranked_ids: Vec<String> = response
-                .results
-                .iter()
-                .map(|hit| {
-                    Path::new(&hit.path)
-                        .file_stem()
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .to_string()
-                })
-                .collect();
-
-            Ok((
-                ndcg_at_10(&ranked_ids, relevances),
-                mrr_at_10(&ranked_ids, relevances),
-                recall_at_10(&ranked_ids, relevances),
-            ))
-        })
-        .collect();
-
-    let metrics_list = results?;
-    let counted_queries = metrics_list.len();
-
-    if counted_queries == 0 {
-        bail!("quality benchmark requires at least one qrels row");
-    }
-
     let mut ndcg_total = 0.0;
     let mut mrr_total = 0.0;
     let mut recall_total = 0.0;
+    let mut counted_queries = 0_usize;
 
-    for (ndcg, mrr, recall) in metrics_list {
-        ndcg_total += ndcg;
-        mrr_total += mrr;
-        recall_total += recall;
+    for (query_id, relevances) in qrels {
+        let query_text = queries
+            .get(query_id)
+            .with_context(|| format!("missing query text for qrels query-id '{query_id}'"))?;
+
+        let response = env.search(query_text, 10, verbose)?;
+
+        let ranked_ids: Vec<String> = response
+            .results
+            .iter()
+            .map(|hit| {
+                Path::new(&hit.path)
+                    .file_stem()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+            })
+            .collect();
+
+        ndcg_total += ndcg_at_10(&ranked_ids, relevances);
+        mrr_total += mrr_at_10(&ranked_ids, relevances);
+        recall_total += recall_at_10(&ranked_ids, relevances);
+        counted_queries += 1;
+    }
+
+    if counted_queries == 0 {
+        bail!("quality benchmark requires at least one qrels row");
     }
 
     Ok(QualityMetrics {
