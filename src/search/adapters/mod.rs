@@ -47,13 +47,15 @@ impl Retriever for SegmentVectorRetriever {
         }
 
         if !missing.is_empty() {
-            crate::trace!(2, verbose, "    vector: scoring {} missing segments via inference", missing.len());
+            crate::trace!(1, verbose, "    vector: scoring {} missing segments via inference", missing.len());
             let missing_start = std::time::Instant::now();
             segment_hits.extend(self.dense.score_segments(query, &missing)?);
-            crate::trace!(2, verbose, "    vector: inference complete in {:.2?}", missing_start.elapsed());
+            crate::trace!(1, verbose, "    vector: inference complete in {:.2?}", missing_start.elapsed());
         }
 
+        crate::trace!(3, verbose, "    vector: aggregating hits");
         let document_hits = aggregate_segment_hits(&segment_hits);
+        crate::trace!(3, verbose, "    vector: aggregation complete");
 
         let results = document_hits
             .into_iter()

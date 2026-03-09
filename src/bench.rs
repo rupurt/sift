@@ -109,8 +109,9 @@ pub fn run_quality_benchmark(
     ignore: Option<&Ignore>,
 ) -> Result<QualityBenchmarkReport> {
     let prepare_started = Instant::now();
-    let dense_for_load = DenseReranker::load(request.dense_model.clone()).ok().map(std::sync::Arc::new);
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, dense_for_load.as_deref())?;
+    crate::trace!(1, request.verbose, "→ loading dense model: {}", request.dense_model.model_id);
+    let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
+    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load))?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
@@ -139,7 +140,7 @@ pub fn run_quality_benchmark(
         },
         &corpus,
         &index,
-        dense_for_load.clone(),
+        Some(dense_for_load.clone()),
     )?;
 
     let metrics = evaluate_quality(
@@ -170,7 +171,7 @@ pub fn run_quality_benchmark(
                 },
                 &corpus,
                 &index,
-                dense_for_load.clone(),
+                Some(dense_for_load.clone()),
             )?;
             Some(evaluate_quality(
                 &queries,
@@ -198,7 +199,7 @@ pub fn run_quality_benchmark(
             },
             &corpus,
             &index,
-            dense_for_load,
+            Some(dense_for_load.clone()),
         )?;
         Some(evaluate_quality(
             &queries,
@@ -236,8 +237,9 @@ pub fn run_latency_benchmark(
     ignore: Option<&Ignore>,
 ) -> Result<LatencyBenchmarkReport> {
     let prepare_started = Instant::now();
-    let dense_for_load = DenseReranker::load(request.dense_model.clone()).ok().map(std::sync::Arc::new);
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, dense_for_load.as_deref())?;
+    crate::trace!(1, request.verbose, "→ loading dense model: {}", request.dense_model.model_id);
+    let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
+    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load))?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries = load_queries(&request.queries_path)?;
     let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
@@ -261,7 +263,7 @@ pub fn run_latency_benchmark(
         },
         &corpus,
         &index,
-        dense_for_load,
+        Some(dense_for_load.clone()),
     )?;
 
     let mut timings = Vec::with_capacity(queries.len());
@@ -309,8 +311,9 @@ pub fn run_comparative_benchmark(
     let mut metadata = Vec::new();
 
     let prepare_started = Instant::now();
-    let dense_for_load = DenseReranker::load(request.dense_model.clone()).ok().map(std::sync::Arc::new);
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, dense_for_load.as_deref())?;
+    crate::trace!(1, request.verbose, "→ loading dense model: {}", request.dense_model.model_id);
+    let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
+    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load))?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
@@ -338,7 +341,7 @@ pub fn run_comparative_benchmark(
             },
             &corpus,
             &index,
-            dense_for_load.clone(),
+            Some(dense_for_load.clone()),
         )?;
 
         // Quality

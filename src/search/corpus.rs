@@ -177,7 +177,14 @@ pub fn load_search_corpus(
                 crate::trace!(3, verbose, "      cache hit (heuristic): {}", path.display());
                 doc.id = path.display().to_string();
                 doc.path = path.to_path_buf();
-                results.push(ProcessResult::Hit(doc));
+                
+                // If we need embeddings but they are missing, treat as a partial miss
+                if dense.is_some() && doc.segments.iter().any(|s| s.embedding.is_none()) {
+                    crate::trace!(2, verbose, "      cache hit but missing embeddings: {}", path.display());
+                    results.push(ProcessResult::Miss(doc, path, heuristics, hash));
+                } else {
+                    results.push(ProcessResult::Hit(doc));
+                }
                 continue;
             }
         }
@@ -188,7 +195,14 @@ pub fn load_search_corpus(
                 crate::trace!(3, verbose, "      cache hit (hash): {}", path.display());
                 doc.id = path.display().to_string();
                 doc.path = path.to_path_buf();
-                results.push(ProcessResult::HashHit(doc, path, heuristics, hash));
+
+                // If we need embeddings but they are missing, treat as a partial miss
+                if dense.is_some() && doc.segments.iter().any(|s| s.embedding.is_none()) {
+                    crate::trace!(2, verbose, "      cache hit but missing embeddings: {}", path.display());
+                    results.push(ProcessResult::Miss(doc, path, heuristics, hash));
+                } else {
+                    results.push(ProcessResult::HashHit(doc, path, heuristics, hash));
+                }
                 continue;
             }
 
