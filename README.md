@@ -105,4 +105,4 @@ Trace the pipeline and timings at different levels:
 
 ## License
 
-MIT OR Apache-2.0
+This project is licensed under the [MIT License](LICENSE).
