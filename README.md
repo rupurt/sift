@@ -118,6 +118,10 @@ Force a specific lexical-only strategy (e.g., `bm25`):
 sift search --strategy bm25 tests/fixtures/rich-docs "service catalog"
 ```
 
+## Configuration
+
+Sift can be configured via a `sift.toml` file. See [CONFIGURATION.md](CONFIGURATION.md) for a full guide on available strategies, model settings, and environment variables.
+
 ## Evaluation And Benchmarks
 
 The evaluation loop uses the exact same ranking pipeline as normal search.
