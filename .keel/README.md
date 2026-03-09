@@ -50,3 +50,5 @@
 |--------|--------|
 | [Layered Search Strategy Foundation](epics/1vzXLN000/voyages/1vzdCx000/) | done |
 
+### [Zig-Style Global File Cache](epics/1vzfew000/) (draft)
+
