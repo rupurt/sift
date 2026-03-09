@@ -1,4 +1,5 @@
 pub mod bench;
+pub mod config;
 pub mod dense;
 pub mod eval;
 pub mod extract;

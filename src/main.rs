@@ -5,12 +5,10 @@ use clap::{Args, Parser, Subcommand};
 use sift::bench::{
     LatencyBenchmarkRequest, QualityBenchmarkRequest, run_latency_benchmark, run_quality_benchmark,
 };
+use sift::config::Config;
 use sift::dense::DenseModelSpec;
 use sift::eval::{download_scifact_dataset, materialize_scifact_dir};
-use sift::search::{
-    DEFAULT_HYBRID_SHORTLIST, DEFAULT_RESULT_LIMIT, OutputFormat, SearchRequest,
-    render_search_response, run_search,
-};
+use sift::search::{OutputFormat, SearchRequest, render_search_response, run_search};
 
 const SCIFACT_BASE_URL: &str = "https://huggingface.co/datasets/BeIR/scifact/resolve/main";
 const SCIFACT_QRELS_BASE_URL: &str =
@@ -36,6 +34,8 @@ enum Commands {
         #[command(subcommand)]
         command: BenchCommands,
     },
+    /// Show the applied configuration
+    Config,
     /// Search the corpus
     Search(SearchCommand),
 }
@@ -45,17 +45,17 @@ enum Commands {
 #[command(override_usage = "sift search [OPTIONS] [PATH] <QUERY>")]
 #[command(after_help = "If PATH is omitted, sift searches the current directory.")]
 struct SearchCommand {
-    #[arg(long, default_value = "hybrid")]
-    strategy: String,
+    #[arg(long)]
+    strategy: Option<String>,
 
     #[arg(long)]
     json: bool,
 
-    #[arg(long, default_value_t = DEFAULT_RESULT_LIMIT)]
-    limit: usize,
+    #[arg(long)]
+    limit: Option<usize>,
 
-    #[arg(long, default_value_t = DEFAULT_HYBRID_SHORTLIST)]
-    shortlist: usize,
+    #[arg(long)]
+    shortlist: Option<usize>,
 
     #[arg(long)]
     model_id: Option<String>,
@@ -103,8 +103,8 @@ enum EvalCommands {
 enum BenchCommands {
     /// Run quality benchmarks
     Quality {
-        #[arg(long, default_value = "bm25")]
-        strategy: String,
+        #[arg(long)]
+        strategy: Option<String>,
         #[arg(long)]
         baseline: Option<String>,
         #[arg(long)]
@@ -113,8 +113,8 @@ enum BenchCommands {
         queries: Option<PathBuf>,
         #[arg(long)]
         qrels: PathBuf,
-        #[arg(long, default_value_t = DEFAULT_HYBRID_SHORTLIST)]
-        shortlist: usize,
+        #[arg(long)]
+        shortlist: Option<usize>,
         #[arg(long)]
         model_id: Option<String>,
         #[arg(long)]
@@ -124,14 +124,14 @@ enum BenchCommands {
     },
     /// Run latency benchmarks
     Latency {
-        #[arg(long, default_value = "bm25")]
-        strategy: String,
+        #[arg(long)]
+        strategy: Option<String>,
         #[arg(long)]
         corpus: PathBuf,
         #[arg(long)]
         queries: PathBuf,
-        #[arg(long, default_value_t = DEFAULT_HYBRID_SHORTLIST)]
-        shortlist: usize,
+        #[arg(long)]
+        shortlist: Option<usize>,
         #[arg(long)]
         model_id: Option<String>,
         #[arg(long)]
@@ -149,6 +149,7 @@ enum Dataset {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let command_line = std::env::args().collect::<Vec<_>>().join(" ");
+    let config = Config::load().unwrap_or_default();
 
     match cli.command {
         Commands::Eval { command } => match command {
@@ -182,6 +183,8 @@ fn main() -> Result<()> {
                 model_revision,
                 max_length,
             } => {
+                let strategy = strategy.unwrap_or_else(|| config.search.strategy.clone());
+                let shortlist = shortlist.unwrap_or(config.search.shortlist);
                 let report = run_quality_benchmark(&QualityBenchmarkRequest {
                     strategy,
                     baseline,
@@ -191,9 +194,9 @@ fn main() -> Result<()> {
                     qrels_path: qrels,
                     shortlist,
                     dense_model: DenseModelSpec::with_overrides(
-                        model_id,
-                        model_revision,
-                        max_length,
+                        model_id.or_else(|| config.model.model_id.clone()),
+                        model_revision.or_else(|| config.model.model_revision.clone()),
+                        max_length.or(config.model.max_length),
                     ),
                 })?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
@@ -207,6 +210,8 @@ fn main() -> Result<()> {
                 model_revision,
                 max_length,
             } => {
+                let strategy = strategy.unwrap_or_else(|| config.search.strategy.clone());
+                let shortlist = shortlist.unwrap_or(config.search.shortlist);
                 let report = run_latency_benchmark(&LatencyBenchmarkRequest {
                     strategy,
                     command: command_line,
@@ -214,26 +219,38 @@ fn main() -> Result<()> {
                     queries_path: queries,
                     shortlist,
                     dense_model: DenseModelSpec::with_overrides(
-                        model_id,
-                        model_revision,
-                        max_length,
+                        model_id.or_else(|| config.model.model_id.clone()),
+                        model_revision.or_else(|| config.model.model_revision.clone()),
+                        max_length.or(config.model.max_length),
                     ),
                 })?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
         },
+        Commands::Config => {
+            let toml_string = toml::to_string_pretty(&config)?;
+            println!("{}", Config::highlight_toml(&toml_string));
+        }
         Commands::Search(search) => {
             let (path, query) = search.resolve_targets();
+            let strategy = search
+                .strategy
+                .unwrap_or_else(|| config.search.strategy.clone());
+            let limit = search.limit.unwrap_or(config.search.limit);
+            let shortlist = search.shortlist.unwrap_or(config.search.shortlist);
+
             let response = run_search(&SearchRequest {
-                strategy: search.strategy,
+                strategy,
                 query,
                 path,
-                limit: search.limit,
-                shortlist: search.shortlist,
+                limit,
+                shortlist,
                 dense_model: DenseModelSpec::with_overrides(
-                    search.model_id,
-                    search.model_revision,
-                    search.max_length,
+                    search.model_id.or_else(|| config.model.model_id.clone()),
+                    search
+                        .model_revision
+                        .or_else(|| config.model.model_revision.clone()),
+                    search.max_length.or(config.model.max_length),
                 ),
             })?;
             let output = render_search_response(

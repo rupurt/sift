@@ -10,9 +10,6 @@ use crate::dense::DenseModelSpec;
 use crate::extract::SourceKind;
 use crate::segment::Segment;
 
-pub const DEFAULT_RESULT_LIMIT: usize = 10;
-pub const DEFAULT_HYBRID_SHORTLIST: usize = 8;
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ValueEnum)]
 #[serde(rename_all = "lowercase")]
 pub enum Engine {
