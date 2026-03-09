@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T15:00:15.121570345-07:00
+mode: manual
+---
+Telemetry uses AtomicUsize for thread safety

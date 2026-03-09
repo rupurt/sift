@@ -1,6 +1,49 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use sysinfo::System;
+
+#[derive(Debug, Default)]
+pub struct Telemetry {
+    pub heuristic_hits: AtomicUsize,
+    pub blob_hits: AtomicUsize,
+    pub embedding_hits: AtomicUsize,
+    pub total_files: AtomicUsize,
+    pub total_segments: AtomicUsize,
+}
+
+impl Telemetry {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn heuristic_hit_rate(&self) -> f64 {
+        let total = self.total_files.load(Ordering::Relaxed);
+        if total == 0 {
+            0.0
+        } else {
+            self.heuristic_hits.load(Ordering::Relaxed) as f64 / total as f64
+        }
+    }
+
+    pub fn blob_hit_rate(&self) -> f64 {
+        let total = self.total_files.load(Ordering::Relaxed);
+        if total == 0 {
+            0.0
+        } else {
+            self.blob_hits.load(Ordering::Relaxed) as f64 / total as f64
+        }
+    }
+
+    pub fn embedding_hit_rate(&self) -> f64 {
+        let total = self.total_segments.load(Ordering::Relaxed);
+        if total == 0 {
+            0.0
+        } else {
+            self.embedding_hits.load(Ordering::Relaxed) as f64 / total as f64
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HardwareSummary {

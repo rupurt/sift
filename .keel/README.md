@@ -58,5 +58,9 @@
 | [Incremental File Caching](epics/1vzfew000/voyages/1vzfjD000/) | done |
 | [Vector Embedding Caching](epics/1vzfew000/voyages/1vzgQK000/) | done |
 
-### [Comprehensive Performance Instrumentation](epics/1vziaX000/) (draft)
+### [Comprehensive Performance Instrumentation](epics/1vziaX000/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Instrumentation Foundation](epics/1vziaX000/voyages/1vzibo000/) | in-progress |
 

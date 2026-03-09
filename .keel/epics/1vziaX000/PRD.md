@@ -1,6 +1,6 @@
-# Comprehensive Performance Instrumentation - Product Requirements
+# Performance Observability - Product Requirements
 
-> By integrating structured telemetry (spans and events), allocation profiling, and cache efficiency metrics, we can transform performance optimization from "guesswork based on wall-clock time" into a data-driven process. This will allow us to identify precise bottlenecks in the search asset pipeline and validate the impact of future optimizations (like parallelization or I/O changes).
+> Transform performance optimization from "guesswork based on wall-clock time" into a data-driven process by integrating structured telemetry, allocation profiling, and cache efficiency metrics.
 
 ## Problem Statement
 
@@ -10,23 +10,29 @@ As `sift` scales to larger repositories (thousands of files), the complex intera
 
 | ID | Goal | Success Metric | Target |
 |----|------|----------------|--------|
-| GOAL-01 | Validate bearing recommendation in delivery flow | Adoption signal | Initial rollout complete |
+| GOAL-01 | Quantify cache effectiveness | Displayed hit rates | % of work skipped is clearly visible in benchmarks. |
+| GOAL-02 | Visualize pipeline bottlenecks | Tracing spans | Major search phases are instrumented with structured spans. |
+| GOAL-03 | Detect memory/compute regressions | Micro-benchmarks | Standard CI-ready benchmarks for hot-path functions. |
 
 ## Users
 
 | Persona | Description | Primary Need |
 |---------|-------------|--------------|
-| Product/Delivery Owner | Coordinates planning and execution | Reliable strategic direction |
+| Developer | Improving sift performance | Precise data on where latency/allocations occur. |
 
 ## Scope
 
 ### In Scope
 
-- Deliver the bearing-backed capability slice for this epic.
+- [SCOPE-01] Integrate `tracing` and `tracing-subscriber` for structured spans.
+- [SCOPE-02] Implement `Telemetry` module for cache metrics.
+- [SCOPE-03] Establish `criterion` micro-benchmarks.
+- [SCOPE-04] Add `just` recipes for flamegraphs and heap profiling.
 
 ### Out of Scope
 
-- Unrelated platform-wide refactors outside bearing findings.
+- [SCOPE-05] Remote telemetry collection.
+- [SCOPE-06] External dashboard integration.
 
 ## Requirements
 
@@ -35,7 +41,9 @@ As `sift` scales to larger repositories (thousands of files), the complex intera
 <!-- BEGIN FUNCTIONAL_REQUIREMENTS -->
 | ID | Requirement | Goals | Priority | Rationale |
 |----|-------------|-------|----------|-----------|
-| FR-01 | Implement the core user workflow identified in bearing research. | GOAL-01 | must | Converts research recommendation into executable product capability. |
+| FR-01 | `sift` must display Heuristic, Blob, and Embedding hit rates in benchmark reports. | GOAL-01 | must | Validates cache effectiveness. |
+| FR-02 | The search pipeline must be wrapped in `tracing` spans. | GOAL-02 | must | Enables waterfall visualization. |
+| FR-03 | Hot-path functions (BM25, dot_product) must have `criterion` benchmarks. | GOAL-03 | should | Prevents algorithmic regressions. |
 <!-- END FUNCTIONAL_REQUIREMENTS -->
 
 ### Non-Functional Requirements
@@ -43,54 +51,35 @@ As `sift` scales to larger repositories (thousands of files), the complex intera
 <!-- BEGIN NON_FUNCTIONAL_REQUIREMENTS -->
 | ID | Requirement | Goals | Priority | Rationale |
 |----|-------------|-------|----------|-----------|
-| NFR-01 | Ensure deterministic behavior and operational visibility for the delivered workflow. | GOAL-01 | must | Keeps delivery safe and auditable during rollout. |
+| NFR-01 | Instrumentation overhead must be < 5% of total search time. | GOAL-02 | must | Monitoring should not become the bottleneck. |
+| NFR-02 | Tracing must support a "silent" mode for standard users. | GOAL-02 | must | Maintains clean CLI output. |
 <!-- END NON_FUNCTIONAL_REQUIREMENTS -->
 
 ## Verification Strategy
 
-- Prove functional behavior through story-level verification evidence mapped to voyage requirements.
-- Validate non-functional posture with operational checks and documented artifacts.
+- Verify telemetry correctness by running `sift search -vv` on known files and checking hit rates.
+- Benchmark the overhead of `tracing` spans using `criterion`.
+- Generate and inspect SVG flamegraphs for SciFact benchmarks.
 
 ## Assumptions
 
 | Assumption | Impact if Wrong | Validation |
 |------------|-----------------|------------|
-| Bearing findings reflect current user needs | Scope may need re-planning | Re-check feedback during first voyage |
+| `tracing` overhead is negligible | Search becomes slower | Micro-benchmarks |
+| `AtomicUsize` is sufficient for telemetry | Potential overflow | Analysis of total document counts |
 
 ## Open Questions & Risks
 
 | Question/Risk | Owner | Status |
 |---------------|-------|--------|
-| Which rollout constraints should gate broader adoption? | Product | Open |
+| Will tracing output clutter CLI? | Engineering | Mitigation: Map verbose level to tracing level |
+| Criterion build time | Engineering | Track impact on dev cycle |
 
 ## Success Criteria
 
 <!-- BEGIN SUCCESS_CRITERIA -->
-- [ ] Implement a `Telemetry` module to track and display cache hit rates (heuristic, blob, embedding).
-- [ ] Integrate the `tracing` crate to provide structured spans for all major search phases.
-- [ ] Establish a micro-benchmarking harness using `criterion` for hot-path functions.
-- [ ] Integrate allocation profiling (e.g., `dhat`) into the development workflow.
-- [ ] Provide a `just` recipe for generating flamegraphs to identify compute bottlenecks.
-- [ ] Ensure all instrumentation is lightweight and does not significantly degrade baseline performance.
+- [ ] Telemetry module implemented and integrated into benchmark output.
+- [ ] `tracing` spans visible at `-vv` level.
+- [ ] `criterion` benchmarks passing in `target/criterion`.
+- [ ] `just bench flamegraph` generates a valid SVG.
 <!-- END SUCCESS_CRITERIA -->
-
-## Research Analysis
-
-*From bearing assessment:*
-
-### Findings
-- Structured tracing is required to visualize the "waterfall" of search phases [SRC-01].
-- Allocation profiling will identify memory bottlenecks in the text extraction pipeline [SRC-02].
-- Micro-benchmarks are necessary to protect the performance of hot-path functions like BM25 [SRC-03].
-
-### Dependencies
-- Access to `cargo-flamegraph` on the developer machine for the new just task [SRC-01].
-- Integration of `tracing` and `tracing-subscriber` crates [SRC-01].
-
-### Alternatives Considered
-- **Keep custom `trace!` macro:** Rejected because it doesn't provide structured spans or compatible output for external visualization tools [SRC-01].
-- **Strictly wall-clock timing:** Rejected because it doesn't reveal *why* a phase is slow (e.g., waiting on I/O vs. compute) [SRC-01] [SRC-03].
-
----
-
-*This PRD was seeded from bearing `1vziaX000`. See `bearings/1vziaX000/` for original research.*
