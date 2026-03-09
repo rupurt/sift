@@ -216,18 +216,96 @@ pub fn tokenize(text: &str) -> Vec<String> {
     tokens
 }
 
-pub fn build_snippet(text: &str) -> String {
+pub fn build_snippet(text: &str, query: &str) -> String {
+    let query_terms = tokenize(query);
+    if query_terms.is_empty() {
+        return build_simple_snippet(text, 160);
+    }
+
+    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let lowercase_text = collapsed.to_lowercase();
+
+    // Find the first occurrence of any query term
+    let mut first_match_pos = None;
+    for term in &query_terms {
+        if let Some(pos) = lowercase_text.find(term) {
+            match first_match_pos {
+                None => first_match_pos = Some(pos),
+                Some(current) if pos < current => first_match_pos = Some(pos),
+                _ => {}
+            }
+        }
+    }
+
+    let start_pos = first_match_pos.unwrap_or(0);
+    // Move back a bit to get some context, but don't split words
+    let context_start = if start_pos > 40 {
+        // Find a space around start_pos - 40
+        collapsed[..start_pos - 40]
+            .rfind(' ')
+            .map(|p| p + 1)
+            .unwrap_or(0)
+    } else {
+        0
+    };
+
+    let limit = 240; // Show more content
+    let mut snippet = collapsed.chars().skip(context_start).take(limit).collect::<String>();
+    
+    if context_start > 0 {
+        snippet = format!("...{}", snippet);
+    }
+    if collapsed.chars().count() > context_start + limit {
+        snippet.push_str("...");
+    }
+
+    highlight_matches(&snippet, &query_terms)
+}
+
+fn build_simple_snippet(text: &str, limit: usize) -> String {
     let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
     if collapsed.is_empty() {
         return String::new();
     }
 
-    const LIMIT: usize = 160;
-    let mut snippet = collapsed.chars().take(LIMIT).collect::<String>();
-    if collapsed.chars().count() > LIMIT {
+    let mut snippet = collapsed.chars().take(limit).collect::<String>();
+    if collapsed.chars().count() > limit {
         snippet.push_str("...");
     }
     snippet
+}
+
+fn highlight_matches(text: &str, terms: &[String]) -> String {
+    if terms.is_empty() {
+        return text.to_string();
+    }
+
+    let mut highlighted = text.to_string();
+    // Use a regex-like replacement or simple string replace for each term.
+    // To avoid nested highlighting or partial matches, we sort terms by length descending.
+    let mut sorted_terms = terms.to_vec();
+    sorted_terms.sort_by_key(|b| std::cmp::Reverse(b.len()));
+
+    for term in sorted_terms {
+        // We need case-insensitive replacement but preserving original case.
+        // This is a simple but slightly inefficient approach for a CLI.
+        let mut result = String::new();
+        let mut last_pos = 0;
+        let lowercase_h = highlighted.to_lowercase();
+        
+        while let Some(pos) = lowercase_h[last_pos..].find(&term) {
+            let actual_pos = last_pos + pos;
+            result.push_str(&highlighted[last_pos..actual_pos]);
+            result.push_str("\x1b[1;33m"); // Bold Yellow
+            result.push_str(&highlighted[actual_pos..actual_pos + term.len()]);
+            result.push_str("\x1b[0m"); // Reset
+            last_pos = actual_pos + term.len();
+        }
+        result.push_str(&highlighted[last_pos..]);
+        highlighted = result;
+    }
+
+    highlighted
 }
 
 // --- NEW DOMAIN TYPES ---

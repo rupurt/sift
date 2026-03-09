@@ -33,6 +33,7 @@ fn render_text_response(response: &SearchResponse) -> Result<String> {
         if !hit.snippet.is_empty() {
             writeln!(&mut output, "   snippet: {}", hit.snippet)?;
         }
+        writeln!(&mut output)?;
     }
 
     Ok(output.trim_end().to_string())

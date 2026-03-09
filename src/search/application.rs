@@ -207,7 +207,7 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
             path: result.path.display().to_string(),
             rank: index + 1,
             score: result.score,
-            snippet: resolve_snippet_from_candidate(&corpus, &result),
+            snippet: resolve_snippet_from_candidate(&corpus, &result, &request.query),
         })
         .collect();
 
@@ -220,9 +220,9 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
     })
 }
 
-fn resolve_snippet_from_candidate(corpus: &LoadedCorpus, candidate: &Candidate) -> String {
+fn resolve_snippet_from_candidate(corpus: &LoadedCorpus, candidate: &Candidate, query: &str) -> String {
     if let Some(snippet) = candidate.snippet.as_deref() {
-        return build_snippet(snippet);
+        return build_snippet(snippet, query);
     }
 
     build_snippet(
@@ -230,6 +230,7 @@ fn resolve_snippet_from_candidate(corpus: &LoadedCorpus, candidate: &Candidate) 
             .document_by_id(&candidate.id)
             .map(Document::text)
             .unwrap_or_default(),
+        query,
     )
 }
 
