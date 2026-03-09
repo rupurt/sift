@@ -161,30 +161,139 @@ pub fn load_search_corpus(
         );
     }
 
+    use rayon::prelude::*;
+
+    enum ProcessResult {
+        Hit(Document),
+        HashHit(Document, PathBuf, crate::cache::CacheEntry, String),
+        Miss(Document, PathBuf, crate::cache::CacheEntry, String),
+        Skip,
+    }
+
+    let process_start = std::time::Instant::now();
+    let total_files = files_to_process.len();
+
+    // Stage 1: Parallel cache check and extraction (lexical only)
+    let results: Vec<ProcessResult> = files_to_process
+        .into_par_iter()
+        .map(|path| {
+            let Ok(heuristics) = get_file_heuristics(&path) else {
+                return ProcessResult::Skip;
+            };
+
+            // Fast path: heuristics match manifest
+            if let Some(hash) = manifest.check_heuristics(&path, &heuristics) {
+                if let Ok(mut doc) = load_blob(&blobs_dir, &hash) {
+                    crate::trace!(3, verbose, "      cache hit (heuristic): {}", path.display());
+                    doc.id = path.display().to_string();
+                    doc.path = path.to_path_buf();
+                    return ProcessResult::Hit(doc);
+                }
+            }
+
+            // Medium path: compute blake3 and check global blob store
+            if let Ok(hash) = hash_file(&path) {
+                if let Ok(mut doc) = load_blob(&blobs_dir, &hash) {
+                    crate::trace!(3, verbose, "      cache hit (hash): {}", path.display());
+                    doc.id = path.display().to_string();
+                    doc.path = path.to_path_buf();
+                    return ProcessResult::HashHit(doc, path, heuristics, hash);
+                }
+
+                // Slow path: True miss, must extract
+                if let Ok(Some(extracted)) = extract_path(&path) {
+                    let id = path.display().to_string();
+                    let doc = index_document(id, path.to_path_buf(), extracted);
+                    return ProcessResult::Miss(doc, path, heuristics, hash);
+                }
+            }
+            ProcessResult::Skip
+        })
+        .collect();
+
+    // Stage 2: Batch vectorize all new documents across the whole corpus
     let mut documents = Vec::new();
     let mut total_bytes = 0_u64;
     let mut skipped_files = 0_usize;
     let mut manifest_updated = false;
-
-    let process_start = std::time::Instant::now();
-    let total_files = files_to_process.len();
     
-    for (i, path) in files_to_process.into_iter().enumerate() {
-        if verbose > 0 && i > 0 && i % 100 == 0 {
-            crate::trace!(1, verbose, "    indexed {}/{} files...", i, total_files);
-        }
+    // We'll collect documents that need embedding
+    let mut docs_to_embed = Vec::new();
+    // Indices in the final 'documents' vector for the docs being embedded
+    let mut doc_indices = Vec::new();
 
-        collect_search_file_cached(
-            &path,
-            &blobs_dir,
-            &mut manifest,
-            &mut manifest_updated,
-            &mut documents,
-            &mut total_bytes,
-            &mut skipped_files,
-            verbose,
-            dense,
-        );
+    for result in results {
+        match result {
+            ProcessResult::Hit(doc) => {
+                total_bytes += doc.text.len() as u64;
+                documents.push(doc);
+            }
+            ProcessResult::HashHit(doc, path, heuristics, hash) => {
+                manifest.update(path, heuristics, hash);
+                manifest_updated = true;
+                total_bytes += doc.text.len() as u64;
+                documents.push(doc);
+            }
+            ProcessResult::Miss(doc, path, heuristics, hash) => {
+                let idx = documents.len();
+                documents.push(doc);
+                docs_to_embed.push((idx, path, heuristics, hash));
+                doc_indices.push(idx);
+            }
+            ProcessResult::Skip => {
+                skipped_files += 1;
+            }
+        }
+    }
+
+    // Perform batch embedding if model is present and we have misses
+    if let Some(dense) = dense {
+        if !docs_to_embed.is_empty() {
+            crate::trace!(1, verbose, "    vectorizing {} new/changed documents...", docs_to_embed.len());
+            
+            // Flatten all segments from all documents into a single batch
+            let mut all_texts = Vec::new();
+            let mut segment_refs = Vec::new(); // (doc_idx, segment_idx)
+
+            for (doc_idx, _, _, _) in &docs_to_embed {
+                let doc = &documents[*doc_idx];
+                for (seg_idx, segment) in doc.segments.iter().enumerate() {
+                    all_texts.push(segment.text.clone());
+                    segment_refs.push((*doc_idx, seg_idx));
+                }
+            }
+
+            if !all_texts.is_empty() {
+                let embed_start = std::time::Instant::now();
+                if let Ok(embeddings) = dense.embed_batch(&all_texts) {
+                    for (i, embedding) in embeddings.into_iter().enumerate() {
+                        let (doc_idx, seg_idx) = segment_refs[i];
+                        documents[doc_idx].segments[seg_idx].embedding = Some(embedding);
+                    }
+                    crate::trace!(2, verbose, "    embedded {} segments in {:.2?}", all_texts.len(), embed_start.elapsed());
+                }
+            }
+
+            // Save new blobs and update manifest after embedding
+            for (doc_idx, path, heuristics, hash) in docs_to_embed {
+                let doc = &documents[doc_idx];
+                if save_blob(&blobs_dir, &hash, doc).is_ok() {
+                    manifest.update(path, heuristics, hash);
+                    manifest_updated = true;
+                }
+                total_bytes += doc.text.len() as u64;
+            }
+        }
+    } else {
+        // If no model, still count the bytes for the misses
+        for (doc_idx, path, heuristics, hash) in docs_to_embed {
+            let doc = &documents[doc_idx];
+            if save_blob(&blobs_dir, &hash, doc).is_ok() {
+                manifest.update(path, heuristics, hash);
+                manifest_updated = true;
+            }
+            total_bytes += doc.text.len() as u64;
+        }
     }
 
     crate::trace!(2, verbose, "    processing {} files took: {:.2?}", total_files, process_start.elapsed());
@@ -206,79 +315,7 @@ pub fn load_search_corpus(
     })
 }
 
-fn collect_search_file_cached(
-    path: &Path,
-    blobs_dir: &Path,
-    manifest: &mut Manifest,
-    manifest_updated: &mut bool,
-    documents: &mut Vec<Document>,
-    total_bytes: &mut u64,
-    skipped_files: &mut usize,
-    verbose: u8,
-    dense: Option<&DenseReranker>,
-) {
-    let Ok(heuristics) = get_file_heuristics(path) else {
-        *skipped_files += 1;
-        return;
-    };
 
-    // Fast path: heuristics match manifest
-    if let Some(hash) = manifest.check_heuristics(path, &heuristics) {
-        if let Ok(mut doc) = load_blob(blobs_dir, &hash) {
-            crate::trace!(3, verbose, "      cache hit (heuristic): {}", path.display());
-            // Update document ID to match current path, just in case file moved
-            doc.id = path.display().to_string();
-            doc.path = path.to_path_buf();
-            *total_bytes += doc.text.len() as u64;
-            documents.push(doc);
-            return;
-        }
-    }
-
-    // Medium path: compute blake3 and check global blob store
-    if let Ok(hash) = hash_file(path) {
-        if let Ok(mut doc) = load_blob(blobs_dir, &hash) {
-            crate::trace!(3, verbose, "      cache hit (hash): {}", path.display());
-            manifest.update(path.to_path_buf(), heuristics, hash);
-            *manifest_updated = true;
-            
-            doc.id = path.display().to_string();
-            doc.path = path.to_path_buf();
-            *total_bytes += doc.text.len() as u64;
-            documents.push(doc);
-            return;
-        }
-
-        // Slow path: True miss, must extract and embed
-        crate::trace!(2, verbose, "    cache miss (extracting + embedding): {}", path.display());
-        if let Ok(Some(extracted)) = extract_path(path) {
-            let id = path.display().to_string();
-            let mut doc = index_document(id, path.to_path_buf(), extracted);
-            
-            if let Some(dense) = dense {
-                let texts: Vec<_> = doc.segments.iter().map(|s| s.text.clone()).collect();
-                if let Ok(embeddings) = dense.embed_batch(&texts) {
-                    for (i, embedding) in embeddings.into_iter().enumerate() {
-                        doc.segments[i].embedding = Some(embedding);
-                    }
-                }
-            }
-
-            // Pre-warm the cache.
-            if save_blob(blobs_dir, &hash, &doc).is_ok() {
-                manifest.update(path.to_path_buf(), heuristics, hash);
-                *manifest_updated = true;
-            }
-
-            *total_bytes += doc.text.len() as u64;
-            documents.push(doc);
-        } else {
-            *skipped_files += 1;
-        }
-    } else {
-        *skipped_files += 1;
-    }
-}
 
 
 
