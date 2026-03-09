@@ -9,6 +9,15 @@ Sift is designed using **Domain-Driven Design (DDD)** and **Hexagonal Architectu
 3. **Pluggable Adapters:** BM25, Candle-based dense vectors, and phrase matching are implemented as adapters fulfilling domain traits.
 4. **Pure Rust:** Sift is a pure-Rust application, with no external C++ or database dependencies.
 
+## Execution Model
+
+### Parallel Processing (`rayon`)
+Sift leverages multi-core parallelism via the `rayon` crate during two critical phases:
+1. **Corpus Loading:** Files are extracted, segmented, and vectorized in parallel across all available CPU cores.
+2. **Benchmark Execution:** Multiple queries are evaluated concurrently during quality and latency benchmarking.
+
+This parallel execution, combined with the heuristic cache, allows `sift` to scale to large repositories while maintaining sub-second search latency.
+
 ## Hexagonal Boundaries
 
 ### 1. The Domain (`src/search/domain.rs`)
@@ -40,13 +49,13 @@ Adapters are the concrete implementations of the domain ports.
 
 ## The Incremental File Cache (`src/cache/`)
 
-Sift employs a Zig-inspired incremental caching system to make repeat searches nearly instant. It operates as an asset pipeline in `~/.cache/sift/`.
+Sift employs a Zig-inspired incremental caching system to make repeat searches nearly instant. It operates as an asset pipeline in the standard system cache directory (e.g., `~/.cache/sift/` on Linux).
 
 ### 1. The Metadata Store (Manifests)
-Located in `~/.cache/sift/manifests/`, manifests are keyed by the hash of the absolute path being searched. They map filesystem heuristics (`inode`, `mtime`, `size`, `relative_path`) to a BLAKE3 content hash.
+Located in the `manifests/` sub-directory, manifests are keyed by the hash of the absolute path being searched. They map filesystem heuristics (`inode`, `mtime`, `size`, `relative_path`) to a BLAKE3 content hash.
 
 ### 2. The Content-Addressable Blob Store (CAS)
-Located in `~/.cache/sift/blobs/`, this stores binary serialized `Document` representations.
+Located in the `blobs/` sub-directory, this stores binary serialized `Document` representations.
 - **Fully Processed Assets:** Each blob contains the extracted text, pre-computed term frequencies for lexical search, and pre-computed dense vector embeddings for semantic search. This allows `sift` to perform search at the speed of a dot-product without re-running neural network inference on subsequent queries.
 - **Atomic Writes:** New blobs are written to a `.tmp` file and then renamed for atomicity.
 - **Global Deduplication:** Identical files across different projects only occupy a single entry in the blob store.
