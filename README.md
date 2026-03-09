@@ -2,8 +2,8 @@
 
 `sift` is a standalone Rust CLI for local document retrieval in agentic
 workflows. It searches raw local corpora without a long-running daemon, uses a 
-composable search strategy architecture, and keeps evaluation and benchmark workflows
-inside the same binary.
+composable search strategy architecture, and employs a Zig-style heuristic 
+caching system for near-instant repeated queries.
 
 The core idea is simple: point `sift` at a directory, extract text on demand,
 and run a layered search pipeline (Expansion, Retrieval, Fusion, Reranking). 
@@ -12,9 +12,11 @@ There is no external database, no daemon, and no background indexing service.
 ## Current Contract
 
 - Single Rust binary. No external database, daemon, or long-running service.
+- Pure-Rust toolchain. No C++ dependencies, enabling easy static binary distribution.
 - Default `search` mode uses a configurable champion strategy (currently the `page-index` preset).
 - Search execution is modeled as a layered pipeline: Query Expansion -> Retrieval -> Fusion -> Reranking.
-- Corpus loading is transient and query-time (with aggressive incremental caching heuristics planned).
+- Heuristic Incremental Caching. Uses `mtime`, `inode`, and `size` to bypass 
+  extraction and hashing for unchanged files, keeping repeat searches sub-second.
 - Dense inference runs locally through Candle with
   `sentence-transformers/all-MiniLM-L6-v2` as the current default model.
 - Supported inputs today: ASCII and UTF-8 text, HTML, text-bearing PDF, and
@@ -29,42 +31,51 @@ At runtime, `sift` follows this path:
 flowchart TD
   A[CLI parse] --> B[Resolve PATH + QUERY]
   B --> C[Walk file tree]
-  C --> D[Extract text by file type]
-  D --> E[Build transient corpus + term stats]
-  E --> F[Query Expansion]
-  F --> G{Parallel Retrievers}
-  G -->|Lexical| G1[BM25]
-  G -->|Exact| G2[Phrase]
-  G -->|Semantic| G3[Segment Vector]
-  G1 --> H[Reciprocal Rank Fusion]
-  G2 --> H
-  G3 --> H
-  H --> I[Optional Reranking]
-  I --> J[Render text or JSON]
+  C --> D{Heuristic Cache Hit?}
+  D -->|Yes| E[Load Blob from CAS]
+  D -->|No| F[Hash File + Check CAS]
+  F -->|Hit| G[Update Manifest + Load Blob]
+  F -->|Miss| H[Extract + Embed + Save Blob]
+  E --> I[Build transient corpus + term stats]
+  G --> I
+  H --> I
+  I --> J[Query Expansion]
+  J --> K{Parallel Retrievers}
+  K -->|Lexical| K1[BM25]
+  K -->|Exact| K2[Phrase]
+  K -->|Semantic| K3[Segment Vector]
+  K1 --> L[Reciprocal Rank Fusion]
+  K2 --> L
+  K3 --> L
+  L --> M[Optional Reranking]
+  M --> N[Render text or JSON]
 ```
 
 In linear terms:
 
-1. `sift search [PATH] <QUERY>` resolves the search root. If `PATH` is omitted,
-   it searches the current directory.
-2. The corpus is scanned recursively and text is extracted per file type.
-3. `sift` builds an ephemeral in-memory corpus representation.
-4. The strategy pipeline executes:
+1. `sift search [PATH] <QUERY>` resolves the search root.
+2. The corpus is scanned. For each file, `sift` checks a global manifest 
+   (`~/.cache/sift/manifests/`) using fast filesystem heuristics (`mtime`, `size`, `inode`).
+3. If a match is found, the pre-computed `Document` (including text and term 
+   stats) is loaded from the Content-Addressable Blob Store (`~/.cache/sift/blobs/`).
+4. If a miss occurs, the file is hashed (BLAKE3) and extracted. The result is 
+   cached for future runs.
+5. The strategy pipeline executes:
    - **Expansion:** The query is expanded into variants (e.g., synonyms).
-   - **Retrieval:** Multiple retrievers (BM25, Phrase, Vector) score the corpus independently.
+   - **Retrieval:** Multiple retrievers score the corpus independently.
    - **Fusion:** Candidate lists are merged using Reciprocal Rank Fusion (RRF).
-   - **Reranking:** An optional final pass (e.g., cross-encoder) finalizes the order.
-5. Results are rendered as human-readable text or JSON.
+   - **Reranking:** An optional final pass finalizes the order.
+6. Results are rendered as human-readable text or JSON.
 
 ## Design Choices
 
 These are the deliberate tradeoffs behind the current design:
 
 - **Composable Strategies:** Search is not a monolithic engine. It is a pipeline of independent domain concepts.
-- **No sidecar index management:** Search structures are rebuilt or cached transparently so the tool stays stateless from the user's perspective.
+- **Zig-style Caching:** Near-instant indexing for repeat queries without a background daemon or database. The cache is a "Search Asset Pipeline" in `~/.cache/sift/`.
 - **Pure-Rust local inference:** Dense inference uses Candle and local model files instead of Python bindings or a separate model server.
 - **One extraction boundary:** Text, HTML, PDF, and OOXML files all normalize into the same text-first search path.
-- **Determinism:** Directory walking and tie-breaking are stable, which matters for agent workflows and benchmark reproducibility.
+- **Stateless UX:** No sidecar index management. `sift` stays out of your project directories.
 
 ## Installation
 
@@ -101,33 +112,17 @@ If you omit the path, `sift` searches the current directory:
 sift search "architecture decision"
 ```
 
-Request JSON output for agent consumption:
-
-```bash
-sift search --json tests/fixtures/rich-docs "quarterly roadmap"
-```
-
 Force a specific lexical-only strategy (e.g., `bm25`):
 
 ```bash
 sift search --strategy bm25 tests/fixtures/rich-docs "service catalog"
 ```
 
-Override dense model settings explicitly:
-
-```bash
-sift search \
-  --model-id sentence-transformers/all-MiniLM-L6-v2 \
-  --max-length 40 \
-  ~/.cache/sift/eval/scifact-materialized \
-  "retrieval architecture"
-```
-
 ## Evaluation And Benchmarks
 
 The evaluation loop uses the exact same ranking pipeline as normal search.
 
-Download and materialize the SciFact evaluation corpus (defaults to `~/.cache/sift/eval`):
+Download and materialize the SciFact evaluation corpus:
 
 ```bash
 sift eval download scifact
@@ -143,24 +138,6 @@ sift bench quality \
   --corpus ~/.cache/sift/eval/scifact-materialized \
   --qrels ~/.cache/sift/eval/scifact/qrels/test.tsv
 ```
-
-Measure search latency:
-
-```bash
-sift bench latency \
-  --strategy hybrid \
-  --corpus ~/.cache/sift/eval/scifact-materialized \
-  --queries ~/.cache/sift/eval/scifact-materialized/test-queries.tsv
-```
-
-Benchmark reports include the exact command, corpus size, git SHA, hardware
-summary, dense model settings, and measured metrics so results are traceable.
-
-## Current Limits
-
-- No OCR or scanned-image PDF recovery.
-- No legacy binary Office formats (`.doc`, `.xls`, `.ppt`).
-- No persisted database or background indexing service.
 
 ## License
 
