@@ -63,6 +63,14 @@ Runs a report for the standard `bm25` strategy.
 just eval baseline --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv --queries $HOME/.cache/sift/eval/scifact-files/test-queries.tsv
 ```
 
+### 4. Running a Subset (`--query-limit`)
+For large datasets like SciFact, you can limit the number of queries evaluated to speed up the development cycle:
+
+```bash
+# Evaluate only the first 5 queries
+just eval all --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv --query-limit 5
+```
+
 ---
 
 ## Performance Profiling
@@ -90,10 +98,11 @@ just eval-flamegraph all --corpus $HOME/.cache/sift/eval/scifact-files --qrels $
 - **MRR@10:** Measures how high the first relevant document appears.
 - **Recall@10:** Measures the percentage of relevant documents found in the top 10.
 - **p50 (ms):** The median search latency.
-- **Cache Hits:** The "Cache Hits" column in `eval all` shows the percentage of files/segments that hit the heuristic, blob, and embedding caches respectively (e.g., `100/100/100%`).
+- **Cache Hits:** Shows the percentage of files/segments that hit the heuristic, blob, and embedding caches respectively (e.g., `100/100/100%`).
 
 ### Result Highlighting
-Benchmark tables use color-coding to highlight performance:
-- **Bold Green:** The best performer in that column.
-- **Bold Red:** The worst performer in that column.
-- **Bold Yellow/Orange:** The value closest to the median.
+The evaluation table uses strict color-coding to identify performance outliers:
+- **Bold Green:** The **best** performer in that column (highest quality or lowest latency).
+- **Bold Red:** The **worst** performer in that column.
+- **Bold Yellow/Orange:** The value closest to the **median** of the set.
+- **Uncolored:** Average "middle" performers.
