@@ -18,9 +18,9 @@ created_at: 2026-03-09T11:52:42
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 1/2 voyages complete, 4/7 stories done
+**Progress:** 2/2 voyages complete, 6/7 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
 | [Incremental File Caching](voyages/1vzfjD000/) | done | 3/4 |
-| [Vector Embedding Caching](voyages/1vzgQK000/) | in-progress | 1/3 |
+| [Vector Embedding Caching](voyages/1vzgQK000/) | done | 3/3 |
 <!-- END GENERATED -->

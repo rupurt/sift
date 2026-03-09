@@ -46,7 +46,8 @@ Sift employs a Zig-inspired incremental caching system to make repeat searches n
 Located in `~/.cache/sift/manifests/`, manifests are keyed by the hash of the absolute path being searched. They map filesystem heuristics (`inode`, `mtime`, `size`, `relative_path`) to a BLAKE3 content hash.
 
 ### 2. The Content-Addressable Blob Store (CAS)
-Located in `~/.cache/sift/blobs/`, this stores binary serialized `Document` representations (including pre-computed term frequencies and extraction artifacts). 
+Located in `~/.cache/sift/blobs/`, this stores binary serialized `Document` representations.
+- **Fully Processed Assets:** Each blob contains the extracted text, pre-computed term frequencies for lexical search, and pre-computed dense vector embeddings for semantic search. This allows `sift` to perform search at the speed of a dot-product without re-running neural network inference on subsequent queries.
 - **Atomic Writes:** New blobs are written to a `.tmp` file and then renamed for atomicity.
 - **Global Deduplication:** Identical files across different projects only occupy a single entry in the blob store.
 

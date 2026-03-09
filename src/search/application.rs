@@ -200,10 +200,21 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
     let registry = StrategyPresetRegistry::default_registry();
     let plan = registry.resolve(&request.strategy)?;
 
+    let corpus_start = std::time::Instant::now();
+    
+    // Determine if we need to pass the dense model for embedding during load
+    let mut dense_for_load = None;
     if plan.retrievers.contains(&RetrieverPolicy::SegmentVector) {
         let model_start = std::time::Instant::now();
         let dense = DenseReranker::load(request.dense_model.clone())?;
         crate::trace!(1, verbose, "→ dense model loaded in {:.2?}", model_start.elapsed());
+        dense_for_load = Some(dense);
+    }
+
+    let corpus = load_search_corpus(&request.path, ignore, verbose, dense_for_load.as_ref())?;
+    crate::trace!(1, verbose, "→ corpus loaded ({} files) in {:.2?}", corpus.indexed_files, corpus_start.elapsed());
+
+    if let Some(dense) = dense_for_load {
         service.register_retriever(Box::new(SegmentVectorRetriever { dense }));
     }
 
@@ -211,10 +222,6 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
     service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
     service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
     service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
-
-    let corpus_start = std::time::Instant::now();
-    let corpus = load_search_corpus(&request.path, ignore, verbose)?;
-    crate::trace!(1, verbose, "→ corpus loaded ({} files) in {:.2?}", corpus.indexed_files, corpus_start.elapsed());
 
     let index_start = std::time::Instant::now();
     let index = Bm25Index::build(&corpus.documents);

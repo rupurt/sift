@@ -9,6 +9,8 @@ use crate::extract::extract_path;
 use crate::segment::build_segments;
 use crate::cache::{Manifest, get_file_heuristics, hash_file, load_blob, save_blob, cache_dir};
 
+use crate::dense::DenseReranker;
+
 fn get_project_manifest_path(root: &Path) -> Result<PathBuf> {
     let absolute = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let path_str = absolute.to_string_lossy();
@@ -84,7 +86,12 @@ fn is_benchmark_metadata_file(root: &Path, path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>, verbose: u8) -> Result<LoadedCorpus> {
+pub fn load_search_corpus(
+    root: &Path,
+    ignore: Option<&Ignore>,
+    verbose: u8,
+    dense: Option<&DenseReranker>,
+) -> Result<LoadedCorpus> {
     if !root.exists() {
         bail!("search path '{}' does not exist", root.display());
     }
@@ -118,6 +125,7 @@ pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>, verbose: u8) -> 
             &mut total_bytes,
             &mut skipped_files,
             verbose,
+            dense,
         );
     } else if root.is_dir() {
         let walk_start = std::time::Instant::now();
@@ -140,6 +148,7 @@ pub fn load_search_corpus(root: &Path, ignore: Option<&Ignore>, verbose: u8) -> 
                             &mut total_bytes,
                             &mut skipped_files,
                             verbose,
+                            dense,
                         );
                     }
                 }
@@ -180,6 +189,7 @@ fn collect_search_file_cached(
     total_bytes: &mut u64,
     skipped_files: &mut usize,
     verbose: u8,
+    dense: Option<&DenseReranker>,
 ) {
     let Ok(heuristics) = get_file_heuristics(path) else {
         *skipped_files += 1;
@@ -217,10 +227,19 @@ fn collect_search_file_cached(
         crate::trace!(2, verbose, "    cache miss: {}", path.display());
         if let Ok(Some(extracted)) = extract_path(path) {
             let id = path.display().to_string();
-            let doc = index_document(id, path.to_path_buf(), extracted);
+            let mut doc = index_document(id, path.to_path_buf(), extracted);
             
-            // Pre-warm the cache. Note: Segments don't have embeddings yet, 
-            // but the text extraction work is saved.
+            // NEW: Compute embeddings for segments if model is provided
+            if let Some(dense) = dense {
+                let texts: Vec<_> = doc.segments.iter().map(|s| s.text.clone()).collect();
+                if let Ok(embeddings) = dense.embed_batch(&texts) {
+                    for (i, embedding) in embeddings.into_iter().enumerate() {
+                        doc.segments[i].embedding = Some(embedding);
+                    }
+                }
+            }
+
+            // Pre-warm the cache.
             if save_blob(blobs_dir, &hash, &doc).is_ok() {
                 manifest.update(path.to_path_buf(), heuristics, hash);
                 *manifest_updated = true;

@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T12:41:08.415380384-07:00
+mode: manual
+---
+load_search_corpus now accepts DenseReranker

@@ -27,3 +27,8 @@
 | SRS-07 | `load_search_corpus` MUST compute and populate embeddings for all segments before saving a document to the blob store. | SCOPE-02 | FR-01 | Integration test or trace verification. |
 | SRS-08 | `SegmentVectorRetriever` MUST utilize pre-computed embeddings if present in the corpus. | SCOPE-03 | FR-01 | Timing verification at `-v`. |
 <!-- END FUNCTIONAL_REQUIREMENTS -->
+
+### Non-Functional Requirements
+
+<!-- BEGIN NON_FUNCTIONAL_REQUIREMENTS -->
+<!-- END NON_FUNCTIONAL_REQUIREMENTS -->

@@ -51,10 +51,10 @@
 |--------|--------|
 | [Layered Search Strategy Foundation](epics/1vzXLN000/voyages/1vzdCx000/) | done |
 
-### [Zig-Style Global File Cache](epics/1vzfew000/) (active)
+### [Zig-Style Global File Cache](epics/1vzfew000/) (done)
 
 | Voyage | Status |
 |--------|--------|
 | [Incremental File Caching](epics/1vzfew000/voyages/1vzfjD000/) | done |
-| [Vector Embedding Caching](epics/1vzfew000/voyages/1vzgQK000/) | in-progress |
+| [Vector Embedding Caching](epics/1vzfew000/voyages/1vzgQK000/) | done |
 

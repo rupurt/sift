@@ -1,7 +1,8 @@
 use super::domain::*;
 use crate::dense::DenseReranker;
-use crate::vector::retrieve_semantic_documents;
 use anyhow::Result;
+
+use crate::vector::{aggregate_segment_hits, score_segments_manually, SegmentScorer};
 
 pub struct SegmentVectorRetriever {
     pub dense: DenseReranker,
@@ -33,13 +34,28 @@ impl Retriever for SegmentVectorRetriever {
             });
         }
 
-        crate::trace!(2, verbose, "    vector: scoring {} segments", segments.len());
-        let semantic_start = std::time::Instant::now();
-        let semantic =
-            retrieve_semantic_documents(&self.dense, query, &segments, corpus.documents.len())?;
-        crate::trace!(2, verbose, "    vector: search complete in {:.2?}", semantic_start.elapsed());
+        // Split segments into those with embeddings and those without
+        let (cached, missing): (Vec<_>, Vec<_>) = segments.into_iter().partition(|s| s.embedding.is_some());
 
-        let results = semantic
+        let mut segment_hits = Vec::new();
+
+        if !cached.is_empty() {
+            crate::trace!(2, verbose, "    vector: scoring {} segments from cache", cached.len());
+            let cached_start = std::time::Instant::now();
+            segment_hits.extend(score_segments_manually(&self.dense, query, &cached)?);
+            crate::trace!(2, verbose, "    vector: cached scoring complete in {:.2?}", cached_start.elapsed());
+        }
+
+        if !missing.is_empty() {
+            crate::trace!(2, verbose, "    vector: scoring {} missing segments via inference", missing.len());
+            let missing_start = std::time::Instant::now();
+            segment_hits.extend(self.dense.score_segments(query, &missing)?);
+            crate::trace!(2, verbose, "    vector: inference complete in {:.2?}", missing_start.elapsed());
+        }
+
+        let document_hits = aggregate_segment_hits(&segment_hits);
+
+        let results = document_hits
             .into_iter()
             .map(|s| {
                 crate::trace!(3, verbose, "      vector score: {:.4} for {}", s.score, s.path.display());

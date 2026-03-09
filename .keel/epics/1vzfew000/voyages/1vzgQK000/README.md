@@ -1,12 +1,13 @@
 ---
 id: 1vzgQK000
 title: Vector Embedding Caching
-status: in-progress
+status: done
 epic: 1vzfew000
 created_at: 2026-03-09T12:37:52
 index: 2
 updated_at: 2026-03-09T12:38:29
 started_at: 2026-03-09T12:38:29
+completed_at: 2026-03-09T12:41:31
 ---
 
 # Vector Embedding Caching
@@ -20,16 +21,18 @@ started_at: 2026-03-09T12:38:29
 |----------|-------------|
 | [SRS.md](SRS.md) | Requirements and verification criteria |
 | [SDD.md](SDD.md) | Architecture and implementation details |
+| [VOYAGE_REPORT.md](VOYAGE_REPORT.md) | Narrative summary of implementation and evidence |
+| [COMPLIANCE_REPORT.md](COMPLIANCE_REPORT.md) | Traceability matrix and verification proof |
 <!-- END DOCUMENTS -->
 
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 1/3 stories complete
+**Progress:** 3/3 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
 | [Add Embedding To Segment Model](../../../../stories/1vzgQX000/README.md) | feat | done |
-| [Compute And Cache Embeddings On Load](../../../../stories/1vzgQd000/README.md) | feat | backlog |
-| [Document Vector Caching](../../../../stories/1vzgQk000/README.md) | docs | backlog |
+| [Compute And Cache Embeddings On Load](../../../../stories/1vzgQd000/README.md) | feat | done |
+| [Document Vector Caching](../../../../stories/1vzgQk000/README.md) | docs | done |
 <!-- END GENERATED -->

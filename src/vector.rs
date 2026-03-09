@@ -28,6 +28,41 @@ pub struct SemanticDocumentHit {
     pub segment_hits: usize,
 }
 
+pub fn score_segments_manually(
+    scorer: &crate::dense::DenseReranker,
+    query: &str,
+    segments: &[Segment],
+) -> Result<Vec<SegmentHit>> {
+    if segments.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Embed the query
+    let query_embeddings = scorer.embed_batch(&[query.to_string()])?;
+    let query_vec = &query_embeddings[0];
+
+    let mut hits = Vec::with_capacity(segments.len());
+    for segment in segments {
+        if let Some(doc_vec) = &segment.embedding {
+            let score = dot_product(query_vec, doc_vec);
+            hits.push(SegmentHit {
+                segment_id: segment.id.clone(),
+                doc_id: segment.doc_id.clone(),
+                path: segment.path.clone(),
+                label: segment.label.clone(),
+                text: segment.text.clone(),
+                score: score as f64,
+            });
+        }
+    }
+
+    Ok(hits)
+}
+
+fn dot_product(a: &[f32], b: &[f32]) -> f32 {
+    a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
+}
+
 pub trait SegmentScorer {
     fn score_segments(&self, query: &str, segments: &[Segment]) -> Result<Vec<SegmentHit>>;
 }

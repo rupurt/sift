@@ -210,6 +210,23 @@ impl DenseReranker {
         Ok(scores)
     }
 
+    pub fn embed_batch(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+        if texts.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let embeddings = self.embed_texts(texts)?;
+        let (num_texts, _dim) = embeddings.dims2()?;
+        let mut results = Vec::with_capacity(num_texts);
+
+        for i in 0..num_texts {
+            let vec = embeddings.get(i)?.flatten_all()?.to_vec1::<f32>()?;
+            results.push(vec);
+        }
+
+        Ok(results)
+    }
+
     fn embed_texts(&self, texts: &[String]) -> Result<Tensor> {
         let encoded = self.tokenizer.encode_list(
             texts,
