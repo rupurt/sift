@@ -1,3 +1,7 @@
+---
+id: 1vzXLN000
+---
+
 # Recover Hybrid Retrieval Viability — Survey
 
 ## Evidence From The Completed Voyage
@@ -65,6 +69,13 @@ Cons:
 - the measured latency miss is so large that tuning alone is unlikely to be
   enough;
 - quality also regressed on the sample, so the risk is high.
+
+## Sources
+
+| ID | Class | Provenance | Location | Observed / Published | Retrieved | Authority | Freshness | Notes |
+|----|-------|------------|----------|----------------------|-----------|-----------|-----------|-------|
+| SRC-01 | manual | manual:project-evidence | .keel/voyages/1vzSne000 | 2026-03-09 | 2026-03-09 | high | high | Completed true-hybrid voyage provided benchmark evidence showing hybrid underperformed BM25 |
+| SRC-02 | manual | manual:project-evidence | .keel/bearings/1vzSne000/EVIDENCE.md | 2026-03-09 | 2026-03-09 | high | high | Prior bearing research documented architecture options including persisted sidecar indexes |
 
 ## Survey Conclusion
 

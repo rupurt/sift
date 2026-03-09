@@ -15,6 +15,6 @@ laid_at: 2026-03-08T15:28:19
 | Document | Description |
 |----------|-------------|
 | [BRIEF.md](BRIEF.md) | Research hypothesis, problem framing, and open questions |
-| [SURVEY.md](SURVEY.md) | Research findings, alternatives, and key constraints |
+| [EVIDENCE.md](EVIDENCE.md) | Research findings, alternatives, and key constraints |
 | [ASSESSMENT.md](ASSESSMENT.md) | Recommendation and rollout decision |
 <!-- END DOCUMENTS -->

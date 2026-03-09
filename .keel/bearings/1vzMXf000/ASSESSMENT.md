@@ -29,32 +29,38 @@ query-time caching, and more aggressive hybrid fusion tuning. That tradeoff is
 acceptable because unsupported formats are a larger practical recall gap than
 another small ranking iteration on text-only corpora.
 
+### Findings
+
+- Pure-Rust extraction libraries exist for all three target format families: PDF, HTML, and OOXML [SRC-01] [SRC-03] [SRC-05]
+- html5ever provides a robust parser foundation if lighter-weight html2text proves insufficient [SRC-04]
+- pdf_oxide offers a broader PDF processing stack as an alternative to pdf-extract [SRC-02]
+
 ### Dependencies
 
 The following need to hold:
 
 - The chosen extraction crates must stay compatible with Linux and macOS in a
-  pure-Rust, in-process path.
+  pure-Rust, in-process path. [SRC-01] [SRC-03] [SRC-05]
 - Sift needs a narrow extractor interface so new formats do not fork the search
-  or benchmark codepaths.
+  or benchmark codepaths. [SRC-04]
 - The next stories must include local fixtures and evidence for extraction
-  correctness, not just happy-path parsing.
+  correctness, not just happy-path parsing. [SRC-01] [SRC-02]
 
 ### Alternatives Considered
 
 Alternatives considered:
 
 - Stay text-only for longer. Rejected because the board has already finished the
-  text-only MVP and the user objective explicitly continues into richer formats.
+  text-only MVP and the user objective explicitly continues into richer formats. [SRC-03]
 - Shell out to system converters such as LibreOffice, Pandoc, or PDF toolkits.
-  Rejected because this weakens the single-binary/local-runtime contract.
+  Rejected because this weakens the single-binary/local-runtime contract. [SRC-01]
 - Hand-roll every extractor from ZIP/XML/PDF primitives. Rejected as the first
   move because it increases implementation cost without evidence that the
-  existing Rust libraries are inadequate.
+  existing Rust libraries are inadequate. [SRC-05]
 
 ## Recommendation
 
-[x] Proceed → convert to epic
+[x] Proceed → convert to epic [SRC-01] [SRC-03] [SRC-05]
 [ ] Park → revisit later
 [ ] Decline → document learnings
 

@@ -38,14 +38,14 @@ no persisted vector index.
     local file corpus             local model cache      bench/eval CLI
 ```
 
-In scope:
+### In Scope
 
 - structure-aware segmentation,
 - full-corpus vector retrieval over active segments,
 - document aggregation and RRF fusion,
 - benchmark/eval updates for the true-hybrid path.
 
-Out of scope:
+### Out of Scope
 
 - persisted vector indices,
 - ANN as a required first step,

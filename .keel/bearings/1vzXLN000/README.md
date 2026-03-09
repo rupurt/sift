@@ -15,6 +15,6 @@ laid_at: 2026-03-09T03:20:00
 | Document | Description |
 |----------|-------------|
 | [BRIEF.md](BRIEF.md) | Core research brief covering the hypothesis, problem space, success criteria, and open questions |
-| [SURVEY.md](SURVEY.md) | Survey findings, market and technical research, and discovered constraints |
+| [EVIDENCE.md](EVIDENCE.md) | Survey findings, market and technical research, and discovered constraints |
 | [ASSESSMENT.md](ASSESSMENT.md) | Impact scoring, tradeoff analysis, and the final recommendation |
 <!-- END DOCUMENTS -->

@@ -30,13 +30,13 @@ new work happens in the ingestion boundary that maps a filesystem path to
       local rich files         local CLI / benchmarks
 ```
 
-In scope:
+### In Scope
 
 - Extractor dispatch by extension/content type.
 - HTML, text-bearing PDF, and OOXML extraction.
 - Mixed-format tests, demos, and benchmark/report updates.
 
-Out of scope:
+### Out of Scope
 
 - OCR/scanned PDFs.
 - Legacy binary Office documents.

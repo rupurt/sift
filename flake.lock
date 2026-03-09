@@ -31,17 +31,18 @@
         ]
       },
       "locked": {
-        "lastModified": 1773008913,
-        "narHash": "sha256-OHyUKQDVF4P2igh1hfsiYV0uJXxwL94z5n/gqQEBvIE=",
-        "ref": "refs/heads/main",
-        "rev": "7a55b7e858c79be9940039b4faa1971fcd18402e",
-        "revCount": 155,
-        "type": "git",
-        "url": "ssh://git@github.com/rupurt/keel.git"
+        "lastModified": 1773071516,
+        "narHash": "sha256-7n5xBgjQIIUqQHrEBQjx+W4M0aswszpW7XR2YfC1HSE=",
+        "owner": "rupurt",
+        "repo": "keel",
+        "rev": "2b14d578c1771b247275ad5ba295e2cf4a0f1fec",
+        "type": "github"
       },
       "original": {
-        "type": "git",
-        "url": "ssh://git@github.com/rupurt/keel.git"
+        "owner": "rupurt",
+        "repo": "keel",
+        "rev": "2b14d578c1771b247275ad5ba295e2cf4a0f1fec",
+        "type": "github"
       }
     },
     "nixpkgs": {
@@ -106,11 +107,11 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1772939270,
-        "narHash": "sha256-HbxD5DJAKxzo0G8on5wdY+OZNiUWt3FTvGmXmVEmg7g=",
+        "lastModified": 1773025773,
+        "narHash": "sha256-Wik8+xApNfldpUFjPmJkPdg0RrvUPSWGIZis+A/0N1w=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "bb93f191a07c0165992ed6d0b4197ee5c7e6e641",
+        "rev": "3c06fdbbd36ff60386a1e590ee0cd52dcd1892bf",
         "type": "github"
       },
       "original": {

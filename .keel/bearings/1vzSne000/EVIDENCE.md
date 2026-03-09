@@ -201,13 +201,10 @@ preference.
 
 ## Sources
 
-- PageIndex semantic document search:
-  https://docs.pageindex.ai/tutorials/doc-search/semantics
-- PageIndex hybrid tree search:
-  https://docs.pageindex.ai/tutorials/tree-search/hybrid
-- fastembed-rs README:
-  https://github.com/Anush008/fastembed-rs
-- `ort` cargo feature docs:
-  https://ort.pyke.io/setup/cargo-features
-- Qdrant hybrid-query docs:
-  https://qdrant.tech/documentation/concepts/hybrid-queries/
+| ID | Class | Provenance | Location | Observed / Published | Retrieved | Authority | Freshness | Notes |
+|----|-------|------------|----------|----------------------|-----------|-----------|-----------|-------|
+| SRC-01 | web | manual:web-search | https://docs.pageindex.ai/tutorials/doc-search/semantics | 2026-03-08 | 2026-03-08 | medium | high | PageIndex semantic document search tutorial recommends chunk-to-document aggregation |
+| SRC-02 | web | manual:web-search | https://docs.pageindex.ai/tutorials/tree-search/hybrid | 2026-03-08 | 2026-03-08 | medium | high | PageIndex hybrid tree search tutorial uses chunk-to-node score aggregation |
+| SRC-03 | web | manual:github-review | https://github.com/Anush008/fastembed-rs | 2026-03-08 | 2026-03-08 | medium | high | fastembed-rs README documents ort-backed ONNX inference and limited Candle support |
+| SRC-04 | web | manual:web-search | https://ort.pyke.io/setup/cargo-features | 2026-03-08 | 2026-03-08 | medium | high | ort cargo feature docs show prebuilt binary downloads and dynamic library management |
+| SRC-05 | web | manual:web-search | https://qdrant.tech/documentation/concepts/hybrid-queries/ | 2026-03-08 | 2026-03-08 | high | high | Qdrant hybrid-query docs treat RRF as standard sparse+dense fusion method |

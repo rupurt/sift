@@ -7,7 +7,7 @@
     flake-utils.url = "github:numtide/flake-utils";
     nixpkgs-cmake.url = "github:NixOS/nixpkgs/nixos-25.05";
     keel = {
-      url = "git+ssh://git@github.com/rupurt/keel.git";
+      url = "github:rupurt/keel?rev=2b14d578c1771b247275ad5ba295e2cf4a0f1fec";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.rust-overlay.follows = "rust-overlay";
       inputs.flake-utils.follows = "flake-utils";

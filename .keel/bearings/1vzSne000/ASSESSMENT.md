@@ -30,15 +30,21 @@ acceptable because the current hybrid engine does not satisfy the intended
 retrieval contract and would otherwise force later work to build on a misleading
 foundation.
 
+### Findings
+
+- PageIndex tutorials demonstrate chunk-to-parent aggregation as the standard pattern for document-level retrieval from segment hits [SRC-01] [SRC-02]
+- fastembed-rs relies on ONNX Runtime by default, making Candle the better first runtime for pure-Rust constraints [SRC-03] [SRC-04]
+- RRF is the standard fusion method for combining independently retrieved sparse and dense result sets [SRC-05]
+
 ### Dependencies
 
 The following need to hold:
 
-- sift needs a structure-aware segment abstraction beneath document ranking;
+- sift needs a structure-aware segment abstraction beneath document ranking [SRC-01] [SRC-02]
 - the current Candle embedding path must remain viable as the default local
-  runtime for the first implementation slice;
+  runtime for the first implementation slice [SRC-03] [SRC-04]
 - benchmark work must explicitly measure both retrieval-quality gains and any
-  latency regressions introduced by whole-corpus vector retrieval.
+  latency regressions introduced by whole-corpus vector retrieval [SRC-05]
 
 ### Alternatives Considered
 
@@ -46,20 +52,20 @@ Alternatives considered:
 
 - Keep rerank-only hybrid semantics and rename the feature.
   Rejected because the user objective is true BM25 plus vector retrieval, not a
-  documentation fix.
+  documentation fix. [SRC-05]
 - Replace the current embedding path with `fastembed-rs` immediately.
   Deferred because the default documented path relies on ONNX Runtime, while
-  Candle already satisfies the repository's preferred runtime constraints.
+  Candle already satisfies the repository's preferred runtime constraints. [SRC-03] [SRC-04]
 - Use single whole-document embeddings.
   Rejected because it is weak for long and structured documents and does not
-  exploit the section-aware insight from PageIndex.
+  exploit the section-aware insight from PageIndex. [SRC-01] [SRC-02]
 - Introduce persisted vector sidecars immediately.
   Deferred because the current board still prefers transient or ephemeral
-  structures first and requires evidence before relaxing that constraint.
+  structures first and requires evidence before relaxing that constraint. [SRC-05]
 
 ## Recommendation
 
-[x] Proceed → convert to epic
+[x] Proceed → convert to epic [SRC-01] [SRC-05]
 [ ] Park → revisit later
 [ ] Decline → document learnings
 

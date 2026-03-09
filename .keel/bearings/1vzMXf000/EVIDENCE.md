@@ -135,3 +135,13 @@ ranking rewrite.
   through the current hybrid ranking pipeline.
 - Whether PDF layout artifacts require lightweight post-processing heuristics
   before indexing.
+
+## Sources
+
+| ID | Class | Provenance | Location | Observed / Published | Retrieved | Authority | Freshness | Notes |
+|----|-------|------------|----------|----------------------|-----------|-----------|-----------|-------|
+| SRC-01 | web | manual:web-search | https://docs.rs/pdf-extract/latest/pdf_extract/ | 2026-03-08 | 2026-03-08 | medium | high | pdf-extract offers focused text extraction for text-bearing PDFs |
+| SRC-02 | web | manual:web-search | https://docs.rs/pdf_oxide/latest/pdf_oxide/ | 2026-03-08 | 2026-03-08 | medium | high | pdf_oxide provides broader PDF processing stack in pure Rust |
+| SRC-03 | web | manual:web-search | https://docs.rs/html2text/latest/html2text/ | 2026-03-08 | 2026-03-08 | medium | high | html2text converts HTML into readable plain text |
+| SRC-04 | web | manual:web-search | https://docs.rs/html5ever/latest/html5ever/ | 2026-03-08 | 2026-03-08 | high | high | html5ever is the robust HTML parser foundation for DOM-aware processing |
+| SRC-05 | web | manual:web-search | https://docs.rs/undoc/latest/undoc/ | 2026-03-08 | 2026-03-08 | medium | high | undoc exposes text, Markdown, and JSON extraction for DOCX, XLSX, and PPTX |

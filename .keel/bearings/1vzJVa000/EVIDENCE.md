@@ -267,3 +267,14 @@ an approximation.
   improving enough to justify the added latency.
 - Whether a second corpus closer to developer documentation will reveal
   different failure modes than SciFact.
+
+## Sources
+
+| ID | Class | Provenance | Location | Observed / Published | Retrieved | Authority | Freshness | Notes |
+|----|-------|------------|----------|----------------------|-----------|-----------|-----------|-------|
+| SRC-01 | web | manual:web-search | https://docs.rs/bm25/latest/bm25/ | 2026-03-08 | 2026-03-08 | high | high | bm25 crate provides in-memory BM25 search engine and raw scorer APIs |
+| SRC-02 | web | manual:github-review | https://github.com/huggingface/candle | 2026-03-08 | 2026-03-08 | high | high | Candle positions itself for lightweight serverless deployment with BERT and JinaBert examples |
+| SRC-03 | web | manual:web-search | https://docs.rs/crate/burn-candle/latest | 2026-03-08 | 2026-03-08 | medium | high | burn-candle backend supports Linux and macOS inference targets |
+| SRC-04 | web | manual:web-search | https://docs.rs/burn-import/latest/burn_import/onnx/struct.ModelGen.html | 2026-03-08 | 2026-03-08 | medium | high | burn-import can convert ONNX models into Rust source plus model weights |
+| SRC-05 | web | manual:web-search | https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2 | 2026-03-08 | 2026-03-08 | high | high | all-MiniLM-L6-v2 model card documents 384-dim embeddings and 22.7M parameters |
+| SRC-06 | web | manual:web-search | https://huggingface.co/datasets/BeIR/scifact | 2026-03-08 | 2026-03-08 | high | high | BEIR SciFact dataset provides standard corpus/queries/qrels for IR evaluation |
