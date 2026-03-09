@@ -3,10 +3,11 @@ id: 1vzSw1000
 title: Add Full-Corpus Segment Vector Retrieval
 type: feat
 scope: 1vzSne000/1vzSy6000
-status: in-progress
+status: done
 created_at: 2026-03-08T22:13:41
-updated_at: 2026-03-09T01:16:29
+updated_at: 2026-03-09T01:23:40
 started_at: 2026-03-09T01:16:29
+completed_at: 2026-03-09T01:23:40
 ---
 
 # Add Full-Corpus Segment Vector Retrieval

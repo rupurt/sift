@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T01:27:55.657992031-07:00
+mode: manual
+---
+Hybrid search now fuses independent BM25 and vector document rankings with Reciprocal Rank Fusion.

@@ -1,105 +1,157 @@
 use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 use anyhow::Result;
 
-const BM25_WEIGHT: f64 = 0.35;
-const DENSE_WEIGHT: f64 = 0.65;
-const BM25_TIE_BONUS_SCALE: f64 = 1000.0;
+use crate::vector::SemanticDocumentHit;
+
+const RRF_K: usize = 60;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct HybridCandidate {
+pub struct Bm25DocumentHit {
     pub id: String,
-    pub bm25_rank: usize,
-    pub bm25_score: f64,
-    pub dense_score: f64,
-    pub final_score: f64,
+    pub path: PathBuf,
+    pub score: f64,
 }
 
-pub fn fuse_candidates(candidates: &[HybridCandidate]) -> Result<Vec<HybridCandidate>> {
-    if candidates.is_empty() {
-        return Ok(Vec::new());
+#[derive(Debug, Clone, PartialEq)]
+pub struct HybridDocumentHit {
+    pub id: String,
+    pub path: PathBuf,
+    pub score: f64,
+    pub bm25_score: Option<f64>,
+    pub semantic_score: Option<f64>,
+    pub snippet: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct HybridAccumulator {
+    id: String,
+    path: PathBuf,
+    score: f64,
+    bm25_score: Option<f64>,
+    semantic_score: Option<f64>,
+    snippet: Option<String>,
+}
+
+pub fn fuse_rankings(
+    bm25: &[Bm25DocumentHit],
+    semantic: &[SemanticDocumentHit],
+    limit: usize,
+) -> Result<Vec<HybridDocumentHit>> {
+    let mut documents = HashMap::<String, HybridAccumulator>::new();
+
+    for (index, document) in bm25.iter().enumerate() {
+        let entry = documents
+            .entry(document.id.clone())
+            .or_insert_with(|| HybridAccumulator {
+                id: document.id.clone(),
+                path: document.path.clone(),
+                score: 0.0,
+                bm25_score: None,
+                semantic_score: None,
+                snippet: None,
+            });
+        entry.score += reciprocal_rank(index + 1);
+        entry.bm25_score = Some(document.score);
     }
 
-    let (bm25_min, bm25_max) =
-        score_bounds(candidates.iter().map(|candidate| candidate.bm25_score));
-    let (dense_min, dense_max) =
-        score_bounds(candidates.iter().map(|candidate| candidate.dense_score));
+    for (index, document) in semantic.iter().enumerate() {
+        let entry = documents
+            .entry(document.id.clone())
+            .or_insert_with(|| HybridAccumulator {
+                id: document.id.clone(),
+                path: document.path.clone(),
+                score: 0.0,
+                bm25_score: None,
+                semantic_score: None,
+                snippet: None,
+            });
+        entry.score += reciprocal_rank(index + 1);
+        entry.path = document.path.clone();
+        entry.semantic_score = Some(document.score);
+        entry.snippet = Some(document.best_segment_text.clone());
+    }
 
-    let mut fused = candidates
-        .iter()
-        .cloned()
-        .map(|mut candidate| {
-            let lexical = normalize(candidate.bm25_score, bm25_min, bm25_max);
-            let semantic = normalize(candidate.dense_score, dense_min, dense_max);
-            let tie_bonus = 1.0 / (BM25_TIE_BONUS_SCALE + candidate.bm25_rank as f64);
-            candidate.final_score = lexical * BM25_WEIGHT + semantic * DENSE_WEIGHT + tie_bonus;
-            candidate
+    let mut fused = documents
+        .into_values()
+        .map(|document| HybridDocumentHit {
+            id: document.id,
+            path: document.path,
+            score: document.score,
+            bm25_score: document.bm25_score,
+            semantic_score: document.semantic_score,
+            snippet: document.snippet,
         })
         .collect::<Vec<_>>();
 
     fused.sort_by(|left, right| {
         right
-            .final_score
-            .partial_cmp(&left.final_score)
+            .score
+            .partial_cmp(&left.score)
             .unwrap_or(Ordering::Equal)
-            .then_with(|| left.bm25_rank.cmp(&right.bm25_rank))
             .then_with(|| left.id.cmp(&right.id))
     });
 
-    Ok(fused)
+    Ok(fused.into_iter().take(limit.max(1)).collect())
 }
 
-fn score_bounds(scores: impl Iterator<Item = f64>) -> (f64, f64) {
-    let mut min_score = f64::INFINITY;
-    let mut max_score = f64::NEG_INFINITY;
-
-    for score in scores {
-        min_score = min_score.min(score);
-        max_score = max_score.max(score);
-    }
-
-    if !min_score.is_finite() || !max_score.is_finite() {
-        (0.0, 0.0)
-    } else {
-        (min_score, max_score)
-    }
-}
-
-fn normalize(score: f64, min_score: f64, max_score: f64) -> f64 {
-    let range = max_score - min_score;
-    if range.abs() < f64::EPSILON {
-        1.0
-    } else {
-        (score - min_score) / range
-    }
+fn reciprocal_rank(rank: usize) -> f64 {
+    1.0 / (RRF_K as f64 + rank as f64)
 }
 
 #[cfg(test)]
-mod fusion {
-    use super::{HybridCandidate, fuse_candidates};
+mod rrf {
+    use std::path::PathBuf;
+
+    use crate::vector::SemanticDocumentHit;
+
+    use super::{Bm25DocumentHit, fuse_rankings};
 
     #[test]
-    fn dense_signal_can_reorder_bm25_shortlist() {
-        let fused = fuse_candidates(&[
-            HybridCandidate {
-                id: "doc-a".to_string(),
-                bm25_rank: 1,
-                bm25_score: 12.0,
-                dense_score: 0.10,
-                final_score: 0.0,
-            },
-            HybridCandidate {
-                id: "doc-b".to_string(),
-                bm25_rank: 2,
-                bm25_score: 11.0,
-                dense_score: 0.95,
-                final_score: 0.0,
-            },
-        ])
-        .expect("fused candidates");
+    fn fuses_independent_bm25_and_vector_rankings() {
+        let fused = fuse_rankings(
+            &[
+                Bm25DocumentHit {
+                    id: "doc-a".to_string(),
+                    path: PathBuf::from("alpha.txt"),
+                    score: 12.0,
+                },
+                Bm25DocumentHit {
+                    id: "doc-b".to_string(),
+                    path: PathBuf::from("beta.txt"),
+                    score: 11.0,
+                },
+            ],
+            &[
+                SemanticDocumentHit {
+                    id: "doc-b".to_string(),
+                    path: PathBuf::from("beta.txt"),
+                    score: 0.9,
+                    best_segment_id: "doc-b::segment:0001".to_string(),
+                    best_segment_label: "section 1".to_string(),
+                    best_segment_text: "semantic beta snippet".to_string(),
+                    best_segment_score: 0.9,
+                    segment_hits: 1,
+                },
+                SemanticDocumentHit {
+                    id: "doc-c".to_string(),
+                    path: PathBuf::from("gamma.txt"),
+                    score: 0.8,
+                    best_segment_id: "doc-c::segment:0001".to_string(),
+                    best_segment_label: "section 1".to_string(),
+                    best_segment_text: "semantic gamma snippet".to_string(),
+                    best_segment_score: 0.8,
+                    segment_hits: 1,
+                },
+            ],
+            10,
+        )
+        .expect("fused rankings");
 
         assert_eq!(fused[0].id, "doc-b");
-        assert_eq!(fused[1].id, "doc-a");
-        assert!(fused[0].final_score > fused[1].final_score);
+        assert!(fused[0].score > fused[1].score);
+        assert_eq!(fused[0].snippet.as_deref(), Some("semantic beta snippet"));
     }
 }

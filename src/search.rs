@@ -10,6 +10,7 @@ use walkdir::WalkDir;
 
 use crate::dense::{DenseModelSpec, DenseReranker};
 use crate::extract::{SourceKind, extract_path};
+use crate::hybrid::{Bm25DocumentHit, fuse_rankings};
 use crate::segment::{Segment, build_segments};
 use crate::vector::retrieve_semantic_documents;
 
@@ -114,6 +115,7 @@ pub struct RankedDocument {
     pub score: f64,
     pub bm25_score: f64,
     pub dense_score: Option<f64>,
+    pub snippet: Option<String>,
 }
 
 pub struct Bm25Index {
@@ -222,12 +224,7 @@ pub fn run_search(request: &SearchRequest) -> Result<SearchResponse> {
         path: result.path.display().to_string(),
         rank: index + 1,
         score: result.score,
-        snippet: build_snippet(
-            corpus
-                .document_by_id(&result.id)
-                .map(Document::text)
-                .unwrap_or_default(),
-        ),
+        snippet: resolve_snippet(&corpus, &result),
     })
     .collect::<Vec<_>>();
 
@@ -266,6 +263,7 @@ pub fn rank_corpus(
                 score: document.score,
                 bm25_score: document.score,
                 dense_score: None,
+                snippet: None,
             })
             .collect()),
         Engine::Hybrid => {
@@ -280,14 +278,26 @@ pub fn rank_corpus(
                 return Ok(Vec::new());
             }
 
-            Ok(retrieve_semantic_documents(dense, query, &segments, limit)?
+            let semantic =
+                retrieve_semantic_documents(dense, query, &segments, corpus.documents.len())?;
+            let lexical = lexical
+                .into_iter()
+                .map(|document| Bm25DocumentHit {
+                    id: document.id,
+                    path: document.path,
+                    score: document.score,
+                })
+                .collect::<Vec<_>>();
+
+            Ok(fuse_rankings(&lexical, &semantic, limit)?
                 .into_iter()
                 .map(|document| RankedDocument {
                     id: document.id,
                     path: document.path,
                     score: document.score,
-                    bm25_score: 0.0,
-                    dense_score: Some(document.score),
+                    bm25_score: document.bm25_score.unwrap_or(0.0),
+                    dense_score: document.semantic_score,
+                    snippet: document.snippet,
                 })
                 .collect())
         }
@@ -537,6 +547,19 @@ fn build_snippet(text: &str) -> String {
     snippet
 }
 
+fn resolve_snippet(corpus: &LoadedCorpus, result: &RankedDocument) -> String {
+    if let Some(snippet) = result.snippet.as_deref() {
+        return build_snippet(snippet);
+    }
+
+    build_snippet(
+        corpus
+            .document_by_id(&result.id)
+            .map(Document::text)
+            .unwrap_or_default(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs as stdfs;
@@ -547,7 +570,8 @@ mod tests {
     use crate::dense::DenseModelSpec;
 
     use super::{
-        Engine, OutputFormat, SearchRequest, load_search_corpus, render_search_response, run_search,
+        Engine, OutputFormat, RankedDocument, SearchRequest, load_search_corpus,
+        render_search_response, resolve_snippet, run_search,
     };
 
     mod search {
@@ -599,6 +623,38 @@ mod tests {
             assert!(first.get("rank").is_some());
             assert!(first.get("score").is_some());
             assert!(first.get("snippet").is_some());
+        }
+    }
+
+    mod hybrid {
+        use super::*;
+
+        mod best_segment_snippet {
+            use super::*;
+
+            #[test]
+            fn prefers_best_segment_snippet_over_document_truncation() {
+                let corpus = sample_rich_search_tree();
+                let loaded = load_search_corpus(corpus.path()).expect("loaded corpus");
+                let document = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("docs/service.html"))
+                    .expect("html document");
+                let ranked = RankedDocument {
+                    id: document.id.clone(),
+                    path: document.path.clone(),
+                    score: 1.0,
+                    bm25_score: 0.4,
+                    dense_score: Some(0.8),
+                    snippet: Some("best matching segment snippet".to_string()),
+                };
+
+                assert_eq!(
+                    resolve_snippet(&loaded, &ranked),
+                    "best matching segment snippet"
+                );
+            }
         }
     }
 

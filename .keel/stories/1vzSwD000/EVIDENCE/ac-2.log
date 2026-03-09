@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T01:27:55.562629186-07:00
+mode: manual
+---
+Hybrid results now carry snippet text from the best matching semantic segment instead of truncating the whole document body.
