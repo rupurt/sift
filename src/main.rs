@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use sift::bench::{
     LatencyBenchmarkRequest, QualityBenchmarkRequest, run_latency_benchmark, run_quality_benchmark,
 };
@@ -37,34 +37,48 @@ enum Commands {
         command: BenchCommands,
     },
     /// Search the corpus
-    Search {
-        #[arg(long, value_enum, default_value_t = Engine::Hybrid)]
-        engine: Engine,
+    Search(SearchCommand),
+}
 
-        #[arg(long)]
-        json: bool,
+#[derive(Args)]
+#[command(arg_required_else_help = true)]
+#[command(override_usage = "sift search [OPTIONS] [PATH] <QUERY>")]
+#[command(after_help = "If PATH is omitted, sift searches the current directory.")]
+struct SearchCommand {
+    #[arg(long, value_enum, default_value_t = Engine::Hybrid)]
+    engine: Engine,
 
-        #[arg(long, default_value_t = DEFAULT_RESULT_LIMIT)]
-        limit: usize,
+    #[arg(long)]
+    json: bool,
 
-        #[arg(long, default_value_t = DEFAULT_HYBRID_SHORTLIST)]
-        shortlist: usize,
+    #[arg(long, default_value_t = DEFAULT_RESULT_LIMIT)]
+    limit: usize,
 
-        #[arg(long)]
-        model_id: Option<String>,
+    #[arg(long, default_value_t = DEFAULT_HYBRID_SHORTLIST)]
+    shortlist: usize,
 
-        #[arg(long)]
-        model_revision: Option<String>,
+    #[arg(long)]
+    model_id: Option<String>,
 
-        #[arg(long)]
-        max_length: Option<usize>,
+    #[arg(long)]
+    model_revision: Option<String>,
 
-        /// The search query
-        query: String,
+    #[arg(long)]
+    max_length: Option<usize>,
 
-        /// The path to search
-        path: PathBuf,
-    },
+    /// Provide QUERY to search the current directory, or PATH QUERY to search a specific corpus.
+    #[arg(num_args = 1..=2, value_names = ["PATH", "QUERY"])]
+    targets: Vec<String>,
+}
+
+impl SearchCommand {
+    fn resolve_targets(&self) -> (PathBuf, String) {
+        match self.targets.as_slice() {
+            [query] => (PathBuf::from("."), query.clone()),
+            [path, query] => (PathBuf::from(path), query.clone()),
+            _ => unreachable!("clap enforces one or two search targets"),
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -204,28 +218,23 @@ fn main() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
         },
-        Commands::Search {
-            engine,
-            json,
-            limit,
-            shortlist,
-            model_id,
-            model_revision,
-            max_length,
-            query,
-            path,
-        } => {
+        Commands::Search(search) => {
+            let (path, query) = search.resolve_targets();
             let response = run_search(&SearchRequest {
-                engine,
+                engine: search.engine,
                 query,
                 path,
-                limit,
-                shortlist,
-                dense_model: DenseModelSpec::with_overrides(model_id, model_revision, max_length),
+                limit: search.limit,
+                shortlist: search.shortlist,
+                dense_model: DenseModelSpec::with_overrides(
+                    search.model_id,
+                    search.model_revision,
+                    search.max_length,
+                ),
             })?;
             let output = render_search_response(
                 &response,
-                if json {
+                if search.json {
                     OutputFormat::Json
                 } else {
                     OutputFormat::Text
@@ -236,4 +245,42 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn search_defaults_path_to_current_directory_when_only_query_is_provided() {
+        let cli = Cli::try_parse_from(["sift", "search", "retrieval architecture"])
+            .expect("search command parses");
+
+        let Commands::Search(search) = cli.command else {
+            panic!("expected search command");
+        };
+        let (path, query) = search.resolve_targets();
+
+        assert_eq!(path, PathBuf::from("."));
+        assert_eq!(query, "retrieval architecture");
+    }
+
+    #[test]
+    fn search_accepts_path_before_query() {
+        let cli = Cli::try_parse_from([
+            "sift",
+            "search",
+            "tests/fixtures/rich-docs",
+            "service catalog",
+        ])
+        .expect("search command parses");
+
+        let Commands::Search(search) = cli.command else {
+            panic!("expected search command");
+        };
+        let (path, query) = search.resolve_targets();
+
+        assert_eq!(path, PathBuf::from("tests/fixtures/rich-docs"));
+        assert_eq!(query, "service catalog");
+    }
 }

@@ -43,19 +43,25 @@ cargo install --path .
 Hybrid search is the default:
 
 ```bash
-sift search "architecture decision" tests/fixtures/rich-docs
+sift search tests/fixtures/rich-docs "architecture decision"
+```
+
+If you omit the path, `sift` searches the current directory:
+
+```bash
+sift search "architecture decision"
 ```
 
 Request JSON output for agent consumption:
 
 ```bash
-sift search --json "quarterly roadmap" tests/fixtures/rich-docs
+sift search --json tests/fixtures/rich-docs "quarterly roadmap"
 ```
 
 Force lexical-only BM25 search when you want a baseline:
 
 ```bash
-sift search --engine bm25 "service catalog" tests/fixtures/rich-docs
+sift search --engine bm25 tests/fixtures/rich-docs "service catalog"
 ```
 
 Override dense model settings explicitly:
@@ -64,8 +70,8 @@ Override dense model settings explicitly:
 sift search \
   --model-id sentence-transformers/all-MiniLM-L6-v2 \
   --max-length 40 \
-  "retrieval architecture" \
-  .cache/eval/scifact-files
+  .cache/eval/scifact-files \
+  "retrieval architecture"
 ```
 
 ## Evaluation And Benchmarks

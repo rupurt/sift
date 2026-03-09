@@ -21,19 +21,42 @@ fmt:
 fmt-check:
     cargo fmt --check
 
+build profile="debug":
+    @set -eu; \
+    local_target="{{justfile_directory()}}/target"; \
+    case "{{profile}}" in \
+        debug) cargo build; profile_dir=debug ;; \
+        release) cargo build --release; profile_dir=release ;; \
+        *) echo "unsupported build profile: {{profile}} (expected debug or release)" >&2; exit 1 ;; \
+    esac; \
+    source_root="${CARGO_TARGET_DIR:-$local_target}"; \
+    source_bin="$source_root/$profile_dir/sift"; \
+    dest_dir="$local_target/$profile_dir"; \
+    dest_bin="$dest_dir/sift"; \
+    if [ ! -f "$source_bin" ]; then \
+        echo "expected build artifact not found: $source_bin" >&2; \
+        exit 1; \
+    fi; \
+    mkdir -p "$dest_dir"; \
+    if [ "$source_bin" != "$dest_bin" ]; then \
+        cp -f "$source_bin" "$dest_bin"; \
+        echo "copied $source_bin -> $dest_bin"; \
+    fi
+
 clippy:
     cargo clippy --all-targets --all-features -- -D warnings
 
 test:
-    cargo test
+    cargo nextest run
+
+test-doc:
+    cargo test --doc
 
 check:
     cargo fmt --check
     cargo clippy --all-targets --all-features -- -D warnings
-    cargo test
+    cargo nextest run
+    cargo test --doc
 
-search query path:
-    cargo run -- search "{{query}}" "{{path}}"
-
-search-json query path:
-    cargo run -- search --json "{{query}}" "{{path}}"
+search *args:
+    cargo run -- search {{args}}
