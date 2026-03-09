@@ -50,5 +50,9 @@
 |--------|--------|
 | [Layered Search Strategy Foundation](epics/1vzXLN000/voyages/1vzdCx000/) | done |
 
-### [Zig-Style Global File Cache](epics/1vzfew000/) (draft)
+### [Zig-Style Global File Cache](epics/1vzfew000/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Incremental File Caching](epics/1vzfew000/voyages/1vzfjD000/) | in-progress |
 
