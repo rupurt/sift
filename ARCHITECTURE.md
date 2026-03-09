@@ -14,7 +14,7 @@ Sift is designed using **Domain-Driven Design (DDD)** and **Hexagonal Architectu
 ### Parallel Processing (`rayon`)
 Sift leverages multi-core parallelism via the `rayon` crate during two critical phases:
 1. **Corpus Loading:** Files are extracted, segmented, and vectorized in parallel across all available CPU cores.
-2. **Benchmark Execution:** Multiple queries are evaluated concurrently during quality and latency benchmarking.
+2. **Evaluation Execution:** Multiple queries are evaluated concurrently during quality and latency testing.
 
 This parallel execution, combined with the heuristic cache, allows `sift` to scale to large repositories while maintaining sub-second search latency.
 

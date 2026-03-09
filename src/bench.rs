@@ -411,7 +411,7 @@ pub fn render_comparative_report(report: &ComparativeBenchmarkReport) -> String 
     use std::fmt::Write;
     let mut out = String::new();
 
-    writeln!(out, "\x1b[1mComparative Search Strategy Benchmark\x1b[0m").unwrap();
+    writeln!(out, "\x1b[1mComparative Search Strategy Evaluation\x1b[0m").unwrap();
     writeln!(
         out,
         "──────────────────────────────────────────────────────────────────────────────────────────────"

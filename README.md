@@ -97,8 +97,7 @@ Trace the pipeline and timings at different levels:
 ## Configuration & Customization
 
 - **[CONFIGURATION.md](CONFIGURATION.md):** Guide to `sift.toml`, available strategies, and environment variables.
-- **[BENCH.md](BENCH.md):** How to run quality and latency benchmarks.
-- **[EVALS.md](EVALS.md):** Managing evaluation datasets (e.g., SciFact).
+- **[EVALUATION.md](EVALUATION.md):** How to manage datasets and run quality/latency evaluations.
 - **[ARCHITECTURE.md](ARCHITECTURE.md):** Deep dive into the hexagonal design and asset pipeline.
 
 ## License

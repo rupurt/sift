@@ -1,6 +1,6 @@
 mod keel '.justfiles/keel.just'
-mod bench '.justfiles/bench.just'
 mod eval '.justfiles/eval.just'
+mod dataset '.justfiles/dataset.just'
 
 default:
     @echo "Root recipes:"
@@ -9,11 +9,11 @@ default:
     @echo "Keel module:"
     @just --list keel
     @echo
-    @echo "Bench module:"
-    @just --list bench
-    @echo
     @echo "Eval module:"
     @just --list eval
+    @echo
+    @echo "Dataset module:"
+    @just --list dataset
 
 fmt:
     cargo fmt
@@ -64,8 +64,8 @@ search *args:
 config:
     cargo run --release -- config
 
-bench-flamegraph *args:
-    cargo flamegraph -- {{args}}
+eval-flamegraph *args:
+    cargo flamegraph -- eval {{args}}
 
-bench-micro:
+eval-micro:
     cargo bench

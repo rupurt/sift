@@ -32,15 +32,15 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Evaluation corpus utilities
+    /// Evaluation dataset management
+    Dataset {
+        #[command(subcommand)]
+        command: DatasetCommands,
+    },
+    /// Run evaluations and quality measurements
     Eval {
         #[command(subcommand)]
         command: EvalCommands,
-    },
-    /// Benchmark commands
-    Bench {
-        #[command(subcommand)]
-        command: BenchCommands,
     },
     /// Show the applied configuration
     Config,
@@ -102,7 +102,7 @@ impl SearchCommand {
 }
 
 #[derive(Subcommand)]
-enum EvalCommands {
+enum DatasetCommands {
     /// Download an evaluation dataset
     Download {
         dataset: Dataset,
@@ -124,7 +124,7 @@ enum EvalCommands {
 }
 
 #[derive(Subcommand)]
-enum BenchCommands {
+enum EvalCommands {
     /// Compare all available strategies
     All {
         #[arg(long)]
@@ -146,7 +146,7 @@ enum BenchCommands {
         #[arg(short, long, action = clap::ArgAction::Count)]
         verbose: u8,
     },
-    /// Run quality benchmarks
+    /// Run quality evaluations
     Quality {
         #[arg(long)]
         strategy: Option<String>,
@@ -169,7 +169,7 @@ enum BenchCommands {
         #[arg(short, long, action = clap::ArgAction::Count)]
         verbose: u8,
     },
-    /// Run latency benchmarks
+    /// Run latency measurements
     Latency {
         #[arg(long)]
         strategy: Option<String>,
@@ -198,14 +198,14 @@ enum Dataset {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let verbose = match &cli.command {
-        Commands::Eval { command } => match command {
-            EvalCommands::Download { verbose, .. } => *verbose,
-            EvalCommands::Materialize { verbose, .. } => *verbose,
+        Commands::Dataset { command } => match command {
+            DatasetCommands::Download { verbose, .. } => *verbose,
+            DatasetCommands::Materialize { verbose, .. } => *verbose,
         },
-        Commands::Bench { command } => match command {
-            BenchCommands::All { verbose, .. } => *verbose,
-            BenchCommands::Quality { verbose, .. } => *verbose,
-            BenchCommands::Latency { verbose, .. } => *verbose,
+        Commands::Eval { command } => match command {
+            EvalCommands::All { verbose, .. } => *verbose,
+            EvalCommands::Quality { verbose, .. } => *verbose,
+            EvalCommands::Latency { verbose, .. } => *verbose,
         },
         Commands::Search(search) => search.verbose,
         Commands::Config => 0,
@@ -229,8 +229,8 @@ fn main() -> Result<()> {
     let telemetry = Arc::new(Telemetry::new());
 
     match cli.command {
-        Commands::Eval { command } => match command {
-            EvalCommands::Download { dataset, out, verbose: _ } => {
+        Commands::Dataset { command } => match command {
+            DatasetCommands::Download { dataset, out, verbose: _ } => {
                 let dataset_name = match dataset {
                     Dataset::Scifact => "scifact",
                 };
@@ -251,7 +251,7 @@ fn main() -> Result<()> {
                     }
                 }
             }
-            EvalCommands::Materialize {
+            DatasetCommands::Materialize {
                 dataset,
                 source,
                 out,
@@ -279,8 +279,8 @@ fn main() -> Result<()> {
                 }
             }
         },
-        Commands::Bench { command } => match command {
-            BenchCommands::All {
+        Commands::Eval { command } => match command {
+            EvalCommands::All {
                 corpus,
                 queries,
                 qrels,
@@ -317,7 +317,7 @@ fn main() -> Result<()> {
                     println!("{}", render_comparative_report(&report));
                 }
             }
-            BenchCommands::Quality {
+            EvalCommands::Quality {
                 strategy,
                 baseline,
                 corpus,
@@ -351,7 +351,7 @@ fn main() -> Result<()> {
                 )?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
-            BenchCommands::Latency {
+            EvalCommands::Latency {
                 strategy,
                 corpus,
                 queries,
