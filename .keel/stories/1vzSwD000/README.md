@@ -3,10 +3,11 @@ id: 1vzSwD000
 title: Fuse BM25 And Vector Retrieval In Hybrid Search
 type: feat
 scope: 1vzSne000/1vzSy6000
-status: in-progress
+status: done
 created_at: 2026-03-08T22:13:53
-updated_at: 2026-03-09T01:24:08
+updated_at: 2026-03-09T01:29:01
 started_at: 2026-03-09T01:24:08
+completed_at: 2026-03-09T01:29:01
 ---
 
 # Fuse BM25 And Vector Retrieval In Hybrid Search

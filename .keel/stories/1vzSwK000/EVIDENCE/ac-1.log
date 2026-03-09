@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T02:50:44.022928906-07:00
+mode: manual
+---
+On the SciFact 3-query sample, hybrid reported NDCG@10 0.4521, MRR@10 0.3889, Recall@10 0.6667 versus BM25 NDCG@10 0.5436, MRR@10 0.5000, Recall@10 0.6667; delta was -0.0916 NDCG, -0.1111 MRR, and 0.0 recall.

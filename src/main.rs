@@ -110,6 +110,8 @@ enum BenchCommands {
         #[arg(long)]
         corpus: PathBuf,
         #[arg(long)]
+        queries: Option<PathBuf>,
+        #[arg(long)]
         qrels: PathBuf,
         #[arg(long, default_value_t = DEFAULT_HYBRID_SHORTLIST)]
         shortlist: usize,
@@ -173,6 +175,7 @@ fn main() -> Result<()> {
                 engine,
                 baseline,
                 corpus,
+                queries,
                 qrels,
                 shortlist,
                 model_id,
@@ -184,6 +187,7 @@ fn main() -> Result<()> {
                     baseline,
                     command: command_line,
                     corpus_dir: corpus,
+                    queries_path: queries,
                     qrels_path: qrels,
                     shortlist,
                     dense_model: DenseModelSpec::with_overrides(

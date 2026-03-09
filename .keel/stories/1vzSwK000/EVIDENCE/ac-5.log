@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T02:50:43.946969795-07:00
+mode: manual
+---
+On the SciFact 3-query sample, hybrid latency measured prepare_ms 530.61, p50 129071.37 ms, p90 133319.99 ms, and max 133319.99 ms, which is an explicit miss against the 200 ms target by roughly 128.9s to 133.1s per query.

@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T02:50:44.018553402-07:00
+mode: manual
+---
+No persisted ANN/vector sidecar files were created outside build output, and hybrid search runs directly as a local CLI command without any daemon or background index service.

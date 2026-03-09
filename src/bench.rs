@@ -8,7 +8,9 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::dense::{DenseModelSpec, DenseReranker};
-use crate::search::{Bm25Index, Engine, RankedDocument, load_materialized_corpus, rank_corpus};
+use crate::search::{
+    Bm25Index, Engine, LoadedCorpus, RankedDocument, load_materialized_corpus, rank_corpus,
+};
 use crate::system::{HardwareSummary, current_git_sha, detect_hardware_summary};
 
 const LATENCY_TARGET_MS: f64 = 200.0;
@@ -21,6 +23,8 @@ pub struct BenchmarkMetadata {
     pub git_sha: Option<String>,
     pub corpus_documents: usize,
     pub corpus_bytes: u64,
+    pub segment_strategy: String,
+    pub segment_count: usize,
     pub hardware: HardwareSummary,
     pub dense_model: Option<String>,
     pub dense_revision: Option<String>,
@@ -67,6 +71,7 @@ pub struct QualityBenchmarkRequest {
     pub baseline: Option<Engine>,
     pub command: String,
     pub corpus_dir: PathBuf,
+    pub queries_path: Option<PathBuf>,
     pub qrels_path: PathBuf,
     pub shortlist: usize,
     pub dense_model: DenseModelSpec,
@@ -90,7 +95,10 @@ pub fn run_quality_benchmark(request: &QualityBenchmarkRequest) -> Result<Qualit
         Engine::Bm25 => None,
         Engine::Hybrid => Some(DenseReranker::load(request.dense_model.clone())?),
     };
-    let queries_path = request.corpus_dir.join("test-queries.tsv");
+    let queries_path = request
+        .queries_path
+        .clone()
+        .unwrap_or_else(|| request.corpus_dir.join("test-queries.tsv"));
     let queries = load_queries(&queries_path)?;
     let qrels = load_qrels(&request.qrels_path)?;
     let _prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
@@ -130,23 +138,13 @@ pub fn run_quality_benchmark(request: &QualityBenchmarkRequest) -> Result<Qualit
         .map(|baseline| quality_delta(&metrics, baseline));
 
     Ok(QualityBenchmarkReport {
-        metadata: BenchmarkMetadata {
-            engine: request.engine,
+        metadata: build_metadata(
+            request.engine,
             baseline_engine,
-            command: request.command.clone(),
-            git_sha: current_git_sha(),
-            corpus_documents: corpus.documents.len(),
-            corpus_bytes: corpus.total_bytes,
-            hardware: detect_hardware_summary(),
-            dense_model: dense
-                .as_ref()
-                .map(|reranker| reranker.model_id().to_string()),
-            dense_revision: dense
-                .as_ref()
-                .map(|reranker| reranker.revision().to_string()),
-            dense_max_length: dense.as_ref().map(DenseReranker::max_length),
-            shortlist: matches!(request.engine, Engine::Hybrid).then_some(request.shortlist),
-        },
+            &request.command,
+            &corpus,
+            matches!(request.engine, Engine::Hybrid).then_some(&request.dense_model),
+        ),
         metrics,
         baseline_metrics,
         delta,
@@ -189,23 +187,13 @@ pub fn run_latency_benchmark(request: &LatencyBenchmarkRequest) -> Result<Latenc
     let max_ms = timings.last().copied().unwrap_or(0.0);
 
     Ok(LatencyBenchmarkReport {
-        metadata: BenchmarkMetadata {
-            engine: request.engine,
-            baseline_engine: None,
-            command: request.command.clone(),
-            git_sha: current_git_sha(),
-            corpus_documents: corpus.documents.len(),
-            corpus_bytes: corpus.total_bytes,
-            hardware: detect_hardware_summary(),
-            dense_model: dense
-                .as_ref()
-                .map(|reranker| reranker.model_id().to_string()),
-            dense_revision: dense
-                .as_ref()
-                .map(|reranker| reranker.revision().to_string()),
-            dense_max_length: dense.as_ref().map(DenseReranker::max_length),
-            shortlist: matches!(request.engine, Engine::Hybrid).then_some(request.shortlist),
-        },
+        metadata: build_metadata(
+            request.engine,
+            None,
+            &request.command,
+            &corpus,
+            matches!(request.engine, Engine::Hybrid).then_some(&request.dense_model),
+        ),
         latency_ms: LatencyMetrics {
             prepare_ms,
             p50_ms,
@@ -217,6 +205,34 @@ pub fn run_latency_benchmark(request: &LatencyBenchmarkRequest) -> Result<Latenc
             max_over_target_ms: over_target_ms(max_ms),
         },
     })
+}
+
+fn build_metadata(
+    engine: Engine,
+    baseline_engine: Option<Engine>,
+    command: &str,
+    corpus: &LoadedCorpus,
+    dense_model: Option<&DenseModelSpec>,
+) -> BenchmarkMetadata {
+    BenchmarkMetadata {
+        engine,
+        baseline_engine,
+        command: command.to_string(),
+        git_sha: current_git_sha(),
+        corpus_documents: corpus.documents.len(),
+        corpus_bytes: corpus.total_bytes,
+        segment_strategy: "structure-aware".to_string(),
+        segment_count: corpus
+            .documents
+            .iter()
+            .map(|document| document.segments().len())
+            .sum(),
+        hardware: detect_hardware_summary(),
+        dense_model: dense_model.map(|spec| spec.model_id.clone()),
+        dense_revision: dense_model.map(|spec| spec.revision.clone()),
+        dense_max_length: dense_model.map(|spec| spec.max_length),
+        shortlist: None,
+    }
 }
 
 fn evaluate_quality(
@@ -417,6 +433,7 @@ mod quality {
             baseline: None,
             command: "sift bench quality --engine bm25".to_string(),
             corpus_dir: corpus_dir.path().to_path_buf(),
+            queries_path: None,
             qrels_path: corpus_dir.path().join("qrels/test.tsv"),
             shortlist: DEFAULT_HYBRID_SHORTLIST,
             dense_model: DenseModelSpec::default(),
@@ -450,6 +467,36 @@ mod quality {
         assert!((delta.ndcg_at_10 - 0.02).abs() < 1e-9);
         assert!((delta.mrr_at_10 - 0.01).abs() < 1e-9);
         assert!((delta.recall_at_10 - 0.02).abs() < 1e-9);
+    }
+
+    #[test]
+    fn quality_benchmark_prefers_explicit_queries_path() {
+        let corpus_dir = sample_corpus_dir();
+        let explicit_queries_path = corpus_dir.path().join("explicit-queries.tsv");
+        fs::write(
+            &explicit_queries_path,
+            "query-id\ttext\nq-1\trust benchmark\nq-2\tsemantic retrieval\n",
+        )
+        .expect("write explicit queries");
+        fs::write(
+            corpus_dir.path().join("test-queries.tsv"),
+            "query-id\ttext\nq-1\twrong query\nq-2\twrong query\n",
+        )
+        .expect("overwrite default queries");
+
+        let report = run_quality_benchmark(&QualityBenchmarkRequest {
+            engine: Engine::Bm25,
+            baseline: None,
+            command: "sift bench quality --engine bm25".to_string(),
+            corpus_dir: corpus_dir.path().to_path_buf(),
+            queries_path: Some(explicit_queries_path),
+            qrels_path: corpus_dir.path().join("qrels/test.tsv"),
+            shortlist: DEFAULT_HYBRID_SHORTLIST,
+            dense_model: DenseModelSpec::default(),
+        })
+        .expect("quality report");
+
+        assert!(report.metrics.recall_at_10 > 0.0);
     }
 
     fn sample_corpus_dir() -> tempfile::TempDir {
@@ -567,6 +614,7 @@ mod rich_formats {
             baseline: None,
             command: "sift bench quality --engine bm25".to_string(),
             corpus_dir: fixture_root.clone(),
+            queries_path: None,
             qrels_path: fixture_root.join("qrels/test.tsv"),
             shortlist: 8,
             dense_model: DenseModelSpec::default(),
@@ -592,5 +640,67 @@ mod rich_formats {
 
         assert!(report.metadata.corpus_documents >= 5);
         assert!(report.latency_ms.p50_ms >= 0.0);
+    }
+}
+
+#[cfg(test)]
+mod metadata {
+    use std::fs;
+
+    use tempfile::tempdir;
+
+    use crate::dense::{
+        DEFAULT_MAX_LENGTH, DEFAULT_MODEL_ID, DEFAULT_MODEL_REVISION, DenseModelSpec,
+    };
+    use crate::search::{Engine, load_materialized_corpus};
+
+    use super::build_metadata;
+
+    #[test]
+    fn true_hybrid_metadata_records_segment_configuration_and_model_settings() {
+        let corpus_dir = sample_corpus_dir();
+        let corpus = load_materialized_corpus(corpus_dir.path()).expect("materialized corpus");
+        let metadata = build_metadata(
+            Engine::Hybrid,
+            Some(Engine::Bm25),
+            "sift bench quality --engine hybrid --baseline bm25",
+            &corpus,
+            Some(&DenseModelSpec::default()),
+        );
+
+        assert_eq!(metadata.segment_strategy, "structure-aware");
+        assert_eq!(metadata.segment_count, 2);
+        assert_eq!(metadata.dense_model.as_deref(), Some(DEFAULT_MODEL_ID));
+        assert_eq!(
+            metadata.dense_revision.as_deref(),
+            Some(DEFAULT_MODEL_REVISION)
+        );
+        assert_eq!(metadata.dense_max_length, Some(DEFAULT_MAX_LENGTH));
+    }
+
+    fn sample_corpus_dir() -> tempfile::TempDir {
+        let dir = tempdir().expect("corpus dir");
+        fs::write(
+            dir.path().join("doc-a.txt"),
+            "Alpha heading\n\nrust search benchmark corpus",
+        )
+        .expect("write doc a");
+        fs::write(
+            dir.path().join("doc-b.txt"),
+            "Beta heading\n\nsemantic retrieval benchmark corpus",
+        )
+        .expect("write doc b");
+        fs::write(
+            dir.path().join("test-queries.tsv"),
+            "query-id\ttext\nq-1\trust benchmark\nq-2\tsemantic retrieval\n",
+        )
+        .expect("write queries");
+        fs::create_dir_all(dir.path().join("qrels")).expect("qrels dir");
+        fs::write(
+            dir.path().join("qrels/test.tsv"),
+            "query-id\tcorpus-id\tscore\nq-1\tdoc-a\t1\nq-2\tdoc-b\t1\n",
+        )
+        .expect("write qrels");
+        dir
     }
 }

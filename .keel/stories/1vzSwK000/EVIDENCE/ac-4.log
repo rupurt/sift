@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T02:50:43.933558547-07:00
+mode: manual
+---
+The default dependency graph retains Candle as the local embedding runtime and does not introduce fastembed-rs or ONNX Runtime as the default path.

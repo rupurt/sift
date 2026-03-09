@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T02:50:43.867299300-07:00
+mode: manual
+---
+Hybrid benchmark metadata now records segment_strategy=structure-aware, segment_count=9616, dense_model=sentence-transformers/all-MiniLM-L6-v2, dense_revision=main, dense_max_length=40, git SHA, corpus_documents=5183, corpus_bytes=7783523, and the detected hardware summary.

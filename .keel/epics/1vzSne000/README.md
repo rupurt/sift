@@ -20,8 +20,8 @@ created_at: 2026-03-08T22:15:14
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 2/4 stories done
+**Progress:** 0/1 voyages complete, 3/4 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Structure-Aware True Hybrid Retrieval](voyages/1vzSy6000/) | in-progress | 2/4 |
+| [Structure-Aware True Hybrid Retrieval](voyages/1vzSy6000/) | in-progress | 3/4 |
 <!-- END GENERATED -->
