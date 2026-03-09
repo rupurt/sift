@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::extract::SourceKind;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Segment {
     pub id: String,
     pub doc_id: String,
@@ -12,6 +12,7 @@ pub struct Segment {
     pub ordinal: usize,
     pub label: String,
     pub text: String,
+    pub embedding: Option<Vec<f32>>,
 }
 
 #[derive(Debug, Clone)]
@@ -54,6 +55,7 @@ pub fn build_segments(
             ordinal: index + 1,
             label: seed.label,
             text: seed.text,
+            embedding: None,
         })
         .collect()
 }

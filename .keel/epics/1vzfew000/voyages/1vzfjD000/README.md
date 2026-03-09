@@ -28,11 +28,12 @@ completed_at: 2026-03-09T11:59:53
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 3/3 stories complete
+**Progress:** 3/4 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
 | [Add Blake3 Bincode And Cache Models](../../../../stories/1vzfji000/README.md) | feat | done |
 | [Implement Blob Store And Manifest Logic](../../../../stories/1vzfjv000/README.md) | feat | done |
 | [Wire Cache Into Prepared Corpus](../../../../stories/1vzfkD000/README.md) | feat | done |
+| [Persist Vector Embeddings In Cache Blobs](../../../../stories/1vzgPp000/README.md) | feat | icebox |
 <!-- END GENERATED -->

@@ -11,6 +11,7 @@
 | [Rich Document Extraction Support](bearings/1vzMXf000/) | laid | ✓ | ✓ | decision-ready | 3.34 | ✓ |
 | [True Hybrid Retrieval Architecture](bearings/1vzSne000/) | laid | ✓ | ✓ | decision-ready | 2.59 | ✓ |
 | [Composable Search Strategy Architecture](bearings/1vzXLN000/) | laid | ✓ | ✓ | decision-ready | 3.31 | ✓ |
+| [Zig-Style Global File Cache](bearings/1vzfew000/) | laid | ✓ | ✓ | decision-ready | 4.44 | ✓ |
 
 ## Epics
 
@@ -50,9 +51,10 @@
 |--------|--------|
 | [Layered Search Strategy Foundation](epics/1vzXLN000/voyages/1vzdCx000/) | done |
 
-### [Zig-Style Global File Cache](epics/1vzfew000/) (done)
+### [Zig-Style Global File Cache](epics/1vzfew000/) (active)
 
 | Voyage | Status |
 |--------|--------|
 | [Incremental File Caching](epics/1vzfew000/voyages/1vzfjD000/) | done |
+| [Vector Embedding Caching](epics/1vzfew000/voyages/1vzgQK000/) | in-progress |
 
