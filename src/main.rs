@@ -238,7 +238,7 @@ fn main() -> Result<()> {
                 let out = out.unwrap_or_else(|| {
                     cache_dir("eval")
                         .expect("resolve eval cache dir")
-                        .join(format!("{}-materialized", dataset_name))
+                        .join(format!("{}-files", dataset_name))
                 });
 
                 match dataset {
