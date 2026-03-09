@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T01:14:02.308831043-07:00
+mode: manual
+---
+Stable document identifiers now emit deterministic segment ids and at least one segment per supported text, HTML, PDF, DOCX, XLSX, and PPTX fixture document.

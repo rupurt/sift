@@ -41,5 +41,5 @@
 
 | Voyage | Status |
 |--------|--------|
-| [Structure-Aware True Hybrid Retrieval](epics/1vzSne000/voyages/1vzSy6000/) | planned |
+| [Structure-Aware True Hybrid Retrieval](epics/1vzSne000/voyages/1vzSy6000/) | in-progress |
 

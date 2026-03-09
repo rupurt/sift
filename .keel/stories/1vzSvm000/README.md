@@ -3,9 +3,10 @@ id: 1vzSvm000
 title: Add Structure-Aware Segment Model
 type: feat
 scope: 1vzSne000/1vzSy6000
-status: backlog
+status: in-progress
 created_at: 2026-03-08T22:13:26
-updated_at: 2026-03-08T22:15:14
+updated_at: 2026-03-09T01:06:54
+started_at: 2026-03-09T01:06:54
 ---
 
 # Add Structure-Aware Segment Model

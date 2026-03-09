@@ -11,6 +11,7 @@ use walkdir::WalkDir;
 use crate::dense::{DenseModelSpec, DenseReranker};
 use crate::extract::{SourceKind, extract_path};
 use crate::hybrid::{HybridCandidate, fuse_candidates};
+use crate::segment::{Segment, build_segments};
 
 pub const DEFAULT_RESULT_LIMIT: usize = 10;
 pub const DEFAULT_HYBRID_SHORTLIST: usize = 8;
@@ -86,11 +87,16 @@ pub struct Document {
     pub length: usize,
     pub terms: HashMap<String, usize>,
     text: String,
+    segments: Vec<Segment>,
 }
 
 impl Document {
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    pub fn segments(&self) -> &[Segment] {
+        &self.segments
     }
 }
 
@@ -497,6 +503,7 @@ fn index_document(
     path: PathBuf,
     extracted: crate::extract::ExtractedDocument,
 ) -> Document {
+    let segments = build_segments(&id, &path, extracted.source_kind, &extracted.text);
     let terms = tokenize(&extracted.text)
         .into_iter()
         .fold(HashMap::new(), |mut acc, term| {
@@ -512,6 +519,7 @@ fn index_document(
         length,
         terms,
         text: extracted.text,
+        segments,
     }
 }
 
@@ -560,6 +568,7 @@ fn build_snippet(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use std::fs as stdfs;
+    use std::path::Path;
 
     use tempfile::tempdir;
 
@@ -684,6 +693,177 @@ mod tests {
                     .expect("text document");
                 assert_eq!(text.source_kind, SourceKind::Text);
                 assert!(text.text().contains("service catalog"));
+            }
+        }
+
+        mod segments {
+            use super::*;
+
+            #[test]
+            fn segment_identity_is_stable_for_supported_documents() {
+                let corpus = supported_fixture_tree();
+
+                let first = load_search_corpus(corpus.path()).expect("first corpus load");
+                let second = load_search_corpus(corpus.path()).expect("second corpus load");
+
+                assert_eq!(first.indexed_files, 6);
+                assert_eq!(second.indexed_files, 6);
+
+                let first_segments = first
+                    .documents
+                    .iter()
+                    .map(|document| {
+                        assert!(
+                            !document.segments().is_empty(),
+                            "{} should emit at least one segment",
+                            document.path.display()
+                        );
+                        (
+                            document.path.display().to_string(),
+                            document.id.clone(),
+                            document
+                                .segments()
+                                .iter()
+                                .map(|segment| segment.id.clone())
+                                .collect::<Vec<_>>(),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                let second_segments = second
+                    .documents
+                    .iter()
+                    .map(|document| {
+                        (
+                            document.path.display().to_string(),
+                            document.id.clone(),
+                            document
+                                .segments()
+                                .iter()
+                                .map(|segment| segment.id.clone())
+                                .collect::<Vec<_>>(),
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
+                assert_eq!(first_segments, second_segments);
+            }
+
+            #[test]
+            fn structure_aware_segments_are_source_aware() {
+                let corpus = supported_fixture_tree();
+                let loaded = load_search_corpus(corpus.path()).expect("loaded corpus");
+
+                let html = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("docs/service.html"))
+                    .expect("html document");
+                assert!(
+                    html.segments()
+                        .iter()
+                        .any(|segment| segment.label.contains("HTML Heading"))
+                );
+
+                let pdf = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("docs/architecture.pdf"))
+                    .expect("pdf document");
+                assert!(pdf.segments()[0].label.starts_with("page "));
+
+                let docx = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("docs/roadmap-docx.docx"))
+                    .expect("docx document");
+                assert!(docx.segments()[0].label.starts_with("section "));
+
+                let xlsx = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("docs/roadmap-sheet.xlsx"))
+                    .expect("xlsx document");
+                assert!(xlsx.segments()[0].label.starts_with("sheet "));
+
+                let pptx = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("docs/roadmap-slides.pptx"))
+                    .expect("pptx document");
+                assert!(pptx.segments()[0].label.starts_with("slide "));
+            }
+
+            #[test]
+            fn segment_text_preservation_keeps_section_local_text() {
+                let corpus = supported_fixture_tree();
+                let loaded = load_search_corpus(corpus.path()).expect("loaded corpus");
+
+                let html = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("docs/service.html"))
+                    .expect("html document");
+                assert!(html.segments().iter().any(|segment| {
+                    segment
+                        .text
+                        .contains("Service Catalog for the agent platform.")
+                }));
+
+                let text = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("notes.txt"))
+                    .expect("text document");
+                assert!(text.segments().iter().any(|segment| {
+                    segment
+                        .text
+                        .contains("Plain text fallback for the service catalog.")
+                }));
+
+                let pdf = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("docs/architecture.pdf"))
+                    .expect("pdf document");
+                assert!(pdf.segments().iter().any(|segment| {
+                    segment
+                        .text
+                        .to_lowercase()
+                        .contains("architecture decision")
+                }));
+
+                let docx = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("docs/roadmap-docx.docx"))
+                    .expect("docx document");
+                assert!(
+                    docx.segments()
+                        .iter()
+                        .any(|segment| segment.text.to_lowercase().contains("quarterly roadmap"))
+                );
+
+                let xlsx = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("docs/roadmap-sheet.xlsx"))
+                    .expect("xlsx document");
+                assert!(
+                    xlsx.segments()
+                        .iter()
+                        .any(|segment| segment.text.to_lowercase().contains("quarterly roadmap"))
+                );
+
+                let pptx = loaded
+                    .documents
+                    .iter()
+                    .find(|document| document.path.ends_with("docs/roadmap-slides.pptx"))
+                    .expect("pptx document");
+                assert!(
+                    pptx.segments()
+                        .iter()
+                        .any(|segment| segment.text.to_lowercase().contains("quarterly roadmap"))
+                );
             }
         }
 
@@ -893,6 +1073,30 @@ mod tests {
         )
         .expect("write notes");
         stdfs::write(dir.path().join("blob.bin"), [0xFF, 0xFE, 0xFD]).expect("write invalid blob");
+        dir
+    }
+
+    fn supported_fixture_tree() -> tempfile::TempDir {
+        let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
+        let dir = tempdir().expect("supported fixture dir");
+        stdfs::create_dir_all(dir.path().join("docs")).expect("docs dir");
+
+        for file in [
+            "architecture.pdf",
+            "roadmap-docx.docx",
+            "roadmap-sheet.xlsx",
+            "roadmap-slides.pptx",
+            "service.html",
+        ] {
+            stdfs::copy(
+                fixture_root.join("docs").join(file),
+                dir.path().join("docs").join(file),
+            )
+            .expect("copy rich fixture");
+        }
+        stdfs::copy(fixture_root.join("notes.txt"), dir.path().join("notes.txt"))
+            .expect("copy notes fixture");
+
         dir
     }
 }

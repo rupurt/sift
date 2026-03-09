@@ -4,4 +4,5 @@ pub mod eval;
 pub mod extract;
 pub mod hybrid;
 pub mod search;
+pub mod segment;
 pub mod system;

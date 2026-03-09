@@ -1,11 +1,12 @@
 ---
 id: 1vzSy6000
 title: Structure-Aware True Hybrid Retrieval
-status: planned
+status: in-progress
 epic: 1vzSne000
 created_at: 2026-03-08T22:15:50
 index: 1
 updated_at: 2026-03-08T22:16:49
+started_at: 2026-03-09T01:06:54
 ---
 
 # Structure-Aware True Hybrid Retrieval

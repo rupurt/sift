@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T01:14:02.334560099-07:00
+mode: manual
+---
+Source-aware segments preserve section-local text across text and rich-document fixtures while the current BM25 CLI behavior remains intact.

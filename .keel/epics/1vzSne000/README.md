@@ -23,5 +23,5 @@ created_at: 2026-03-08T22:15:14
 **Progress:** 0/1 voyages complete, 0/4 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Structure-Aware True Hybrid Retrieval](voyages/1vzSy6000/) | planned | 0/4 |
+| [Structure-Aware True Hybrid Retrieval](voyages/1vzSy6000/) | in-progress | 0/4 |
 <!-- END GENERATED -->
