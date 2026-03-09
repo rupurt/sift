@@ -257,6 +257,7 @@ mod tests {
             ordinal: 1,
             label: "section 1".to_string(),
             text: text.to_string(),
+            embedding: None,
         }
     }
 

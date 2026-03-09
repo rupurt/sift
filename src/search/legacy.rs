@@ -24,6 +24,11 @@ mod tests {
                     limit: 10,
                     shortlist: 10,
                     dense_model: DenseModelSpec::default(),
+                    verbose: 0,
+                    retrievers: None,
+                    fusion: None,
+                    reranking: None,
+                    telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
                 },
                 None,
             )
@@ -51,6 +56,11 @@ mod tests {
                     limit: 10,
                     shortlist: 10,
                     dense_model: DenseModelSpec::default(),
+                    verbose: 0,
+                    retrievers: None,
+                    fusion: None,
+                    reranking: None,
+                    telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
                 },
                 None,
             )
@@ -77,7 +87,7 @@ mod tests {
             #[test]
             fn prefers_best_segment_snippet_over_document_truncation() {
                 let corpus = sample_rich_search_tree();
-                let loaded = load_search_corpus(corpus.path(), None).expect("loaded corpus");
+                let loaded = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("loaded corpus");
                 let document = loaded
                     .documents
                     .iter()
@@ -98,14 +108,20 @@ mod tests {
                 // We can test that via run_search or just check the resolve function if we exported it
 
                 let _response = run_search(
-                    &SearchRequest {
-                        strategy: "legacy-hybrid".to_string(),
-                        query: "service catalog".to_string(),
-                        path: corpus.path().to_path_buf(),
-                        limit: 10,
-                        shortlist: 10,
-                        dense_model: DenseModelSpec::default(),
-                    },
+                                    &SearchRequest {
+                                        strategy: "legacy-hybrid".to_string(),
+                                        query: "service catalog".to_string(),
+                                        path: corpus.path().to_path_buf(),
+                                        limit: 10,
+                                        shortlist: 10,
+                                        dense_model: DenseModelSpec::default(),
+                                        verbose: 0,
+                                        retrievers: None,
+                                        fusion: None,
+                                        reranking: None,
+                                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
+                                    },
+                    
                     None,
                 )
                 .expect("search response");
@@ -133,6 +149,11 @@ mod tests {
                     limit: 10,
                     shortlist: 10,
                     dense_model: DenseModelSpec::default(),
+                    verbose: 0,
+                    retrievers: None,
+                    fusion: None,
+                    reranking: None,
+                    telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
                 },
                 None,
             )
@@ -145,6 +166,11 @@ mod tests {
                     limit: 10,
                     shortlist: 10,
                     dense_model: DenseModelSpec::default(),
+                    verbose: 0,
+                    retrievers: None,
+                    fusion: None,
+                    reranking: None,
+                    telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
                 },
                 None,
             )
@@ -166,7 +192,7 @@ mod tests {
             #[test]
             fn routes_text_and_html_documents_through_shared_extractor() {
                 let corpus = sample_rich_search_tree();
-                let loaded = load_search_corpus(corpus.path(), None).expect("loaded corpus");
+                let loaded = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("loaded corpus");
 
                 assert_eq!(loaded.indexed_files, 2);
                 assert_eq!(loaded.skipped_files, 1);
@@ -197,8 +223,8 @@ mod tests {
             fn segment_identity_is_stable_for_supported_documents() {
                 let corpus = supported_fixture_tree();
 
-                let first = load_search_corpus(corpus.path(), None).expect("first corpus load");
-                let second = load_search_corpus(corpus.path(), None).expect("second corpus load");
+                let first = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("first corpus load");
+                let second = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("second corpus load");
 
                 assert_eq!(first.indexed_files, 6);
                 assert_eq!(second.indexed_files, 6);
@@ -245,7 +271,7 @@ mod tests {
             #[test]
             fn structure_aware_segments_are_source_aware() {
                 let corpus = supported_fixture_tree();
-                let loaded = load_search_corpus(corpus.path(), None).expect("loaded corpus");
+                let loaded = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("loaded corpus");
 
                 let html = loaded
                     .documents
@@ -290,7 +316,7 @@ mod tests {
             #[test]
             fn segment_text_preservation_keeps_section_local_text() {
                 let corpus = supported_fixture_tree();
-                let loaded = load_search_corpus(corpus.path(), None).expect("loaded corpus");
+                let loaded = load_search_corpus(corpus.path(), None, 0, None, &crate::system::Telemetry::new()).expect("loaded corpus");
 
                 let html = loaded
                     .documents
@@ -375,6 +401,11 @@ mod tests {
                         limit: 10,
                         shortlist: 10,
                         dense_model: DenseModelSpec::default(),
+                        verbose: 0,
+                        retrievers: None,
+                        fusion: None,
+                        reranking: None,
+                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
                     },
                     None,
                 )
@@ -410,6 +441,11 @@ mod tests {
                         limit: 10,
                         shortlist: 10,
                         dense_model: DenseModelSpec::default(),
+                        verbose: 0,
+                        retrievers: None,
+                        fusion: None,
+                        reranking: None,
+                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
                     },
                     None,
                 )
@@ -449,6 +485,11 @@ mod tests {
                         limit: 10,
                         shortlist: 10,
                         dense_model: DenseModelSpec::default(),
+                        verbose: 0,
+                        retrievers: None,
+                        fusion: None,
+                        reranking: None,
+                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
                     },
                     None,
                 )
@@ -496,6 +537,11 @@ mod tests {
                         limit: 10,
                         shortlist: 10,
                         dense_model: DenseModelSpec::default(),
+                        verbose: 0,
+                        retrievers: None,
+                        fusion: None,
+                        reranking: None,
+                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
                     },
                     None,
                 )
@@ -508,6 +554,11 @@ mod tests {
                         limit: 10,
                         shortlist: 10,
                         dense_model: DenseModelSpec::default(),
+                        verbose: 0,
+                        retrievers: None,
+                        fusion: None,
+                        reranking: None,
+                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
                     },
                     None,
                 )
@@ -534,6 +585,11 @@ mod tests {
                         limit: 10,
                         shortlist: 10,
                         dense_model: DenseModelSpec::default(),
+                        verbose: 0,
+                        retrievers: None,
+                        fusion: None,
+                        reranking: None,
+                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
                     },
                     None,
                 )
@@ -546,6 +602,11 @@ mod tests {
                         limit: 10,
                         shortlist: 10,
                         dense_model: DenseModelSpec::default(),
+                        verbose: 0,
+                        retrievers: None,
+                        fusion: None,
+                        reranking: None,
+                        telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
                     },
                     None,
                 )
