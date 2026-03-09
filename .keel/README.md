@@ -1,7 +1,5 @@
 # Planning Board
 
-[![CI Status](https://github.com/rupurt/sift/actions/workflows/ci.yml/badge.svg)](https://github.com/rupurt/sift/actions/workflows/ci.yml)
-
 > [!NOTE]
 > Auto-generated from story frontmatter. Run `keel generate` to update.
 
