@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T01:22:31.413471047-07:00
+mode: manual
+---
+Semantic document ranking now uses the planned diminishing-returns aggregation rule over segment-level hits.

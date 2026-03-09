@@ -6,3 +6,4 @@ pub mod hybrid;
 pub mod search;
 pub mod segment;
 pub mod system;
+pub mod vector;

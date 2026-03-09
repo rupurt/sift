@@ -10,8 +10,8 @@ use walkdir::WalkDir;
 
 use crate::dense::{DenseModelSpec, DenseReranker};
 use crate::extract::{SourceKind, extract_path};
-use crate::hybrid::{HybridCandidate, fuse_candidates};
 use crate::segment::{Segment, build_segments};
+use crate::vector::retrieve_semantic_documents;
 
 pub const DEFAULT_RESULT_LIMIT: usize = 10;
 pub const DEFAULT_HYBRID_SHORTLIST: usize = 8;
@@ -247,7 +247,7 @@ pub fn rank_corpus(
     query: &str,
     engine: Engine,
     limit: usize,
-    shortlist: usize,
+    _shortlist: usize,
 ) -> Result<Vec<RankedDocument>> {
     let lexical = index
         .score(query)
@@ -270,54 +270,26 @@ pub fn rank_corpus(
             .collect()),
         Engine::Hybrid => {
             let dense =
-                dense.ok_or_else(|| anyhow::anyhow!("hybrid search requires a dense reranker"))?;
-            let shortlist = shortlist.max(limit);
-            let shortlist_docs = lexical.into_iter().take(shortlist).collect::<Vec<_>>();
-            if shortlist_docs.is_empty() {
+                dense.ok_or_else(|| anyhow::anyhow!("hybrid search requires a dense scorer"))?;
+            let segments = corpus
+                .documents
+                .iter()
+                .flat_map(|document| document.segments().iter().cloned())
+                .collect::<Vec<_>>();
+            if segments.is_empty() {
                 return Ok(Vec::new());
             }
 
-            let texts = shortlist_docs
-                .iter()
-                .map(|document| {
-                    corpus
-                        .document_by_id(&document.id)
-                        .map(Document::text)
-                        .ok_or_else(|| anyhow::anyhow!("missing corpus document '{}'", document.id))
-                })
-                .collect::<Result<Vec<_>>>()?;
-            let dense_scores = dense.score(query, &texts)?;
-            let fused = fuse_candidates(
-                &shortlist_docs
-                    .iter()
-                    .zip(dense_scores)
-                    .enumerate()
-                    .map(|(index, (document, dense_score))| HybridCandidate {
-                        id: document.id.clone(),
-                        bm25_rank: index + 1,
-                        bm25_score: document.score,
-                        dense_score,
-                        final_score: 0.0,
-                    })
-                    .collect::<Vec<_>>(),
-            )?;
-
-            Ok(fused
+            Ok(retrieve_semantic_documents(dense, query, &segments, limit)?
                 .into_iter()
-                .take(limit)
-                .map(|candidate| {
-                    let document = corpus.document_by_id(&candidate.id).ok_or_else(|| {
-                        anyhow::anyhow!("missing fused corpus document '{}'", candidate.id)
-                    })?;
-                    Ok(RankedDocument {
-                        id: candidate.id,
-                        path: document.path.clone(),
-                        score: candidate.final_score,
-                        bm25_score: candidate.bm25_score,
-                        dense_score: Some(candidate.dense_score),
-                    })
+                .map(|document| RankedDocument {
+                    id: document.id,
+                    path: document.path,
+                    score: document.score,
+                    bm25_score: 0.0,
+                    dense_score: Some(document.score),
                 })
-                .collect::<Result<Vec<_>>>()?)
+                .collect())
         }
     }
 }

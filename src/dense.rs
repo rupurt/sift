@@ -9,9 +9,13 @@ use candle_transformers::models::bert::{BertModel, Config as BertConfig, DTYPE};
 use rust_tokenizers::tokenizer::{BertTokenizer, Tokenizer, TruncationStrategy};
 use serde::Deserialize;
 
+use crate::segment::Segment;
+use crate::vector::{SegmentHit, SegmentScorer};
+
 pub const DEFAULT_MODEL_ID: &str = "sentence-transformers/all-MiniLM-L6-v2";
 pub const DEFAULT_MODEL_REVISION: &str = "main";
 pub const DEFAULT_MAX_LENGTH: usize = 40;
+const SEGMENT_BATCH_SIZE: usize = 32;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DenseModelSpec {
@@ -200,10 +204,7 @@ impl DenseReranker {
 
         for index in 1..texts.len() {
             let doc_embedding = embeddings.get(index)?;
-            let similarity = (&query_embedding * &doc_embedding)?
-                .sum_all()?
-                .to_scalar::<f32>()? as f64;
-            scores.push(similarity);
+            scores.push(similarity(&query_embedding, &doc_embedding)?);
         }
 
         Ok(scores)
@@ -253,6 +254,39 @@ impl DenseReranker {
 
         let pooled = mean_pool(&hidden_states, &attention_mask)?;
         normalize_l2(&pooled)
+    }
+}
+
+impl SegmentScorer for DenseReranker {
+    fn score_segments(&self, query: &str, segments: &[Segment]) -> Result<Vec<SegmentHit>> {
+        if segments.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let query_embedding = self.embed_texts(&[query.to_string()])?.get(0)?;
+        let mut hits = Vec::with_capacity(segments.len());
+
+        for batch in segments.chunks(SEGMENT_BATCH_SIZE) {
+            let texts = batch
+                .iter()
+                .map(|segment| segment.text.clone())
+                .collect::<Vec<_>>();
+            let embeddings = self.embed_texts(&texts)?;
+
+            for (index, segment) in batch.iter().enumerate() {
+                let segment_embedding = embeddings.get(index)?;
+                hits.push(SegmentHit {
+                    segment_id: segment.id.clone(),
+                    doc_id: segment.doc_id.clone(),
+                    path: segment.path.clone(),
+                    label: segment.label.clone(),
+                    text: segment.text.clone(),
+                    score: similarity(&query_embedding, &segment_embedding)?,
+                });
+            }
+        }
+
+        Ok(hits)
     }
 }
 
@@ -336,6 +370,10 @@ fn mean_pool(hidden_states: &Tensor, attention_mask: &Tensor) -> Result<Tensor> 
 
 fn normalize_l2(embeddings: &Tensor) -> Result<Tensor> {
     Ok(embeddings.broadcast_div(&embeddings.sqr()?.sum_keepdim(1)?.sqrt()?)?)
+}
+
+fn similarity(left: &Tensor, right: &Tensor) -> Result<f64> {
+    Ok((left * right)?.sum_all()?.to_scalar::<f32>()? as f64)
 }
 
 #[cfg(test)]

@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T01:22:31.224259064-07:00
+mode: manual
+---
+Hybrid search now scores the full active segment corpus through the vector path instead of only reranking a BM25 shortlist.
