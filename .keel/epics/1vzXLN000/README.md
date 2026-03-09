@@ -24,5 +24,5 @@ created_at: 2026-03-09T02:57:41
 **Progress:** 0/1 voyages complete, 0/5 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Layered Search Strategy Foundation](voyages/1vzdCx000/) | planned | 0/5 |
+| [Layered Search Strategy Foundation](voyages/1vzdCx000/) | in-progress | 0/5 |
 <!-- END GENERATED -->

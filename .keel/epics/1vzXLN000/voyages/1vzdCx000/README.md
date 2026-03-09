@@ -1,11 +1,12 @@
 ---
 id: 1vzdCx000
 title: Layered Search Strategy Foundation
-status: planned
+status: in-progress
 epic: 1vzXLN000
 created_at: 2026-03-09T09:11:51
 index: 1
 updated_at: 2026-03-09T09:20:48
+started_at: 2026-03-09T09:29:28
 ---
 
 # Layered Search Strategy Foundation

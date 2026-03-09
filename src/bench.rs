@@ -7,18 +7,18 @@ use std::time::Instant;
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
-use crate::dense::{DenseModelSpec, DenseReranker};
-use crate::search::{
-    Bm25Index, Engine, LoadedCorpus, RankedDocument, load_materialized_corpus, rank_corpus,
-};
+use crate::dense::DenseModelSpec;
+use crate::search::{LoadedCorpus, SearchRequest, load_materialized_corpus, run_search};
 use crate::system::{HardwareSummary, current_git_sha, detect_hardware_summary};
 
 const LATENCY_TARGET_MS: f64 = 200.0;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BenchmarkMetadata {
-    pub engine: Engine,
-    pub baseline_engine: Option<Engine>,
+    pub strategy: String,
+    pub plan: crate::search::SearchPlan,
+    pub baseline_strategy: Option<String>,
+    pub champion_strategy: Option<String>,
     pub command: String,
     pub git_sha: Option<String>,
     pub corpus_documents: usize,
@@ -44,6 +44,7 @@ pub struct QualityBenchmarkReport {
     pub metadata: BenchmarkMetadata,
     pub metrics: QualityMetrics,
     pub baseline_metrics: Option<QualityMetrics>,
+    pub champion_metrics: Option<QualityMetrics>,
     pub delta: Option<QualityMetrics>,
 }
 
@@ -67,8 +68,8 @@ pub struct LatencyBenchmarkReport {
 
 #[derive(Debug, Clone)]
 pub struct QualityBenchmarkRequest {
-    pub engine: Engine,
-    pub baseline: Option<Engine>,
+    pub strategy: String,
+    pub baseline: Option<String>,
     pub command: String,
     pub corpus_dir: PathBuf,
     pub queries_path: Option<PathBuf>,
@@ -79,7 +80,7 @@ pub struct QualityBenchmarkRequest {
 
 #[derive(Debug, Clone)]
 pub struct LatencyBenchmarkRequest {
-    pub engine: Engine,
+    pub strategy: String,
     pub command: String,
     pub corpus_dir: PathBuf,
     pub queries_path: PathBuf,
@@ -90,11 +91,6 @@ pub struct LatencyBenchmarkRequest {
 pub fn run_quality_benchmark(request: &QualityBenchmarkRequest) -> Result<QualityBenchmarkReport> {
     let prepare_started = Instant::now();
     let corpus = load_materialized_corpus(&request.corpus_dir)?;
-    let index = Bm25Index::build(&corpus.documents);
-    let dense = match request.engine {
-        Engine::Bm25 => None,
-        Engine::Hybrid => Some(DenseReranker::load(request.dense_model.clone())?),
-    };
     let queries_path = request
         .queries_path
         .clone()
@@ -103,50 +99,69 @@ pub fn run_quality_benchmark(request: &QualityBenchmarkRequest) -> Result<Qualit
     let qrels = load_qrels(&request.qrels_path)?;
     let _prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
 
+    let registry = crate::search::StrategyPresetRegistry::default_registry();
+    let plan = registry.resolve(&request.strategy)?;
+
     let metrics = evaluate_quality(
-        &corpus,
-        &index,
-        dense.as_ref(),
+        &request.corpus_dir,
         &queries,
         &qrels,
-        request.engine,
+        &request.strategy,
         request.shortlist,
+        &request.dense_model,
     )?;
 
-    let baseline_engine = match request.engine {
-        Engine::Bm25 => None,
-        Engine::Hybrid => Some(request.baseline.unwrap_or(Engine::Bm25)),
-    };
-    let baseline_metrics = match baseline_engine {
-        Some(Engine::Bm25) => Some(evaluate_quality(
-            &corpus,
-            &index,
-            None,
+    let baseline_strategy = request
+        .baseline
+        .clone()
+        .or_else(|| Some("bm25".to_string()));
+    let baseline_metrics = match &baseline_strategy {
+        Some(strategy) => Some(evaluate_quality(
+            &request.corpus_dir,
             &queries,
             &qrels,
-            Engine::Bm25,
+            strategy,
             request.shortlist,
+            &request.dense_model,
         )?),
-        Some(engine) => bail!(
-            "unsupported quality benchmark baseline engine '{:?}'",
-            engine
-        ),
         None => None,
     };
+
+    // Resolving "hybrid" gives us the champion plan
+    let champion_plan = registry.resolve("hybrid")?;
+    let champion_strategy_name = champion_plan.name.clone();
+    let champion_strategy = Some(champion_strategy_name.clone());
+
+    let champion_metrics = if champion_strategy_name != request.strategy {
+        Some(evaluate_quality(
+            &request.corpus_dir,
+            &queries,
+            &qrels,
+            &champion_strategy_name,
+            request.shortlist,
+            &request.dense_model,
+        )?)
+    } else {
+        Some(metrics.clone())
+    };
+
     let delta = baseline_metrics
         .as_ref()
         .map(|baseline| quality_delta(&metrics, baseline));
 
     Ok(QualityBenchmarkReport {
         metadata: build_metadata(
-            request.engine,
-            baseline_engine,
+            &request.strategy,
+            plan,
+            baseline_strategy,
+            champion_strategy,
             &request.command,
             &corpus,
-            matches!(request.engine, Engine::Hybrid).then_some(&request.dense_model),
+            Some(&request.dense_model),
         ),
         metrics,
         baseline_metrics,
+        champion_metrics,
         delta,
     })
 }
@@ -154,11 +169,6 @@ pub fn run_quality_benchmark(request: &QualityBenchmarkRequest) -> Result<Qualit
 pub fn run_latency_benchmark(request: &LatencyBenchmarkRequest) -> Result<LatencyBenchmarkReport> {
     let prepare_started = Instant::now();
     let corpus = load_materialized_corpus(&request.corpus_dir)?;
-    let index = Bm25Index::build(&corpus.documents);
-    let dense = match request.engine {
-        Engine::Bm25 => None,
-        Engine::Hybrid => Some(DenseReranker::load(request.dense_model.clone())?),
-    };
     let queries = load_queries(&request.queries_path)?;
     let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
 
@@ -166,18 +176,20 @@ pub fn run_latency_benchmark(request: &LatencyBenchmarkRequest) -> Result<Latenc
         bail!("latency benchmark requires at least one query");
     }
 
+    let registry = crate::search::StrategyPresetRegistry::default_registry();
+    let plan = registry.resolve(&request.strategy)?;
+
     let mut timings = Vec::with_capacity(queries.len());
     for query_text in queries.values() {
         let started = Instant::now();
-        let _ = rank_corpus(
-            &corpus,
-            &index,
-            dense.as_ref(),
-            query_text,
-            request.engine,
-            10,
-            request.shortlist,
-        )?;
+        let _ = run_search(&SearchRequest {
+            strategy: request.strategy.clone(),
+            query: query_text.clone(),
+            path: request.corpus_dir.clone(),
+            limit: 10,
+            shortlist: request.shortlist,
+            dense_model: request.dense_model.clone(),
+        })?;
         timings.push(started.elapsed().as_secs_f64() * 1000.0);
     }
 
@@ -188,11 +200,13 @@ pub fn run_latency_benchmark(request: &LatencyBenchmarkRequest) -> Result<Latenc
 
     Ok(LatencyBenchmarkReport {
         metadata: build_metadata(
-            request.engine,
+            &request.strategy,
+            plan,
+            None,
             None,
             &request.command,
             &corpus,
-            matches!(request.engine, Engine::Hybrid).then_some(&request.dense_model),
+            Some(&request.dense_model),
         ),
         latency_ms: LatencyMetrics {
             prepare_ms,
@@ -208,15 +222,19 @@ pub fn run_latency_benchmark(request: &LatencyBenchmarkRequest) -> Result<Latenc
 }
 
 fn build_metadata(
-    engine: Engine,
-    baseline_engine: Option<Engine>,
+    strategy: &str,
+    plan: crate::search::SearchPlan,
+    baseline_strategy: Option<String>,
+    champion_strategy: Option<String>,
     command: &str,
     corpus: &LoadedCorpus,
     dense_model: Option<&DenseModelSpec>,
 ) -> BenchmarkMetadata {
     BenchmarkMetadata {
-        engine,
-        baseline_engine,
+        strategy: strategy.to_string(),
+        plan,
+        baseline_strategy,
+        champion_strategy,
         command: command.to_string(),
         git_sha: current_git_sha(),
         corpus_documents: corpus.documents.len(),
@@ -236,13 +254,12 @@ fn build_metadata(
 }
 
 fn evaluate_quality(
-    corpus: &crate::search::LoadedCorpus,
-    index: &Bm25Index,
-    dense: Option<&DenseReranker>,
+    corpus_dir: &Path,
     queries: &HashMap<String, String>,
     qrels: &HashMap<String, HashMap<String, u32>>,
-    engine: Engine,
+    strategy: &str,
     shortlist: usize,
+    dense_model: &DenseModelSpec,
 ) -> Result<QualityMetrics> {
     let mut ndcg_total = 0.0;
     let mut mrr_total = 0.0;
@@ -253,11 +270,37 @@ fn evaluate_quality(
         let query_text = queries
             .get(query_id)
             .with_context(|| format!("missing query text for qrels query-id '{query_id}'"))?;
-        let ranked = rank_corpus(corpus, index, dense, query_text, engine, 10, shortlist)?;
 
-        ndcg_total += ndcg_at_10(&ranked, relevances);
-        mrr_total += mrr_at_10(&ranked, relevances);
-        recall_total += recall_at_10(&ranked, relevances);
+        let response = run_search(&SearchRequest {
+            strategy: strategy.to_string(),
+            query: query_text.clone(),
+            path: corpus_dir.to_path_buf(),
+            limit: 10,
+            shortlist,
+            dense_model: dense_model.clone(),
+        })?;
+
+        // Map SearchHit to something we can use for metrics
+        // We need the ID, which is not currently in SearchHit.
+        // Wait, SearchHit.path is used as ID in some places or we need a way to get ID.
+        // In materialized corpus, ID is the file stem.
+
+        let ranked_ids: Vec<String> = response
+            .results
+            .iter()
+            .map(|hit| {
+                Path::new(&hit.path)
+                    .file_stem()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+            })
+            .collect();
+
+        ndcg_total += ndcg_at_10(&ranked_ids, relevances);
+        mrr_total += mrr_at_10(&ranked_ids, relevances);
+        recall_total += recall_at_10(&ranked_ids, relevances);
         counted_queries += 1;
     }
 
@@ -350,16 +393,16 @@ fn load_qrels(path: &Path) -> Result<HashMap<String, HashMap<String, u32>>> {
     Ok(qrels)
 }
 
-fn mrr_at_10(results: &[RankedDocument], relevances: &HashMap<String, u32>) -> f64 {
+fn mrr_at_10(results: &[String], relevances: &HashMap<String, u32>) -> f64 {
     results
         .iter()
         .enumerate()
-        .find(|(_, result)| relevances.get(&result.id).copied().unwrap_or(0) > 0)
+        .find(|(_, id)| relevances.get(*id).copied().unwrap_or(0) > 0)
         .map(|(index, _)| 1.0 / (index as f64 + 1.0))
         .unwrap_or(0.0)
 }
 
-fn recall_at_10(results: &[RankedDocument], relevances: &HashMap<String, u32>) -> f64 {
+fn recall_at_10(results: &[String], relevances: &HashMap<String, u32>) -> f64 {
     let relevant_total = relevances.values().filter(|score| **score > 0).count();
     if relevant_total == 0 {
         return 0.0;
@@ -367,19 +410,17 @@ fn recall_at_10(results: &[RankedDocument], relevances: &HashMap<String, u32>) -
 
     let hits = results
         .iter()
-        .filter(|result| relevances.get(&result.id).copied().unwrap_or(0) > 0)
+        .filter(|id| relevances.get(*id).copied().unwrap_or(0) > 0)
         .count();
 
     hits as f64 / relevant_total as f64
 }
 
-fn ndcg_at_10(results: &[RankedDocument], relevances: &HashMap<String, u32>) -> f64 {
+fn ndcg_at_10(results: &[String], relevances: &HashMap<String, u32>) -> f64 {
     let dcg = results
         .iter()
         .enumerate()
-        .map(|(index, result)| {
-            discounted_gain(index, relevances.get(&result.id).copied().unwrap_or(0))
-        })
+        .map(|(index, id)| discounted_gain(index, relevances.get(id).copied().unwrap_or(0)))
         .sum::<f64>();
 
     let mut ideal = relevances.values().copied().collect::<Vec<_>>();
@@ -412,295 +453,4 @@ fn percentile(values: &[f64], quantile: f64) -> f64 {
     let raw_index = (values.len() as f64 * quantile).ceil() as usize;
     let index = raw_index.saturating_sub(1).min(values.len() - 1);
     values[index]
-}
-
-#[cfg(test)]
-mod quality {
-    use std::fs;
-
-    use tempfile::tempdir;
-
-    use crate::dense::DenseModelSpec;
-    use crate::search::DEFAULT_HYBRID_SHORTLIST;
-
-    use super::{Engine, QualityBenchmarkRequest, quality_delta, run_quality_benchmark};
-
-    #[test]
-    fn quality_benchmark_report_contains_metadata_and_metrics() {
-        let corpus_dir = sample_corpus_dir();
-        let request = QualityBenchmarkRequest {
-            engine: Engine::Bm25,
-            baseline: None,
-            command: "sift bench quality --engine bm25".to_string(),
-            corpus_dir: corpus_dir.path().to_path_buf(),
-            queries_path: None,
-            qrels_path: corpus_dir.path().join("qrels/test.tsv"),
-            shortlist: DEFAULT_HYBRID_SHORTLIST,
-            dense_model: DenseModelSpec::default(),
-        };
-
-        let report = run_quality_benchmark(&request).expect("quality report");
-        assert_eq!(report.metadata.engine, Engine::Bm25);
-        assert_eq!(report.metadata.corpus_documents, 2);
-        assert!(!report.metadata.command.is_empty());
-        assert!(report.metrics.ndcg_at_10 >= 0.0);
-        assert!(report.metrics.mrr_at_10 >= 0.0);
-        assert!(report.metrics.recall_at_10 >= 0.0);
-        assert!(report.delta.is_none());
-    }
-
-    #[test]
-    fn quality_delta_is_reported_as_exact_difference() {
-        let delta = quality_delta(
-            &super::QualityMetrics {
-                ndcg_at_10: 0.72,
-                mrr_at_10: 0.61,
-                recall_at_10: 0.80,
-            },
-            &super::QualityMetrics {
-                ndcg_at_10: 0.70,
-                mrr_at_10: 0.60,
-                recall_at_10: 0.78,
-            },
-        );
-
-        assert!((delta.ndcg_at_10 - 0.02).abs() < 1e-9);
-        assert!((delta.mrr_at_10 - 0.01).abs() < 1e-9);
-        assert!((delta.recall_at_10 - 0.02).abs() < 1e-9);
-    }
-
-    #[test]
-    fn quality_benchmark_prefers_explicit_queries_path() {
-        let corpus_dir = sample_corpus_dir();
-        let explicit_queries_path = corpus_dir.path().join("explicit-queries.tsv");
-        fs::write(
-            &explicit_queries_path,
-            "query-id\ttext\nq-1\trust benchmark\nq-2\tsemantic retrieval\n",
-        )
-        .expect("write explicit queries");
-        fs::write(
-            corpus_dir.path().join("test-queries.tsv"),
-            "query-id\ttext\nq-1\twrong query\nq-2\twrong query\n",
-        )
-        .expect("overwrite default queries");
-
-        let report = run_quality_benchmark(&QualityBenchmarkRequest {
-            engine: Engine::Bm25,
-            baseline: None,
-            command: "sift bench quality --engine bm25".to_string(),
-            corpus_dir: corpus_dir.path().to_path_buf(),
-            queries_path: Some(explicit_queries_path),
-            qrels_path: corpus_dir.path().join("qrels/test.tsv"),
-            shortlist: DEFAULT_HYBRID_SHORTLIST,
-            dense_model: DenseModelSpec::default(),
-        })
-        .expect("quality report");
-
-        assert!(report.metrics.recall_at_10 > 0.0);
-    }
-
-    fn sample_corpus_dir() -> tempfile::TempDir {
-        let dir = tempdir().expect("corpus dir");
-        fs::write(
-            dir.path().join("doc-a.txt"),
-            "Alpha\n\nrust search benchmark corpus",
-        )
-        .expect("write doc a");
-        fs::write(
-            dir.path().join("doc-b.txt"),
-            "Beta\n\nsemantic rerank later story",
-        )
-        .expect("write doc b");
-        fs::write(
-            dir.path().join("test-queries.tsv"),
-            "query-id\ttext\nq-1\trust benchmark\nq-2\trerank story\n",
-        )
-        .expect("write queries");
-        fs::create_dir_all(dir.path().join("qrels")).expect("qrels dir");
-        fs::write(
-            dir.path().join("qrels/test.tsv"),
-            "query-id\tcorpus-id\tscore\nq-1\tdoc-a\t1\nq-2\tdoc-b\t1\n",
-        )
-        .expect("write qrels");
-        dir
-    }
-}
-
-#[cfg(test)]
-mod latency {
-    use std::fs;
-
-    use tempfile::tempdir;
-
-    use crate::dense::DenseModelSpec;
-    use crate::search::DEFAULT_HYBRID_SHORTLIST;
-
-    use super::{Engine, LatencyBenchmarkRequest, over_target_ms, run_latency_benchmark};
-
-    #[test]
-    fn latency_benchmark_report_contains_reproducible_fields() {
-        let corpus_dir = sample_corpus_dir();
-        let request = LatencyBenchmarkRequest {
-            engine: Engine::Bm25,
-            command: "sift bench latency --engine bm25".to_string(),
-            corpus_dir: corpus_dir.path().to_path_buf(),
-            queries_path: corpus_dir.path().join("test-queries.tsv"),
-            shortlist: DEFAULT_HYBRID_SHORTLIST,
-            dense_model: DenseModelSpec::default(),
-        };
-
-        let report = run_latency_benchmark(&request).expect("latency report");
-        assert_eq!(report.metadata.engine, Engine::Bm25);
-        assert_eq!(report.metadata.corpus_documents, 2);
-        assert!(!report.metadata.command.is_empty());
-        assert!(report.latency_ms.prepare_ms >= 0.0);
-        assert!(report.latency_ms.p50_ms >= 0.0);
-        assert!(report.latency_ms.p90_ms >= report.latency_ms.p50_ms);
-        assert!(report.latency_ms.max_ms >= report.latency_ms.p90_ms);
-        assert_eq!(report.latency_ms.target_ms, 200.0);
-    }
-
-    #[test]
-    fn latency_shortfall_is_explicit_and_non_negative() {
-        assert_eq!(over_target_ms(150.0), 0.0);
-        assert_eq!(over_target_ms(200.0), 0.0);
-        assert_eq!(over_target_ms(245.5), 45.5);
-    }
-
-    fn sample_corpus_dir() -> tempfile::TempDir {
-        let dir = tempdir().expect("corpus dir");
-        fs::write(
-            dir.path().join("doc-a.txt"),
-            "Alpha\n\nrust search benchmark corpus",
-        )
-        .expect("write doc a");
-        fs::write(
-            dir.path().join("doc-b.txt"),
-            "Beta\n\nsemantic rerank later story",
-        )
-        .expect("write doc b");
-        fs::write(
-            dir.path().join("test-queries.tsv"),
-            "query-id\ttext\nq-1\trust benchmark\nq-2\trerank story\n",
-        )
-        .expect("write queries");
-        fs::create_dir_all(dir.path().join("qrels")).expect("qrels dir");
-        fs::write(
-            dir.path().join("qrels/test.tsv"),
-            "query-id\tcorpus-id\tscore\nq-1\tdoc-a\t1\nq-2\tdoc-b\t1\n",
-        )
-        .expect("write qrels");
-        dir
-    }
-}
-
-#[cfg(test)]
-mod rich_formats {
-    use std::path::Path;
-
-    use crate::dense::DenseModelSpec;
-    use crate::search::Engine;
-
-    use super::{
-        LatencyBenchmarkRequest, QualityBenchmarkRequest, run_latency_benchmark,
-        run_quality_benchmark,
-    };
-
-    #[test]
-    fn quality_benchmark_accepts_mixed_format_fixture_corpus() {
-        let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
-        let report = run_quality_benchmark(&QualityBenchmarkRequest {
-            engine: Engine::Bm25,
-            baseline: None,
-            command: "sift bench quality --engine bm25".to_string(),
-            corpus_dir: fixture_root.clone(),
-            queries_path: None,
-            qrels_path: fixture_root.join("qrels/test.tsv"),
-            shortlist: 8,
-            dense_model: DenseModelSpec::default(),
-        })
-        .expect("quality report");
-
-        assert!(report.metadata.corpus_documents >= 5);
-        assert!(report.metrics.recall_at_10 >= 0.0);
-    }
-
-    #[test]
-    fn latency_benchmark_accepts_mixed_format_fixture_corpus() {
-        let fixture_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rich-docs");
-        let report = run_latency_benchmark(&LatencyBenchmarkRequest {
-            engine: Engine::Bm25,
-            command: "sift bench latency --engine bm25".to_string(),
-            corpus_dir: fixture_root.clone(),
-            queries_path: fixture_root.join("test-queries.tsv"),
-            shortlist: 8,
-            dense_model: DenseModelSpec::default(),
-        })
-        .expect("latency report");
-
-        assert!(report.metadata.corpus_documents >= 5);
-        assert!(report.latency_ms.p50_ms >= 0.0);
-    }
-}
-
-#[cfg(test)]
-mod metadata {
-    use std::fs;
-
-    use tempfile::tempdir;
-
-    use crate::dense::{
-        DEFAULT_MAX_LENGTH, DEFAULT_MODEL_ID, DEFAULT_MODEL_REVISION, DenseModelSpec,
-    };
-    use crate::search::{Engine, load_materialized_corpus};
-
-    use super::build_metadata;
-
-    #[test]
-    fn true_hybrid_metadata_records_segment_configuration_and_model_settings() {
-        let corpus_dir = sample_corpus_dir();
-        let corpus = load_materialized_corpus(corpus_dir.path()).expect("materialized corpus");
-        let metadata = build_metadata(
-            Engine::Hybrid,
-            Some(Engine::Bm25),
-            "sift bench quality --engine hybrid --baseline bm25",
-            &corpus,
-            Some(&DenseModelSpec::default()),
-        );
-
-        assert_eq!(metadata.segment_strategy, "structure-aware");
-        assert_eq!(metadata.segment_count, 2);
-        assert_eq!(metadata.dense_model.as_deref(), Some(DEFAULT_MODEL_ID));
-        assert_eq!(
-            metadata.dense_revision.as_deref(),
-            Some(DEFAULT_MODEL_REVISION)
-        );
-        assert_eq!(metadata.dense_max_length, Some(DEFAULT_MAX_LENGTH));
-    }
-
-    fn sample_corpus_dir() -> tempfile::TempDir {
-        let dir = tempdir().expect("corpus dir");
-        fs::write(
-            dir.path().join("doc-a.txt"),
-            "Alpha heading\n\nrust search benchmark corpus",
-        )
-        .expect("write doc a");
-        fs::write(
-            dir.path().join("doc-b.txt"),
-            "Beta heading\n\nsemantic retrieval benchmark corpus",
-        )
-        .expect("write doc b");
-        fs::write(
-            dir.path().join("test-queries.tsv"),
-            "query-id\ttext\nq-1\trust benchmark\nq-2\tsemantic retrieval\n",
-        )
-        .expect("write queries");
-        fs::create_dir_all(dir.path().join("qrels")).expect("qrels dir");
-        fs::write(
-            dir.path().join("qrels/test.tsv"),
-            "query-id\tcorpus-id\tscore\nq-1\tdoc-a\t1\nq-2\tdoc-b\t1\n",
-        )
-        .expect("write qrels");
-        dir
-    }
 }

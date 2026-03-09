@@ -1,0 +1,38 @@
+---
+recorded_at: 2026-03-09T09:37:55.827346074-07:00
+command: cargo run -- search --strategy page-index /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs 'service catalog'
+---
+strategy: page-index
+root: /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs
+indexed_files: 8
+skipped_files: 0
+results: 8
+
+1. /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs/notes.txt
+   score: 0.0489
+   snippet: service catalog note Plain text fallback for the service catalog.
+2. /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs/docs/service.html
+   score: 0.0487
+   snippet: HTML Heading Service Catalog for the agent platform.
+3. /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs/docs/architecture.pdf
+   score: 0.0317
+   snippet: Architecture decision for local retrieval
+4. /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs/docs/roadmap-docx.docx
+   score: 0.0312
+   snippet: Quarterly roadmap docx
+5. /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs/docs/roadmap-sheet.xlsx
+   score: 0.0308
+   snippet: Quarterly roadmap xlsx
+6. /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs/docs/roadmap-slides.pptx
+   score: 0.0301
+   snippet: Quarterly roadmap pptx
+7. /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs/qrels/test.tsv
+   score: 0.0301
+   snippet: query-id corpus-id score q-roadmap roadmap-docx 1 q-roadmap roadmap-sheet 1 q-roadmap roadmap-slides 1
+8. /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs/test-queries.tsv
+   score: 0.0294
+   snippet: query-id query q-roadmap quarterly roadmap
+
+--- stderr ---
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running `/home/alex/.cache/cargo-target/sift/debug/sift search --strategy page-index /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs 'service catalog'`

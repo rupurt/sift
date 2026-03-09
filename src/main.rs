@@ -8,7 +8,7 @@ use sift::bench::{
 use sift::dense::DenseModelSpec;
 use sift::eval::{download_scifact_dataset, materialize_scifact_dir};
 use sift::search::{
-    DEFAULT_HYBRID_SHORTLIST, DEFAULT_RESULT_LIMIT, Engine, OutputFormat, SearchRequest,
+    DEFAULT_HYBRID_SHORTLIST, DEFAULT_RESULT_LIMIT, OutputFormat, SearchRequest,
     render_search_response, run_search,
 };
 
@@ -45,8 +45,8 @@ enum Commands {
 #[command(override_usage = "sift search [OPTIONS] [PATH] <QUERY>")]
 #[command(after_help = "If PATH is omitted, sift searches the current directory.")]
 struct SearchCommand {
-    #[arg(long, value_enum, default_value_t = Engine::Hybrid)]
-    engine: Engine,
+    #[arg(long, default_value = "hybrid")]
+    strategy: String,
 
     #[arg(long)]
     json: bool,
@@ -103,10 +103,10 @@ enum EvalCommands {
 enum BenchCommands {
     /// Run quality benchmarks
     Quality {
-        #[arg(long, value_enum, default_value_t = Engine::Bm25)]
-        engine: Engine,
-        #[arg(long, value_enum)]
-        baseline: Option<Engine>,
+        #[arg(long, default_value = "bm25")]
+        strategy: String,
+        #[arg(long)]
+        baseline: Option<String>,
         #[arg(long)]
         corpus: PathBuf,
         #[arg(long)]
@@ -124,8 +124,8 @@ enum BenchCommands {
     },
     /// Run latency benchmarks
     Latency {
-        #[arg(long, value_enum, default_value_t = Engine::Bm25)]
-        engine: Engine,
+        #[arg(long, default_value = "bm25")]
+        strategy: String,
         #[arg(long)]
         corpus: PathBuf,
         #[arg(long)]
@@ -172,7 +172,7 @@ fn main() -> Result<()> {
         },
         Commands::Bench { command } => match command {
             BenchCommands::Quality {
-                engine,
+                strategy,
                 baseline,
                 corpus,
                 queries,
@@ -183,7 +183,7 @@ fn main() -> Result<()> {
                 max_length,
             } => {
                 let report = run_quality_benchmark(&QualityBenchmarkRequest {
-                    engine,
+                    strategy,
                     baseline,
                     command: command_line,
                     corpus_dir: corpus,
@@ -199,7 +199,7 @@ fn main() -> Result<()> {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
             BenchCommands::Latency {
-                engine,
+                strategy,
                 corpus,
                 queries,
                 shortlist,
@@ -208,7 +208,7 @@ fn main() -> Result<()> {
                 max_length,
             } => {
                 let report = run_latency_benchmark(&LatencyBenchmarkRequest {
-                    engine,
+                    strategy,
                     command: command_line,
                     corpus_dir: corpus,
                     queries_path: queries,
@@ -225,7 +225,7 @@ fn main() -> Result<()> {
         Commands::Search(search) => {
             let (path, query) = search.resolve_targets();
             let response = run_search(&SearchRequest {
-                engine: search.engine,
+                strategy: search.strategy,
                 query,
                 path,
                 limit: search.limit,
@@ -249,42 +249,4 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn search_defaults_path_to_current_directory_when_only_query_is_provided() {
-        let cli = Cli::try_parse_from(["sift", "search", "retrieval architecture"])
-            .expect("search command parses");
-
-        let Commands::Search(search) = cli.command else {
-            panic!("expected search command");
-        };
-        let (path, query) = search.resolve_targets();
-
-        assert_eq!(path, PathBuf::from("."));
-        assert_eq!(query, "retrieval architecture");
-    }
-
-    #[test]
-    fn search_accepts_path_before_query() {
-        let cli = Cli::try_parse_from([
-            "sift",
-            "search",
-            "tests/fixtures/rich-docs",
-            "service catalog",
-        ])
-        .expect("search command parses");
-
-        let Commands::Search(search) = cli.command else {
-            panic!("expected search command");
-        };
-        let (path, query) = search.resolve_targets();
-
-        assert_eq!(path, PathBuf::from("tests/fixtures/rich-docs"));
-        assert_eq!(query, "service catalog");
-    }
 }

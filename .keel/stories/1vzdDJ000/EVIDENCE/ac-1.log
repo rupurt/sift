@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T09:37:21.105620566-07:00
+mode: manual
+---
+Search execution is represented as a domain search plan with explicit phases in src/search/domain.rs and orchestrator in src/search/application.rs

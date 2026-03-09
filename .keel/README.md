@@ -48,5 +48,5 @@
 
 | Voyage | Status |
 |--------|--------|
-| [Layered Search Strategy Foundation](epics/1vzXLN000/voyages/1vzdCx000/) | planned |
+| [Layered Search Strategy Foundation](epics/1vzXLN000/voyages/1vzdCx000/) | in-progress |
 
