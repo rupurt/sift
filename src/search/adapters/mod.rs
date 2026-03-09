@@ -1,11 +1,10 @@
 use super::domain::*;
-use crate::dense::DenseReranker;
 use anyhow::Result;
 
-use crate::vector::{aggregate_segment_hits, score_segments_manually, SegmentScorer};
+use crate::vector::{aggregate_segment_hits, score_segments_manually};
 
 pub struct SegmentVectorRetriever {
-    pub dense: std::sync::Arc<DenseReranker>,
+    pub embedder: std::sync::Arc<dyn Embedder>,
 }
 
 impl Retriever for SegmentVectorRetriever {
@@ -34,24 +33,12 @@ impl Retriever for SegmentVectorRetriever {
             });
         }
 
-        // Split segments into those with embeddings and those without
-        let (cached, missing): (Vec<_>, Vec<_>) = segments.into_iter().partition(|s| s.embedding.is_some());
-
         let mut segment_hits = Vec::new();
 
-        if !cached.is_empty() {
-            tracing::info!("vector: scoring {} segments from cache", cached.len());
-            let cached_start = std::time::Instant::now();
-            segment_hits.extend(score_segments_manually(&self.dense, query, &cached)?);
-            tracing::debug!("vector: cached scoring complete in {:.2?}", cached_start.elapsed());
-        }
-
-        if !missing.is_empty() {
-            tracing::info!("vector: scoring {} missing segments via inference", missing.len());
-            let missing_start = std::time::Instant::now();
-            segment_hits.extend(self.dense.score_segments(query, &missing)?);
-            tracing::info!("vector: inference complete in {:.2?}", missing_start.elapsed());
-        }
+        tracing::info!("vector: scoring {} segments", segments.len());
+        let start = std::time::Instant::now();
+        segment_hits.extend(score_segments_manually(self.embedder.as_ref(), query, &segments)?);
+        tracing::debug!("vector: scoring complete in {:.2?}", start.elapsed());
 
         tracing::debug!("vector: aggregating hits");
         let document_hits = aggregate_segment_hits(&segment_hits);

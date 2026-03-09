@@ -8,11 +8,11 @@ use sift::bench::{
 };
 use sift::cache::cache_dir;
 use sift::config::Config;
-use sift::dense::DenseModelSpec;
+use sift::dense::{DenseModelSpec, DenseReranker};
 use sift::eval::{download_scifact_dataset, materialize_scifact_dir};
 use sift::search::{
-    FusionPolicy, OutputFormat, RerankingPolicy, RetrieverPolicy, SearchRequest,
-    render_search_response, run_search,
+    Embedder, FusionPolicy, LocalFileCorpusRepository, OutputFormat, RerankingPolicy,
+    RetrieverPolicy, SearchRequest, StrategyPresetRegistry, render_search_response, run_search,
 };
 use sift::system::Telemetry;
 use std::sync::Arc;
@@ -394,6 +394,28 @@ fn main() -> Result<()> {
             let limit = search.limit.unwrap_or(config.search.limit);
             let shortlist = search.shortlist.unwrap_or(config.search.shortlist);
 
+            let spec = DenseModelSpec::with_overrides(
+                search.model_id.clone().or(Some(config.model.model_id.clone())),
+                search
+                    .model_revision
+                    .clone()
+                    .or(Some(config.model.model_revision.clone())),
+                search.max_length.or(Some(config.model.max_length)),
+            );
+
+            let registry = StrategyPresetRegistry::default_registry();
+            let plan = registry.resolve(&strategy)?;
+            let mut embedder = None;
+            if plan.retrievers.contains(&RetrieverPolicy::Vector)
+                || search
+                    .retrievers
+                    .as_ref()
+                    .map(|r| r.contains(&RetrieverPolicy::Vector))
+                    .unwrap_or(false)
+            {
+                embedder = Some(Arc::new(DenseReranker::load(spec.clone())?) as Arc<dyn Embedder>);
+            }
+
             let response = run_search(
                 &SearchRequest {
                     strategy,
@@ -401,14 +423,7 @@ fn main() -> Result<()> {
                     path,
                     limit,
                     shortlist,
-                    dense_model: DenseModelSpec::with_overrides(
-                        search.model_id.clone().or(Some(config.model.model_id.clone())),
-                        search
-                            .model_revision
-                            .clone()
-                            .or(Some(config.model.model_revision.clone())),
-                        search.max_length.or(Some(config.model.max_length)),
-                    ),
+                    dense_model: spec,
                     verbose: search.verbose,
                     retrievers: search.retrievers.clone(),
                     fusion: search.fusion,
@@ -417,6 +432,8 @@ fn main() -> Result<()> {
                     cache_dir: None,
                 },
                 Some(&ignore),
+                &LocalFileCorpusRepository,
+                embedder,
             )?;
             let output = render_search_response(
                 &response,

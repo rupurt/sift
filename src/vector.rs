@@ -29,7 +29,7 @@ pub struct SemanticDocumentHit {
 }
 
 pub fn score_segments_manually(
-    scorer: &crate::dense::DenseReranker,
+    scorer: &dyn crate::search::domain::Embedder,
     query: &str,
     segments: &[Segment],
 ) -> Result<Vec<SegmentHit>> {
@@ -38,12 +38,35 @@ pub fn score_segments_manually(
     }
 
     // Embed the query
-    let query_embeddings = scorer.embed_batch(&[query.to_string()])?;
+    let query_embeddings = scorer.embed(&[query.to_string()])?;
     let query_vec = &query_embeddings[0];
 
     let mut hits = Vec::with_capacity(segments.len());
-    for segment in segments {
+    
+    // Split segments into those with embeddings and those without
+    let (cached, missing): (Vec<&Segment>, Vec<&Segment>) = segments.iter().partition(|s| s.embedding.is_some());
+
+    // 1. Process cached embeddings
+    for segment in cached {
         if let Some(doc_vec) = &segment.embedding {
+            let score = dot_product(query_vec, doc_vec);
+            hits.push(SegmentHit {
+                segment_id: segment.id.clone(),
+                doc_id: segment.doc_id.clone(),
+                path: segment.path.clone(),
+                label: segment.label.clone(),
+                text: segment.text.clone(),
+                score: score as f64,
+            });
+        }
+    }
+
+    // 2. Process missing embeddings (on-the-fly inference)
+    if !missing.is_empty() {
+        let texts: Vec<_> = missing.iter().map(|s| s.text.clone()).collect();
+        let doc_embeddings = scorer.embed(&texts)?;
+        for (i, segment) in missing.iter().enumerate() {
+            let doc_vec = &doc_embeddings[i];
             let score = dot_product(query_vec, doc_vec);
             hits.push(SegmentHit {
                 segment_id: segment.id.clone(),

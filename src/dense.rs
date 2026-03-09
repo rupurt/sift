@@ -274,6 +274,17 @@ impl DenseReranker {
     }
 }
 
+impl crate::search::domain::Embedder for DenseReranker {
+    fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+        self.embed_batch(texts)
+    }
+
+    fn dimension(&self) -> usize {
+        // all-MiniLM-L6-v2 is 384 dimensions
+        384 
+    }
+}
+
 impl SegmentScorer for DenseReranker {
     fn score_segments(&self, query: &str, segments: &[Segment]) -> Result<Vec<SegmentHit>> {
         if segments.is_empty() {

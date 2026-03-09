@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Ignore;
 use crate::dense::{DenseModelSpec, DenseReranker};
-use crate::search::{LoadedCorpus, SearchRequest, load_search_corpus};
+use crate::search::{CorpusRepository, LoadedCorpus, SearchRequest};
 use crate::system::{HardwareSummary, current_git_sha, detect_hardware_summary};
 
 const LATENCY_TARGET_MS: f64 = 200.0;
@@ -111,9 +111,17 @@ pub fn run_quality_benchmark(
 ) -> Result<QualityBenchmarkReport> {
     let prepare_started = Instant::now();
     tracing::info!("→ loading dense model: {}", request.dense_model.model_id);
-    let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
+    let dense_for_load: std::sync::Arc<dyn crate::search::domain::Embedder> = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load), &telemetry_for_load, None)?;
+    let repository = crate::search::LocalFileCorpusRepository;
+    let corpus = repository.load(
+        &request.corpus_dir,
+        ignore,
+        request.verbose,
+        Some(dense_for_load.as_ref()),
+        &telemetry_for_load,
+        None,
+    )?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
@@ -144,7 +152,7 @@ pub fn run_quality_benchmark(
         },
         &corpus,
         &index,
-        Some(dense_for_load.clone()),
+        Some(dense_for_load.clone() as std::sync::Arc<dyn crate::search::domain::Embedder>),
     )?;
 
     let (metrics, _telemetry) = evaluate_quality(
@@ -177,7 +185,7 @@ pub fn run_quality_benchmark(
                 },
                 &corpus,
                 &index,
-                Some(dense_for_load.clone()),
+                Some(dense_for_load.clone() as std::sync::Arc<dyn crate::search::domain::Embedder>),
             )?;
             let (m, _) = evaluate_quality(
                 &queries,
@@ -208,7 +216,7 @@ pub fn run_quality_benchmark(
             },
             &corpus,
             &index,
-            Some(dense_for_load.clone()),
+            Some(dense_for_load.clone() as std::sync::Arc<dyn crate::search::domain::Embedder>),
         )?;
         let (m, _) = evaluate_quality(
             &queries,
@@ -248,9 +256,17 @@ pub fn run_latency_benchmark(
 ) -> Result<LatencyBenchmarkReport> {
     let prepare_started = Instant::now();
     tracing::info!("→ loading dense model: {}", request.dense_model.model_id);
-    let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
+    let dense_for_load: std::sync::Arc<dyn crate::search::domain::Embedder> = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load), &telemetry_for_load, None)?;
+    let repository = crate::search::LocalFileCorpusRepository;
+    let corpus = repository.load(
+        &request.corpus_dir,
+        ignore,
+        request.verbose,
+        Some(dense_for_load.as_ref()),
+        &telemetry_for_load,
+        None,
+    )?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries = load_queries(&request.queries_path)?;
     let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
@@ -276,7 +292,7 @@ pub fn run_latency_benchmark(
         },
         &corpus,
         &index,
-        Some(dense_for_load.clone()),
+        Some(dense_for_load.clone() as std::sync::Arc<dyn crate::search::domain::Embedder>),
     )?;
 
     let mut timings = Vec::with_capacity(queries.len());
@@ -325,9 +341,17 @@ pub fn run_comparative_benchmark(
 
     let prepare_started = Instant::now();
     tracing::info!("→ loading dense model: {}", request.dense_model.model_id);
-    let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
+    let dense_for_load: std::sync::Arc<dyn crate::search::domain::Embedder> = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(&dense_for_load), &telemetry_for_load, None)?;
+    let repository = crate::search::LocalFileCorpusRepository;
+    let corpus = repository.load(
+        &request.corpus_dir,
+        ignore,
+        request.verbose,
+        Some(dense_for_load.as_ref()),
+        &telemetry_for_load,
+        None,
+    )?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
@@ -357,7 +381,7 @@ pub fn run_comparative_benchmark(
             },
             &corpus,
             &index,
-            Some(dense_for_load.clone()),
+            Some(dense_for_load.clone() as std::sync::Arc<dyn crate::search::domain::Embedder>),
         )?;
 
         // Quality

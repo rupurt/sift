@@ -9,7 +9,21 @@ use crate::extract::extract_path;
 use crate::segment::build_segments;
 use crate::cache::{Manifest, get_file_heuristics, hash_file, load_blob, save_blob, cache_dir};
 
-use crate::dense::DenseReranker;
+pub struct LocalFileCorpusRepository;
+
+impl CorpusRepository for LocalFileCorpusRepository {
+    fn load(
+        &self,
+        path: &Path,
+        ignore: Option<&Ignore>,
+        verbose: u8,
+        embedder: Option<&dyn Embedder>,
+        telemetry: &crate::system::Telemetry,
+        cache_base: Option<&Path>,
+    ) -> Result<LoadedCorpus> {
+        load_search_corpus(path, ignore, verbose, embedder, telemetry, cache_base)
+    }
+}
 
 enum ProcessResult {
     Hit(Document),
@@ -119,7 +133,7 @@ pub fn load_search_corpus(
     root: &Path,
     ignore: Option<&Ignore>,
     _verbose: u8,
-    dense: Option<&DenseReranker>,
+    dense: Option<&dyn Embedder>,
     telemetry: &crate::system::Telemetry,
     cache_base: Option<&Path>,
 ) -> Result<LoadedCorpus> {
@@ -293,7 +307,7 @@ pub fn load_search_corpus(
                 let mut current_idx = 0;
                 
                 for chunk in all_texts.chunks(LOAD_BATCH_SIZE) {
-                    if let Ok(embeddings) = dense.embed_batch(chunk) {
+                    if let Ok(embeddings) = dense.embed(chunk) {
                         for embedding in embeddings {
                             let (doc_idx, seg_idx) = segment_refs[current_idx];
                             documents[doc_idx].segments[seg_idx].embedding = Some(embedding);

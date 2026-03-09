@@ -1,11 +1,41 @@
 use anyhow::{Result, anyhow};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use super::adapters::*;
-use super::corpus::load_search_corpus;
 use super::domain::*;
 use crate::config::Ignore;
-use crate::dense::DenseReranker;
+
+pub struct SearchServiceBuilder;
+
+impl SearchServiceBuilder {
+    pub fn build(plan: &SearchPlan, embedder: Option<Arc<dyn Embedder>>) -> SearchService {
+        let mut service = SearchService::new();
+        
+        // Register mandatory components
+        service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
+        service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
+        service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
+        service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
+        service.register_reranker(RerankingPolicy::PositionAware, Box::new(PositionAwareReranker));
+        service.register_reranker(RerankingPolicy::Llm, Box::new(MockLlmReranker));
+
+        // Register retrievers based on plan
+        if plan.retrievers.contains(&RetrieverPolicy::Bm25) {
+            service.register_retriever(Box::new(Bm25Retriever));
+        }
+        if plan.retrievers.contains(&RetrieverPolicy::Phrase) {
+            service.register_retriever(Box::new(PhraseRetriever));
+        }
+        if plan.retrievers.contains(&RetrieverPolicy::Vector) {
+            if let Some(e) = embedder {
+                service.register_retriever(Box::new(SegmentVectorRetriever { embedder: e }));
+            }
+        }
+
+        service
+    }
+}
 
 pub struct SearchService {
     retrievers: HashMap<RetrieverPolicy, Box<dyn Retriever>>,
@@ -247,9 +277,8 @@ impl<'a> SearchEnvironment<'a> {
         request: &SearchRequest,
         corpus: &'a LoadedCorpus,
         index: &'a Bm25Index,
-        dense: Option<std::sync::Arc<DenseReranker>>,
+        embedder: Option<Arc<dyn Embedder>>,
     ) -> Result<Self> {
-        let mut service = SearchService::new();
         let registry = StrategyPresetRegistry::default_registry();
         let mut plan = registry.resolve(&request.strategy)?;
 
@@ -264,18 +293,7 @@ impl<'a> SearchEnvironment<'a> {
             plan.reranking = reranking;
         }
 
-        service.register_retriever(Box::new(Bm25Retriever));
-        service.register_retriever(Box::new(PhraseRetriever));
-        if let Some(dense) = dense {
-            service.register_retriever(Box::new(SegmentVectorRetriever { dense }));
-        }
-
-        service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
-        service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
-        service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
-        service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
-        service.register_reranker(RerankingPolicy::PositionAware, Box::new(PositionAwareReranker));
-        service.register_reranker(RerankingPolicy::Llm, Box::new(MockLlmReranker));
+        let service = SearchServiceBuilder::build(&plan, embedder);
 
         Ok(Self {
             service,
@@ -322,13 +340,13 @@ impl<'a> SearchEnvironment<'a> {
     }
 }
 
-pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<SearchResponse> {
-    let mut service = SearchService::new();
+pub fn run_search(
+    request: &SearchRequest,
+    ignore: Option<&Ignore>,
+    repository: &dyn CorpusRepository,
+    embedder: Option<Arc<dyn Embedder>>,
+) -> Result<SearchResponse> {
     let verbose = request.verbose;
-
-    // Register adapters
-    service.register_retriever(Box::new(Bm25Retriever));
-    service.register_retriever(Box::new(PhraseRetriever));
 
     // For SegmentVectorRetriever, we need to load the model if the plan requires it
     let registry = StrategyPresetRegistry::default_registry();
@@ -346,29 +364,21 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
     }
 
     let corpus_start = std::time::Instant::now();
-    
-    // Determine if we need to pass the dense model for embedding during load
-    let mut dense_for_load = None;
-    if plan.retrievers.contains(&RetrieverPolicy::Vector) {
-        let model_start = std::time::Instant::now();
-        let dense = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
-        tracing::info!("dense model loaded in {:.2?}", model_start.elapsed());
-        dense_for_load = Some(dense);
-    }
+    let corpus = repository.load(
+        &request.path,
+        ignore,
+        verbose,
+        embedder.as_deref(),
+        &request.telemetry,
+        request.cache_dir.as_deref(),
+    )?;
+    tracing::info!(
+        "corpus loaded ({} files) in {:.2?}",
+        corpus.indexed_files,
+        corpus_start.elapsed()
+    );
 
-    let corpus = load_search_corpus(&request.path, ignore, verbose, dense_for_load.as_deref(), &request.telemetry, request.cache_dir.as_deref())?;
-    tracing::info!("corpus loaded ({} files) in {:.2?}", corpus.indexed_files, corpus_start.elapsed());
-
-    if let Some(dense) = dense_for_load {
-        service.register_retriever(Box::new(SegmentVectorRetriever { dense }));
-    }
-
-    service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
-    service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
-    service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
-    service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
-    service.register_reranker(RerankingPolicy::PositionAware, Box::new(PositionAwareReranker));
-    service.register_reranker(RerankingPolicy::Llm, Box::new(MockLlmReranker));
+    let service = SearchServiceBuilder::build(&plan, embedder);
 
     let index_start = std::time::Instant::now();
     let index = Bm25Index::build(&corpus.documents);
@@ -378,7 +388,14 @@ pub fn run_search(request: &SearchRequest, ignore: Option<&Ignore>) -> Result<Se
         bm25_index: Some(&index),
     };
 
-    let candidates = service.execute(&plan, &request.query, &prepared, request.limit, verbose, &request.telemetry)?;
+    let candidates = service.execute(
+        &plan,
+        &request.query,
+        &prepared,
+        request.limit,
+        verbose,
+        &request.telemetry,
+    )?;
 
     let results = candidates
         .results
@@ -415,10 +432,10 @@ fn resolve_snippet_from_candidate(
     query: &str,
 ) -> String {
     if let Some(snippet) = candidate.snippet.as_deref() {
-        return build_snippet(snippet, query);
+        return super::presentation::build_snippet(snippet, query);
     }
 
-    build_snippet(
+    super::presentation::build_snippet(
         corpus
             .document_by_id(&candidate.id)
             .map(Document::text)

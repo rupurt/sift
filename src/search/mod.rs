@@ -3,8 +3,10 @@ pub mod application;
 pub mod corpus;
 pub mod domain;
 pub mod legacy;
+pub mod presentation;
 
 pub use adapters::*;
 pub use application::*;
 pub use corpus::*;
 pub use domain::*;
+pub use presentation::*;
