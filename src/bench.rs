@@ -66,6 +66,19 @@ pub struct LatencyBenchmarkReport {
     pub latency_ms: LatencyMetrics,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ComparativeBenchmarkReport {
+    pub metadata: Vec<BenchmarkMetadata>,
+    pub results: Vec<StrategyComparison>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct StrategyComparison {
+    pub strategy: String,
+    pub quality: QualityMetrics,
+    pub latency: LatencyMetrics,
+}
+
 #[derive(Debug, Clone)]
 pub struct QualityBenchmarkRequest {
     pub strategy: String,
@@ -219,6 +232,137 @@ pub fn run_latency_benchmark(request: &LatencyBenchmarkRequest) -> Result<Latenc
             max_over_target_ms: over_target_ms(max_ms),
         },
     })
+}
+
+pub fn run_comparative_benchmark(
+    request: &QualityBenchmarkRequest,
+) -> Result<ComparativeBenchmarkReport> {
+    let registry = crate::search::StrategyPresetRegistry::default_registry();
+    let names = registry.names();
+    let mut results = Vec::new();
+    let mut metadata = Vec::new();
+
+    // Prepare shared state for latency
+    let corpus = load_materialized_corpus(&request.corpus_dir)?;
+    let queries_path = request
+        .queries_path
+        .clone()
+        .unwrap_or_else(|| request.corpus_dir.join("test-queries.tsv"));
+    let queries = load_queries(&queries_path)?;
+    let qrels = load_qrels(&request.qrels_path)?;
+
+    for name in names {
+        let plan = registry.resolve(&name)?;
+        
+        // Quality
+        let quality = evaluate_quality(
+            &request.corpus_dir,
+            &queries,
+            &qrels,
+            &name,
+            request.shortlist,
+            &request.dense_model,
+        )?;
+
+        // Latency
+        let prepare_started = Instant::now();
+        let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
+        
+        let mut timings = Vec::with_capacity(queries.len());
+        for query_text in queries.values() {
+            let started = Instant::now();
+            let _ = run_search(&SearchRequest {
+                strategy: name.clone(),
+                query: query_text.clone(),
+                path: request.corpus_dir.clone(),
+                limit: 10,
+                shortlist: request.shortlist,
+                dense_model: request.dense_model.clone(),
+            })?;
+            timings.push(started.elapsed().as_secs_f64() * 1000.0);
+        }
+        timings.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
+        
+        let latency = LatencyMetrics {
+            prepare_ms,
+            p50_ms: percentile(&timings, 0.50),
+            p90_ms: percentile(&timings, 0.90),
+            max_ms: timings.last().copied().unwrap_or(0.0),
+            target_ms: LATENCY_TARGET_MS,
+            p50_over_target_ms: over_target_ms(percentile(&timings, 0.50)),
+            p90_over_target_ms: over_target_ms(percentile(&timings, 0.90)),
+            max_over_target_ms: over_target_ms(timings.last().copied().unwrap_or(0.0)),
+        };
+
+        results.push(StrategyComparison {
+            strategy: name.clone(),
+            quality,
+            latency,
+        });
+
+        metadata.push(build_metadata(
+            &name,
+            plan,
+            None,
+            None,
+            &request.command,
+            &corpus,
+            Some(&request.dense_model),
+        ));
+    }
+
+    Ok(ComparativeBenchmarkReport { metadata, results })
+}
+
+pub fn render_comparative_report(report: &ComparativeBenchmarkReport) -> String {
+    use std::fmt::Write;
+    let mut out = String::new();
+
+    writeln!(out, "\x1b[1mComparative Search Strategy Benchmark\x1b[0m").unwrap();
+    writeln!(out, "────────────────────────────────────────────────────────────────────────────────").unwrap();
+    writeln!(out, "{:<20} {:>10} {:>10} {:>10} {:>12}", "Strategy", "nDCG@10", "MRR@10", "Recall@10", "p50 (ms)").unwrap();
+    writeln!(out, "────────────────────────────────────────────────────────────────────────────────").unwrap();
+
+    for res in &report.results {
+        let bar = render_bar(res.quality.ndcg_at_10, 10);
+        writeln!(
+            out,
+            "{:<20} {:>10.4} {:>10.4} {:>10.4} {:>12.2}  {}",
+            res.strategy,
+            res.quality.ndcg_at_10,
+            res.quality.mrr_at_10,
+            res.quality.recall_at_10,
+            res.latency.p50_ms,
+            bar
+        ).unwrap();
+    }
+    writeln!(out, "────────────────────────────────────────────────────────────────────────────────").unwrap();
+    
+    if let Some(meta) = report.metadata.first() {
+        writeln!(out, "\n\x1b[1mEnvironment\x1b[0m").unwrap();
+        writeln!(out, "  OS:       {} ({})", meta.hardware.os, meta.hardware.arch).unwrap();
+        writeln!(out, "  CPU:      {}", meta.hardware.cpu_brand.as_deref().unwrap_or("unknown")).unwrap();
+        writeln!(out, "  Corpus:   {} documents, {} bytes", meta.corpus_documents, meta.corpus_bytes).unwrap();
+        if let Some(sha) = &meta.git_sha {
+            writeln!(out, "  Git SHA:  {}", sha).unwrap();
+        }
+    }
+
+    out
+}
+
+fn render_bar(value: f64, width: usize) -> String {
+    let filled = (value * width as f64).round() as usize;
+    let mut bar = String::from("\x1b[32m");
+    for _ in 0..filled {
+        bar.push('█');
+    }
+    bar.push_str("\x1b[90m");
+    for _ in filled..width {
+        bar.push('░');
+    }
+    bar.push_str("\x1b[0m");
+    bar
 }
 
 fn build_metadata(

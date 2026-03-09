@@ -88,6 +88,12 @@ impl StrategyPresetRegistry {
             .cloned()
             .ok_or_else(|| anyhow!("unknown search strategy: {}", name))
     }
+
+    pub fn names(&self) -> Vec<String> {
+        let mut names: Vec<_> = self.presets.keys().cloned().collect();
+        names.sort();
+        names
+    }
 }
 
 impl SearchService {

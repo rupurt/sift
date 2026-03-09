@@ -3,7 +3,9 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use sift::bench::{
-    LatencyBenchmarkRequest, QualityBenchmarkRequest, run_latency_benchmark, run_quality_benchmark,
+    ComparativeBenchmarkReport, LatencyBenchmarkRequest, QualityBenchmarkRequest,
+    render_comparative_report, run_comparative_benchmark, run_latency_benchmark,
+    run_quality_benchmark,
 };
 use sift::config::Config;
 use sift::dense::DenseModelSpec;
@@ -101,6 +103,25 @@ enum EvalCommands {
 
 #[derive(Subcommand)]
 enum BenchCommands {
+    /// Compare all available strategies
+    All {
+        #[arg(long)]
+        corpus: PathBuf,
+        #[arg(long)]
+        queries: Option<PathBuf>,
+        #[arg(long)]
+        qrels: PathBuf,
+        #[arg(long)]
+        shortlist: Option<usize>,
+        #[arg(long)]
+        model_id: Option<String>,
+        #[arg(long)]
+        model_revision: Option<String>,
+        #[arg(long)]
+        max_length: Option<usize>,
+        #[arg(long)]
+        json: bool,
+    },
     /// Run quality benchmarks
     Quality {
         #[arg(long)]
@@ -172,6 +193,38 @@ fn main() -> Result<()> {
             },
         },
         Commands::Bench { command } => match command {
+            BenchCommands::All {
+                corpus,
+                queries,
+                qrels,
+                shortlist,
+                model_id,
+                model_revision,
+                max_length,
+                json,
+            } => {
+                let shortlist = shortlist.unwrap_or(config.search.shortlist);
+                let report = run_comparative_benchmark(&QualityBenchmarkRequest {
+                    strategy: String::new(), // Not used for All
+                    baseline: None,
+                    command: command_line,
+                    corpus_dir: corpus,
+                    queries_path: queries,
+                    qrels_path: qrels,
+                    shortlist,
+                    dense_model: DenseModelSpec::with_overrides(
+                        model_id.or_else(|| config.model.model_id.clone()),
+                        model_revision.or_else(|| config.model.model_revision.clone()),
+                        max_length.or(config.model.max_length),
+                    ),
+                })?;
+
+                if json {
+                    println!("{}", serde_json::to_string_pretty(&report)?);
+                } else {
+                    println!("{}", render_comparative_report(&report));
+                }
+            }
             BenchCommands::Quality {
                 strategy,
                 baseline,
