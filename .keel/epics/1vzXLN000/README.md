@@ -21,8 +21,8 @@ created_at: 2026-03-09T02:57:41
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 2/5 stories done
+**Progress:** 0/1 voyages complete, 3/5 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Layered Search Strategy Foundation](voyages/1vzdCx000/) | in-progress | 2/5 |
+| [Layered Search Strategy Foundation](voyages/1vzdCx000/) | in-progress | 3/5 |
 <!-- END GENERATED -->

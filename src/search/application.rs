@@ -305,4 +305,19 @@ mod tests {
         // Score for 2 lists: 1/61 + 1/61 = 0.03278
         assert!(results.results[0].score > 0.03);
     }
+
+    #[test]
+    fn strategy_preset_registry_resolves_named_presets_and_hybrid_alias() {
+        let registry = StrategyPresetRegistry::default_registry();
+        
+        let bm25 = registry.resolve("bm25").unwrap();
+        assert_eq!(bm25.name, "bm25");
+        
+        let page_index = registry.resolve("page-index").unwrap();
+        assert_eq!(page_index.name, "page-index");
+        
+        let hybrid = registry.resolve("hybrid").unwrap();
+        // hybrid resolves to the champion which is currently page-index
+        assert_eq!(hybrid.name, "page-index");
+    }
 }

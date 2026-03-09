@@ -2,12 +2,14 @@
 id: 1vzdDu000
 title: Add Fusion And Reranking Layers
 type: feat
-status: in-progress
+status: done
 created_at: 2026-03-09T09:12:50
-updated_at: 2026-03-09T09:41:35
+updated_at: 2026-03-09T09:42:55
 scope: 1vzXLN000/1vzdCx000
 index: 7
 started_at: 2026-03-09T09:41:35
+submitted_at: 2026-03-09T09:42:55
+completed_at: 2026-03-09T09:42:55
 ---
 
 # Add Fusion And Reranking Layers
