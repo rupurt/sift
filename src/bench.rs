@@ -320,7 +320,9 @@ pub fn run_comparative_benchmark(
     let qrels = load_qrels(&request.qrels_path)?;
     let _prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
 
-    for name in names {
+    let total_strategies = names.len();
+    for (idx, name) in names.iter().enumerate() {
+        crate::trace!(1, request.verbose, "→ benchmark strategy {}/{} : {}", idx + 1, total_strategies, name);
         let env = crate::search::SearchEnvironment::new(
             &SearchRequest {
                 strategy: name.clone(),
@@ -517,7 +519,11 @@ fn evaluate_quality(
     let mut recall_total = 0.0;
     let mut counted_queries = 0_usize;
 
-    for (query_id, relevances) in qrels {
+    let total_queries = qrels.len();
+    for (i, (query_id, relevances)) in qrels.iter().enumerate() {
+        if verbose > 0 && i > 0 && i % 50 == 0 {
+            crate::trace!(1, verbose, "    evaluated {}/{} queries...", i, total_queries);
+        }
         let query_text = queries
             .get(query_id)
             .with_context(|| format!("missing query text for qrels query-id '{query_id}'"))?;

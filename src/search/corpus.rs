@@ -11,6 +11,13 @@ use crate::cache::{Manifest, get_file_heuristics, hash_file, load_blob, save_blo
 
 use crate::dense::DenseReranker;
 
+enum ProcessResult {
+    Hit(Document),
+    HashHit(Document, PathBuf, crate::cache::CacheEntry, String),
+    Miss(Document, PathBuf, crate::cache::CacheEntry, String),
+    Skip,
+}
+
 fn get_project_manifest_path(root: &Path) -> Result<PathBuf> {
     let absolute = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let path_str = absolute.to_string_lossy();
@@ -53,40 +60,29 @@ pub fn load_materialized_corpus(
         }
     }
 
-    use rayon::prelude::*;
-
-    let results: Vec<Option<Document>> = files_to_process
-        .into_par_iter()
-        .map(|path| {
-            let extracted = match extract_path(&path) {
-                Ok(Some(extracted)) => extracted,
-                Ok(None) | Err(_) => {
-                    return None;
-                }
-            };
-
-            let id = match path.file_stem().and_then(|stem| stem.to_str()) {
-                Some(id) => id.to_string(),
-                None => {
-                    return None;
-                }
-            };
-
-            Some(index_document(id, path, extracted))
-        })
-        .collect();
-
     let mut documents = Vec::new();
     let mut total_bytes = 0_u64;
     let mut skipped_files = 0_usize;
 
-    for result in results {
-        if let Some(doc) = result {
-            total_bytes += doc.text.len() as u64;
-            documents.push(doc);
-        } else {
-            skipped_files += 1;
-        }
+    for path in files_to_process {
+        let extracted = match extract_path(&path) {
+            Ok(Some(extracted)) => extracted,
+            Ok(None) | Err(_) => {
+                skipped_files += 1;
+                continue;
+            }
+        };
+
+        let id = match path.file_stem().and_then(|stem| stem.to_str()) {
+            Some(id) => id.to_string(),
+            None => {
+                skipped_files += 1;
+                continue;
+            }
+        };
+
+        total_bytes += extracted.text.len() as u64;
+        documents.push(index_document(id, path, extracted));
     }
 
     documents.sort_by(|left, right| left.id.cmp(&right.id));
@@ -161,55 +157,51 @@ pub fn load_search_corpus(
         );
     }
 
-    use rayon::prelude::*;
-
-    enum ProcessResult {
-        Hit(Document),
-        HashHit(Document, PathBuf, crate::cache::CacheEntry, String),
-        Miss(Document, PathBuf, crate::cache::CacheEntry, String),
-        Skip,
-    }
-
     let process_start = std::time::Instant::now();
     let total_files = files_to_process.len();
 
-    // Stage 1: Parallel cache check and extraction (lexical only)
-    let results: Vec<ProcessResult> = files_to_process
-        .into_par_iter()
-        .map(|path| {
-            let Ok(heuristics) = get_file_heuristics(&path) else {
-                return ProcessResult::Skip;
-            };
+    // Stage 1: Sequential cache check and extraction (lexical only)
+    let mut results = Vec::new();
+    for path in files_to_process {
+        let heuristics = match get_file_heuristics(&path) {
+            Ok(h) => h,
+            Err(_) => {
+                results.push(ProcessResult::Skip);
+                continue;
+            }
+        };
 
-            // Fast path: heuristics match manifest
-            if let Some(hash) = manifest.check_heuristics(&path, &heuristics) {
-                if let Ok(mut doc) = load_blob(&blobs_dir, &hash) {
-                    crate::trace!(3, verbose, "      cache hit (heuristic): {}", path.display());
-                    doc.id = path.display().to_string();
-                    doc.path = path.to_path_buf();
-                    return ProcessResult::Hit(doc);
-                }
+        // Fast path: heuristics match manifest
+        if let Some(hash) = manifest.check_heuristics(&path, &heuristics) {
+            if let Ok(mut doc) = load_blob(&blobs_dir, &hash) {
+                crate::trace!(3, verbose, "      cache hit (heuristic): {}", path.display());
+                doc.id = path.display().to_string();
+                doc.path = path.to_path_buf();
+                results.push(ProcessResult::Hit(doc));
+                continue;
+            }
+        }
+
+        // Medium path: compute blake3 and check global blob store
+        if let Ok(hash) = hash_file(&path) {
+            if let Ok(mut doc) = load_blob(&blobs_dir, &hash) {
+                crate::trace!(3, verbose, "      cache hit (hash): {}", path.display());
+                doc.id = path.display().to_string();
+                doc.path = path.to_path_buf();
+                results.push(ProcessResult::HashHit(doc, path, heuristics, hash));
+                continue;
             }
 
-            // Medium path: compute blake3 and check global blob store
-            if let Ok(hash) = hash_file(&path) {
-                if let Ok(mut doc) = load_blob(&blobs_dir, &hash) {
-                    crate::trace!(3, verbose, "      cache hit (hash): {}", path.display());
-                    doc.id = path.display().to_string();
-                    doc.path = path.to_path_buf();
-                    return ProcessResult::HashHit(doc, path, heuristics, hash);
-                }
-
-                // Slow path: True miss, must extract
-                if let Ok(Some(extracted)) = extract_path(&path) {
-                    let id = path.display().to_string();
-                    let doc = index_document(id, path.to_path_buf(), extracted);
-                    return ProcessResult::Miss(doc, path, heuristics, hash);
-                }
+            // Slow path: True miss, must extract
+            if let Ok(Some(extracted)) = extract_path(&path) {
+                let id = path.display().to_string();
+                let doc = index_document(id, path.to_path_buf(), extracted);
+                results.push(ProcessResult::Miss(doc, path, heuristics, hash));
+                continue;
             }
-            ProcessResult::Skip
-        })
-        .collect();
+        }
+        results.push(ProcessResult::Skip);
+    }
 
     // Stage 2: Batch vectorize all new documents across the whole corpus
     let mut documents = Vec::new();
@@ -265,13 +257,21 @@ pub fn load_search_corpus(
 
             if !all_texts.is_empty() {
                 let embed_start = std::time::Instant::now();
-                if let Ok(embeddings) = dense.embed_batch(&all_texts) {
-                    for (i, embedding) in embeddings.into_iter().enumerate() {
-                        let (doc_idx, seg_idx) = segment_refs[i];
-                        documents[doc_idx].segments[seg_idx].embedding = Some(embedding);
+                const LOAD_BATCH_SIZE: usize = 128;
+                let mut current_idx = 0;
+                
+                for chunk in all_texts.chunks(LOAD_BATCH_SIZE) {
+                    if let Ok(embeddings) = dense.embed_batch(chunk) {
+                        for embedding in embeddings {
+                            let (doc_idx, seg_idx) = segment_refs[current_idx];
+                            documents[doc_idx].segments[seg_idx].embedding = Some(embedding);
+                            current_idx += 1;
+                        }
+                    } else {
+                        current_idx += chunk.len();
                     }
-                    crate::trace!(2, verbose, "    embedded {} segments in {:.2?}", all_texts.len(), embed_start.elapsed());
                 }
+                crate::trace!(2, verbose, "    embedded {} segments in {:.2?}", all_texts.len(), embed_start.elapsed());
             }
 
             // Save new blobs and update manifest after embedding

@@ -285,6 +285,7 @@ impl<'a> SearchEnvironment<'a> {
     }
 
     pub fn search(&self, query: &str, limit: usize, verbose: u8) -> Result<SearchResponse> {
+        crate::trace!(1, verbose, "→ search query: '{}'", query);
         let candidates = self.service.execute(&self.plan, query, &self.prepared, limit, verbose)?;
 
         let results = candidates
