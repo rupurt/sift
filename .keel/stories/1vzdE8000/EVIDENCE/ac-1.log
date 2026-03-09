@@ -1,0 +1,63 @@
+---
+recorded_at: 2026-03-09T09:49:11.805461526-07:00
+command: cargo run -- bench quality --strategy page-index --corpus /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs --qrels /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs/qrels/test.tsv
+---
+{
+  "metadata": {
+    "strategy": "page-index",
+    "plan": {
+      "name": "page-index",
+      "query_expansion": "None",
+      "retrievers": [
+        "Bm25",
+        "Phrase",
+        "SegmentVector"
+      ],
+      "fusion": "Rrf",
+      "reranking": "None"
+    },
+    "baseline_strategy": "bm25",
+    "champion_strategy": "page-index",
+    "command": "/home/alex/.cache/cargo-target/sift/debug/sift bench quality --strategy page-index --corpus /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs --qrels /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs/qrels/test.tsv",
+    "git_sha": "1992f13621d85ebf3cf1ceffef9e8318242851bc",
+    "corpus_documents": 6,
+    "corpus_bytes": 232,
+    "segment_strategy": "structure-aware",
+    "segment_count": 6,
+    "hardware": {
+      "os": "linux",
+      "arch": "x86_64",
+      "logical_cores": 48,
+      "cpu_brand": "AMD Ryzen Threadripper 3960X 24-Core Processor",
+      "total_memory_bytes": 130380300288
+    },
+    "dense_model": "sentence-transformers/all-MiniLM-L6-v2",
+    "dense_revision": "main",
+    "dense_max_length": 40,
+    "shortlist": null
+  },
+  "metrics": {
+    "ndcg_at_10": 1.0,
+    "mrr_at_10": 1.0,
+    "recall_at_10": 1.0
+  },
+  "baseline_metrics": {
+    "ndcg_at_10": 1.0,
+    "mrr_at_10": 1.0,
+    "recall_at_10": 1.0
+  },
+  "champion_metrics": {
+    "ndcg_at_10": 1.0,
+    "mrr_at_10": 1.0,
+    "recall_at_10": 1.0
+  },
+  "delta": {
+    "ndcg_at_10": 0.0,
+    "mrr_at_10": 0.0,
+    "recall_at_10": 0.0
+  }
+}
+
+--- stderr ---
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.14s
+     Running `/home/alex/.cache/cargo-target/sift/debug/sift bench quality --strategy page-index --corpus /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs --qrels /home/alex/workspace/rupurt/sift/tests/fixtures/rich-docs/qrels/test.tsv`

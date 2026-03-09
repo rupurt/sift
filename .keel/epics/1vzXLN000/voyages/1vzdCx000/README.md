@@ -25,13 +25,13 @@ started_at: 2026-03-09T09:29:28
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 3/5 stories complete
+**Progress:** 4/5 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
 | [Model Layered Search Plans](../../../../stories/1vzdDJ000/README.md) | feat | done |
 | [Add Query Expansion And Phrase Retrieval](../../../../stories/1vzdDn000/README.md) | feat | done |
 | [Add Fusion And Reranking Layers](../../../../stories/1vzdDu000/README.md) | feat | done |
-| [Add Named Hybrid Strategy Presets](../../../../stories/1vzdE0000/README.md) | feat | backlog |
+| [Add Named Hybrid Strategy Presets](../../../../stories/1vzdE0000/README.md) | feat | done |
 | [Benchmark Strategies Against Baseline And Champion](../../../../stories/1vzdE8000/README.md) | feat | backlog |
 <!-- END GENERATED -->

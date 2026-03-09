@@ -2,12 +2,14 @@
 id: 1vzdE0000
 title: Add Named Hybrid Strategy Presets
 type: feat
-status: in-progress
+status: done
 created_at: 2026-03-09T09:12:56
-updated_at: 2026-03-09T09:43:04
+updated_at: 2026-03-09T09:43:35
 scope: 1vzXLN000/1vzdCx000
 index: 8
 started_at: 2026-03-09T09:43:04
+submitted_at: 2026-03-09T09:43:35
+completed_at: 2026-03-09T09:43:35
 ---
 
 # Add Named Hybrid Strategy Presets

@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T09:49:11.813668342-07:00
+mode: manual
+---
+BenchmarkMetadata in src/bench.rs captures all required fields including the SearchPlan.
