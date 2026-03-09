@@ -32,10 +32,8 @@
 
         sharedInputs = [
           rust
-          pkgs.pkg-config
           pkgs.just
           pkgs.cargo-nextest
-          pkgs.openssl
           keelPkg
         ];
 
