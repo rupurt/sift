@@ -124,23 +124,21 @@ Sift can be configured via a `sift.toml` file. See [CONFIGURATION.md](CONFIGURAT
 
 ## Evaluation And Benchmarks
 
-The evaluation loop uses the exact same ranking pipeline as normal search.
+The evaluation loop uses the exact same ranking pipeline as normal search. 
 
+See [BENCH.md](BENCH.md) for details on running quality and latency measurements, and [EVALS.md](EVALS.md) for a guide on managing evaluation datasets.
+
+### Quick Start
 Download and materialize the SciFact evaluation corpus:
 
 ```bash
-sift eval download scifact
-sift eval materialize scifact
+just bench prepare
 ```
 
-Measure hybrid quality against BM25:
+Measure all strategies:
 
 ```bash
-sift bench quality \
-  --strategy hybrid \
-  --baseline bm25 \
-  --corpus ~/.cache/sift/eval/scifact-materialized \
-  --qrels ~/.cache/sift/eval/scifact/qrels/test.tsv
+just bench all
 ```
 
 ## License
