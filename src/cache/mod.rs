@@ -1,6 +1,8 @@
 pub mod model;
+pub mod store;
 
 pub use model::*;
+pub use store::*;
 
 use anyhow::{Result, bail};
 use directories::ProjectDirs;

@@ -18,8 +18,8 @@ created_at: 2026-03-09T11:52:42
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 0/3 stories done
+**Progress:** 0/1 voyages complete, 2/3 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Incremental File Caching](voyages/1vzfjD000/) | in-progress | 0/3 |
+| [Incremental File Caching](voyages/1vzfjD000/) | in-progress | 2/3 |
 <!-- END GENERATED -->

@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T11:58:41.735413133-07:00
+mode: manual
+---
+hash_file implemented in store.rs using blake3

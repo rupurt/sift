@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T11:58:41.758421467-07:00
+mode: manual
+---
+fs2 exclusive lock used in Manifest::save
