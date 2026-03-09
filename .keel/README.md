@@ -5,12 +5,12 @@
 
 ## Bearings
 
-| Bearing | Status | Survey | Assessment | Laid |
-|---------|--------|--------|------------|------|
-| [Raw Document Retrieval Architecture Research](bearings/1vzJVa000/) | laid | ✓ | ✓ | ✓ |
-| [Rich Document Extraction Support](bearings/1vzMXf000/) | laid | ✓ | ✓ | ✓ |
-| [True Hybrid Retrieval Architecture](bearings/1vzSne000/) | laid | ✓ | ✓ | ✓ |
-| [Recover Hybrid Retrieval Viability](bearings/1vzXLN000/) | laid | ✓ | ✓ | ✓ |
+| Bearing | Status | Evidence | Assessment | Readiness | EV | Laid |
+|---------|--------|----------|------------|-----------|----|------|
+| [Raw Document Retrieval Architecture Research](bearings/1vzJVa000/) | laid | ✓ | ✓ | decision-ready | 3.47 | ✓ |
+| [Rich Document Extraction Support](bearings/1vzMXf000/) | laid | ✓ | ✓ | decision-ready | 3.34 | ✓ |
+| [True Hybrid Retrieval Architecture](bearings/1vzSne000/) | laid | ✓ | ✓ | decision-ready | 2.59 | ✓ |
+| [Composable Search Strategy Architecture](bearings/1vzXLN000/) | laid | ✓ | ✓ | decision-ready | 3.31 | ✓ |
 
 ## Epics
 
@@ -38,11 +38,15 @@
 |--------|--------|
 | [Implement Rich Document Extractors](epics/1vzMXf000/voyages/1vzMd0000/) | done |
 
-### [True Hybrid Retrieval Architecture](epics/1vzSne000/) (active)
+### [True Hybrid Retrieval Architecture](epics/1vzSne000/) (done)
 
 | Voyage | Status |
 |--------|--------|
-| [Structure-Aware True Hybrid Retrieval](epics/1vzSne000/voyages/1vzSy6000/) | in-progress |
+| [Structure-Aware True Hybrid Retrieval](epics/1vzSne000/voyages/1vzSy6000/) | done |
 
-### [Recover Hybrid Retrieval Viability](epics/1vzXLN000/) (draft)
+### [Composable Search Strategy Architecture](epics/1vzXLN000/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Layered Search Strategy Foundation](epics/1vzXLN000/voyages/1vzdCx000/) | planned |
 

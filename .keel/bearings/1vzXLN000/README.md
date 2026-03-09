@@ -1,13 +1,13 @@
 ---
 id: 1vzXLN000
-title: Recover Hybrid Retrieval Viability
+title: Composable Search Strategy Architecture
 status: laid
 created_at: 2026-03-09T02:56:09
 index: 4
 laid_at: 2026-03-09T03:20:00
 ---
 
-# Recover Hybrid Retrieval Viability
+# Composable Search Strategy Architecture
 
 ## Documents
 

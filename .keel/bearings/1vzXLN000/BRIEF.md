@@ -1,39 +1,73 @@
-# Recover Hybrid Retrieval Viability — Brief
+# Composable Search Strategy Architecture — Brief
 
 ## Hypothesis
 
-The current structure-aware true-hybrid design is functionally correct but will
-not reach the product latency/quality targets without changing the retrieval
-architecture. The benchmark evidence likely justifies planning an explicit
-indexing or precomputation step that was previously out of scope.
+Sift should stop treating search as one hard-coded engine branch and instead
+model search as a layered, composable strategy pipeline:
+
+1. query expansion,
+2. parallel retrieval,
+3. result fusion,
+4. optional reranking.
+
+Under that model, `bm25` remains the stable baseline strategy, multiple named
+hybrid presets become first-class, and `hybrid` becomes a configurable alias to
+the current champion preset. This architecture can absorb BM25, phrase and
+proximity retrieval, structure-aware vector retrieval, optional dense or LLM
+reranking, and PageIndex-inspired composite strategies without pretending that
+vector search is the only or best answer.
 
 ## Problem Space
 
-The completed true-hybrid voyage replaced shortlist reranking with BM25 plus
-full-corpus vector retrieval over structure-aware segments. The resulting CLI
-works end to end, but the recorded SciFact sample evidence shows two critical
-problems:
+The completed true-hybrid voyage proved two things at once:
 
-- hybrid latency is orders of magnitude above the 200 ms target;
-- hybrid quality did not beat BM25 on the sampled evaluation slice.
+- independent BM25 + vector retrieval over structure-aware segments is a real
+  retrieval shape that fits sift's thesis;
+- a no-index exact full-corpus vector path is too slow to be the obvious
+  champion strategy.
 
-The repo now needs a recovery direction that preserves the local single-binary
-product thesis while addressing the proven performance and quality gap.
+That evidence makes the broader product question unavoidable. The next problem
+is not just "make the current hybrid engine faster." The next problem is "what
+is the right retrieval platform for sift?"
+
+Right now sift still lacks first-class architecture for:
+
+- query expansion,
+- parallel lexical and semantic search,
+- multiple named hybrid strategies,
+- fusion and reranking as independent layers,
+- fair benchmarking against both a stable baseline and a moving best-known
+  strategy.
+
+The product direction now also includes a maintainability constraint: the search
+domain should be structured with DDD and hexagonal boundaries so new strategies
+do not keep leaking across CLI, benchmark, and runtime code paths.
 
 ## Success Criteria
 
-This research is valuable if it turns the benchmark shortfall into a concrete,
+This research is valuable if it turns that product-direction question into a
 board-ready architecture decision.
 
-- [ ] Identify which current constraints are now proven too expensive in
-      practice and which still need to hold.
-- [ ] Recommend the next recovery direction with explicit tradeoffs across
-      latency, quality, complexity, and product constraints.
+- [ ] Define the layered search architecture sift should use going forward:
+      query expansion, retrieval, fusion, and reranking.
+- [ ] Clarify the current fusion and reranking behavior and recommend the next
+      default algorithms.
+- [ ] Compare vector search with other useful retrieval techniques such as
+      phrase and proximity retrieval rather than treating vector search as the
+      only answer.
+- [ ] Determine what PageIndex ideas fit sift now, and what remains a later
+      agentic/tree-search follow-up.
+- [ ] Produce a concrete epic/voyage recommendation that makes BM25 the stable
+      baseline and benchmarks every candidate strategy against both BM25 and
+      the current champion preset.
 
 ## Open Questions
 
-- Is a persisted local embedding sidecar now justified by the benchmark data?
-- Would an in-memory ANN/session index recover enough performance without
-  violating the current UX goals?
-- Is the quality regression primarily a retrieval-architecture issue, a
-  segmentation issue, or a model/chunking issue?
+- Should the first reranking abstraction ship only with `none`, or should it
+  also expose a concrete dense reranker immediately?
+- Should a future LLM reranker be local-only, remote-optional, or explicitly
+  deferred until the strategy architecture is stable?
+- How far should the first PageIndex-inspired preset go before the product
+  truly needs LLM-guided tree navigation?
+- Does the champion preset live in static code configuration first, or does it
+  need a richer user-configurable registry immediately?

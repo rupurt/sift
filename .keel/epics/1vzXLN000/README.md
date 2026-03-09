@@ -1,14 +1,15 @@
 ---
 id: 1vzXLN000
-title: Recover Hybrid Retrieval Viability
+title: Composable Search Strategy Architecture
 created_at: 2026-03-09T02:57:41
 ---
 
-# Recover Hybrid Retrieval Viability
+# Composable Search Strategy Architecture
 
-> Recover sift's hybrid retrieval quality and latency after the completed
-> true-hybrid voyage proved the current exact no-index design is functionally
-> correct but operationally non-viable for the target benchmark envelope.
+> Reframe sift as a composable search-strategy platform with layered query
+> expansion, retrieval, fusion, and reranking, multiple named presets, a
+> champion-backed `hybrid` alias, and benchmark discipline against BM25 and the
+> current best known strategy.
 
 ## Documents
 
@@ -20,7 +21,8 @@ created_at: 2026-03-09T02:57:41
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/0 voyages complete, 0/0 stories done
+**Progress:** 0/1 voyages complete, 0/5 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
+| [Layered Search Strategy Foundation](voyages/1vzdCx000/) | planned | 0/5 |
 <!-- END GENERATED -->
