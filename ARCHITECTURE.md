@@ -18,6 +18,17 @@ Sift leverages multi-core parallelism via the `rayon` crate during two critical 
 
 This parallel execution, combined with the heuristic cache, allows `sift` to scale to large repositories while maintaining sub-second search latency.
 
+## Observability & Performance
+
+### Structured Telemetry
+Sift uses the `tracing` crate to provide a detailed view of search execution.
+- **Spans:** Major search phases (Expansion, Retrieval, Fusion, Reranking) are wrapped in spans, enabling waterfall visualization of latency.
+- **Cache Telemetry:** The `Telemetry` module uses atomic counters to track the effectiveness of the asset pipeline across multi-threaded operations.
+
+### Performance Guardrails
+- **Micro-benchmarks:** Crucial low-level functions (e.g., `tokenize`) are protected by `criterion` benchmarks in the `benches/` directory.
+- **Flamegraphs:** Integration with `cargo-flamegraph` allows for deep inspection of CPU bottlenecks.
+
 ## Hexagonal Boundaries
 
 ### 1. The Domain (`src/search/domain.rs`)

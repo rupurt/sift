@@ -39,6 +39,25 @@ just bench baseline --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/
 
 ---
 
+## Performance Profiling
+
+### Micro-benchmarks (`criterion`)
+We use `criterion` for high-precision measurement of hot-path functions like tokenization and scoring.
+
+```bash
+just bench-micro
+```
+
+### Flamegraphs
+Identify CPU bottlenecks and visualize where time is being spent in the search pipeline.
+
+```bash
+# Requires cargo-flamegraph installed
+just bench-flamegraph all --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv
+```
+
+---
+
 ## Direct CLI Usage
 
 For more control, you can use the `sift bench` subcommand directly.
@@ -65,7 +84,7 @@ sift bench latency \
 
 ## Debugging Benchmarks (`--verbose`)
 
-Benchmarks support the standard verbosity flags (`-v`, `-vv`, `-vvv`). You can pass these through `just`:
+Benchmarks support the standard verbosity flags (`-v`, `-vv`, `-vvv`). Sift uses the `tracing` crate to provide structured spans and cache telemetry.
 
 ```bash
 just bench all --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv -v
@@ -77,3 +96,4 @@ just bench all --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cach
 - **MRR@10:** Measures how high the first relevant document appears.
 - **Recall@10:** Measures the percentage of relevant documents found in the top 10.
 - **p50 (ms):** The median search latency.
+- **Cache Hits:** The "Cache Hits" column in `bench all` shows the percentage of files/segments that hit the heuristic, blob, and embedding caches respectively (e.g., `100/100/100%`).
