@@ -1,5 +1,5 @@
 quality corpus=".cache/eval/scifact-files" qrels=".cache/eval/scifact/qrels/test.tsv" engine="hybrid" baseline="bm25":
-    cargo run --release -- bench quality --engine "{{engine}}" --baseline "{{baseline}}" --corpus "{{corpus}}" --qrels "{{qrels}}"
+    corpus_path=$(case "{{corpus}}" in /*) printf "%s" "{{corpus}}" ;; *) printf "%s/%s" "{{justfile_directory()}}" "{{corpus}}" ;; esac); qrels_path=$(case "{{qrels}}" in /*) printf "%s" "{{qrels}}" ;; *) printf "%s/%s" "{{justfile_directory()}}" "{{qrels}}" ;; esac); cargo run --release -- bench quality --engine "{{engine}}" --baseline "{{baseline}}" --corpus "$corpus_path" --qrels "$qrels_path"
 
 latency corpus=".cache/eval/scifact-files" queries=".cache/eval/scifact-files/test-queries.tsv" engine="hybrid":
-    cargo run --release -- bench latency --engine "{{engine}}" --corpus "{{corpus}}" --queries "{{queries}}"
+    corpus_path=$(case "{{corpus}}" in /*) printf "%s" "{{corpus}}" ;; *) printf "%s/%s" "{{justfile_directory()}}" "{{corpus}}" ;; esac); queries_path=$(case "{{queries}}" in /*) printf "%s" "{{queries}}" ;; *) printf "%s/%s" "{{justfile_directory()}}" "{{queries}}" ;; esac); cargo run --release -- bench latency --engine "{{engine}}" --corpus "$corpus_path" --queries "$queries_path"

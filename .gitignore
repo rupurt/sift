@@ -29,3 +29,7 @@ target
 .envrc
 result
 result-*
+
+# Local evaluation caches
+/.cache/
+/.keel/.cache/
