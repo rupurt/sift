@@ -10,6 +10,7 @@
 | [Raw Document Retrieval Architecture Research](bearings/1vzJVa000/) | laid | ✓ | ✓ | ✓ |
 | [Rich Document Extraction Support](bearings/1vzMXf000/) | laid | ✓ | ✓ | ✓ |
 | [True Hybrid Retrieval Architecture](bearings/1vzSne000/) | laid | ✓ | ✓ | ✓ |
+| [Recover Hybrid Retrieval Viability](bearings/1vzXLN000/) | laid | ✓ | ✓ | ✓ |
 
 ## Epics
 
@@ -42,4 +43,6 @@
 | Voyage | Status |
 |--------|--------|
 | [Structure-Aware True Hybrid Retrieval](epics/1vzSne000/voyages/1vzSy6000/) | in-progress |
+
+### [Recover Hybrid Retrieval Viability](epics/1vzXLN000/) (draft)
 

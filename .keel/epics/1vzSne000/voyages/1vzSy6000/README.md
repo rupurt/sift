@@ -1,7 +1,7 @@
 ---
 id: 1vzSy6000
 title: Structure-Aware True Hybrid Retrieval
-status: in-progress
+status: done
 epic: 1vzSne000
 created_at: 2026-03-08T22:15:50
 index: 1
@@ -25,12 +25,12 @@ started_at: 2026-03-09T01:06:54
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 3/4 stories complete
+**Progress:** 4/4 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
 | [Add Structure-Aware Segment Model](../../../../stories/1vzSvm000/README.md) | feat | done |
 | [Add Full-Corpus Segment Vector Retrieval](../../../../stories/1vzSw1000/README.md) | feat | done |
 | [Fuse BM25 And Vector Retrieval In Hybrid Search](../../../../stories/1vzSwD000/README.md) | feat | done |
-| [Benchmark True Hybrid Retrieval](../../../../stories/1vzSwK000/README.md) | feat | backlog |
+| [Benchmark True Hybrid Retrieval](../../../../stories/1vzSwK000/README.md) | feat | done |
 <!-- END GENERATED -->

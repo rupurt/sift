@@ -3,10 +3,11 @@ id: 1vzSwK000
 title: Benchmark True Hybrid Retrieval
 type: feat
 scope: 1vzSne000/1vzSy6000
-status: in-progress
+status: done
 created_at: 2026-03-08T22:14:00
-updated_at: 2026-03-09T01:29:34
+updated_at: 2026-03-09T02:54:59
 started_at: 2026-03-09T01:29:34
+completed_at: 2026-03-09T02:54:59
 ---
 
 # Benchmark True Hybrid Retrieval
