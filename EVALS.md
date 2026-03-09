@@ -10,7 +10,7 @@ Sift uses standard Information Retrieval (IR) evaluation datasets to ensure sear
 
 ## The SciFact Dataset
 
-Currently, Sift primarily uses the SciFact dataset for evaluation.
+Currently, Sift primarily uses the SciFact dataset for evaluation. All files are stored in your standard user cache directory (e.g., `~/.cache/sift/eval` on Linux).
 
 ### Download
 Downloads the dataset from HuggingFace to `~/.cache/sift/eval/scifact`.
