@@ -54,6 +54,69 @@ Download the latest pre-built binaries and installers for your platform from the
 - **macOS:** `.tar.gz` archives plus the cross-platform shell installer
 - **Windows:** `.zip` archives, `.msi`, and the PowerShell installer
 
+## Embedded Library
+
+`sift` can also be embedded from another Rust project. The supported library
+contract lives at the crate root:
+
+- `Sift`, `SiftBuilder`
+- `SearchInput`, `SearchOptions`
+- `Retriever`, `Fusion`, `Reranking`
+- `SearchResponse`, `SearchHit`, `ScoreConfidence`
+
+Everything under `sift::internal` exists to support the bundled executable,
+benchmarks, and repository-internal tests. It is not part of the supported
+embedding contract and may change without notice.
+
+### Add The Dependency
+
+Use the git repository until a versioned registry release is part of your
+delivery path:
+
+```toml
+[dependencies]
+sift = { git = "https://github.com/rupurt/sift" }
+```
+
+For local development against a checked-out copy:
+
+```toml
+[dependencies]
+sift = { path = "../sift" }
+```
+
+### Minimal Embedding Example
+
+```rust
+use sift::{Retriever, Reranking, SearchInput, SearchOptions, Sift};
+
+fn main() -> anyhow::Result<()> {
+    let sift = Sift::builder().build();
+
+    let response = sift.search(
+        SearchInput::new("./docs", "hybrid search")
+            .with_options(
+                SearchOptions::default()
+                    .with_strategy("bm25")
+                    .with_retrievers(vec![Retriever::Bm25])
+                    .with_reranking(Reranking::None)
+                    .with_limit(5)
+                    .with_shortlist(5),
+            ),
+    )?;
+
+    for hit in response.results {
+        println!("{} {}", hit.rank, hit.path.display());
+    }
+
+    Ok(())
+}
+```
+
+Embedders should consume `SearchResponse` directly and own their own rendering.
+Helpers under `sift::internal` are executable support code, not stable library
+API.
+
 ## How Sift Works
 
 At runtime, `sift` orchestrates a high-performance asset pipeline:

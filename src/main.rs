@@ -3,17 +3,22 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
-use sift::cache::cache_dir;
-use sift::config::Config;
-use sift::dense::DenseModelSpec;
-use sift::eval::{
-    LatencyEvaluationRequest, QualityEvaluationRequest, download_scifact_dataset,
-    materialize_scifact_dir, render_comparative_report, run_comparative_evaluation,
-    run_latency_evaluation, run_quality_evaluation,
+use sift::internal::{
+    cache::cache_dir,
+    config::{Config, Ignore},
+    dense::DenseModelSpec,
+    eval::{
+        LatencyEvaluationRequest, QualityEvaluationRequest, download_scifact_dataset,
+        materialize_scifact_dir, render_comparative_report, run_comparative_evaluation,
+        run_latency_evaluation, run_quality_evaluation,
+    },
+    search::{
+        OutputFormat,
+        adapters::qwen::{DEFAULT_QWEN_MODEL_ID, DEFAULT_QWEN_REVISION, QwenModelSpec},
+        render_search_response,
+    },
+    system::Telemetry,
 };
-use sift::search::adapters::qwen::{DEFAULT_QWEN_MODEL_ID, DEFAULT_QWEN_REVISION, QwenModelSpec};
-use sift::search::{OutputFormat, render_search_response};
-use sift::system::Telemetry;
 use sift::{Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
@@ -395,7 +400,7 @@ fn main() -> Result<()> {
 
     let command_line = std::env::args().collect::<Vec<_>>().join(" ");
     let config = Config::load().unwrap_or_default();
-    let ignore = sift::config::Ignore::load();
+    let ignore = Ignore::load();
     let telemetry = Arc::new(Telemetry::new());
     let query_cache = Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
 

@@ -1,0 +1,9 @@
+---
+recorded_at: 2026-03-10T16:02:53.390470584-07:00
+command: sh -lc 'cd /home/alex/workspace/rupurt/sift && rg -n "git = \"https://github.com/rupurt/sift\"|path = \"../sift\"|Minimal Embedding Example|let response = sift.search|SearchInput::new" README.md'
+---
+78:sift = { git = "https://github.com/rupurt/sift" }
+85:sift = { path = "../sift" }
+88:### Minimal Embedding Example
+96:    let response = sift.search(
+97:        SearchInput::new("./docs", "hybrid search")

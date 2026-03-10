@@ -1,6 +1,5 @@
 use criterion::{Criterion, criterion_group, criterion_main};
-use sift::search::tokenize;
-use sift::vector::dot_product;
+use sift::internal::{search::tokenize, vector::dot_product};
 use std::hint::black_box;
 
 fn bench_tokenize(c: &mut Criterion) {

@@ -1,0 +1,9 @@
+---
+recorded_at: 2026-03-10T16:02:46.937142553-07:00
+command: sh -lc 'cd /home/alex/workspace/rupurt/sift && rg -n "## Embedded Library|sift::internal|supported library contract" README.md && rg -n "Supported embedded API|Everything under" src/lib.rs'
+---
+57:## Embedded Library
+67:Everything under `sift::internal` exists to support the bundled executable,
+117:Helpers under `sift::internal` are executable support code, not stable library
+3://! Supported embedded API:
+9://! Everything under [`internal`] exists to support the bundled executable,

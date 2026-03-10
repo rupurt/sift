@@ -1,5 +1,9 @@
-use sift::dense::DenseModelSpec;
-use sift::search::{Embedder, LocalFileCorpusRepository, SearchRequest, run_search};
+use sift::internal::{
+    dense::DenseModelSpec,
+    search::{Embedder, LocalFileCorpusRepository, SearchRequest, run_search},
+    system::Telemetry,
+    vector::dot_product,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::RwLock;
@@ -33,7 +37,7 @@ fn test_query_embedding_cache_avoids_redundant_calls() {
         call_count: call_count.clone(),
     });
     let query_cache = Arc::new(RwLock::new(HashMap::new()));
-    let telemetry = Arc::new(sift::system::Telemetry::new());
+    let telemetry = Arc::new(Telemetry::new());
 
     let request = SearchRequest {
         strategy: "vector".to_string(),
@@ -91,7 +95,7 @@ fn test_dot_product_consistency() {
     let b = vec![1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1];
 
     let expected: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let actual = sift::vector::dot_product(&a, &b);
+    let actual = dot_product(&a, &b);
 
     assert!(
         (actual - expected).abs() < 1e-6,

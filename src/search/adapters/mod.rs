@@ -435,4 +435,5 @@ mod tests {
 
 pub mod cli;
 pub mod qwen;
+#[allow(unused_imports)]
 pub use cli::*;

@@ -1,0 +1,8 @@
+---
+recorded_at: 2026-03-10T16:03:01.304514857-07:00
+command: sh -lc 'cd /home/alex/workspace/rupurt/sift && cargo check --all-targets && rg -n "^pub mod internal" src/lib.rs && ! rg -n "^pub mod (cache|config|dense|eval|extract|hybrid|search|segment|system|vector);" src/lib.rs'
+---
+31:pub mod internal {
+
+--- stderr ---
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s
