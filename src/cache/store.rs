@@ -23,13 +23,13 @@ pub fn get_file_heuristics(path: &Path) -> Result<CacheEntry> {
     {
         use std::os::unix::fs::MetadataExt;
 
-        return Ok(CacheEntry {
+        Ok(CacheEntry {
             inode: meta.ino(),
             mtime_secs: meta.mtime(),
             mtime_nanos: meta.mtime_nsec() as u32,
             size: meta.size(),
             blake3_hash: String::new(), // Will be populated if needed
-        });
+        })
     }
 
     #[cfg(windows)]
@@ -37,14 +37,14 @@ pub fn get_file_heuristics(path: &Path) -> Result<CacheEntry> {
         use std::os::windows::fs::MetadataExt;
 
         let last_write_time = meta.last_write_time();
-        return Ok(CacheEntry {
+        Ok(CacheEntry {
             // Use creation time as the closest stable file identity available in std on Windows.
             inode: meta.creation_time(),
             mtime_secs: (last_write_time / 10_000_000) as i64,
             mtime_nanos: ((last_write_time % 10_000_000) * 100) as u32,
             size: meta.file_size(),
             blake3_hash: String::new(), // Will be populated if needed
-        });
+        })
     }
 
     #[cfg(not(any(unix, windows)))]
