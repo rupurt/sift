@@ -2,6 +2,17 @@
 
 This project uses [cargo-dist](https://opensource.axodotdev.com/cargo-dist/) to automate cross-platform releases. Binaries and installers for Linux, macOS, and Windows are automatically built and uploaded to GitHub Releases when a version tag is pushed.
 
+## How to Install
+
+### Homebrew (macOS and Linux)
+
+```bash
+brew tap rupurt/homebrew-tap
+brew install sift
+```
+
+---
+
 ## How to Perform a Release
 
 Follow these steps to release a new version of `sift`:

@@ -19,8 +19,9 @@ index: 4
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 1/1 voyages complete, 2/2 stories done
+**Progress:** 1/2 voyages complete, 2/3 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
 | [Setup Cargo Dist And Release Workflow](voyages/VDQ8Pufmv/) | done | 2/2 |
+| [Add Homebrew Platform Support](voyages/VDQ9bZoZV/) | in-progress | 0/1 |
 <!-- END GENERATED -->
