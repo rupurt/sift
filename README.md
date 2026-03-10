@@ -13,6 +13,9 @@ The core idea is simple: point `sift` at a directory, extract text on demand,
 and run a layered search pipeline (Expansion, Retrieval, Fusion, Reranking). 
 There is no external database, no daemon, and no background indexing service.
 
+For the project background and design rationale, read the introductory post:
+[`Sift: Local Hybrid Search Without the Infrastructure Tax`](https://www.alexdk.com/blog/introducing-sift).
+
 ## Current Contract
 
 - **Single Rust Binary:** No external database, daemon, or long-running service.
