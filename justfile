@@ -68,8 +68,8 @@ build-static:
         exit 1; \
     fi
 
-search *args:
-    cargo run --release -- search {{args}}
+search features="" *args:
+    cargo run --release --features "{{features}}" -- search {{args}}
 
 config:
     cargo run --release -- config

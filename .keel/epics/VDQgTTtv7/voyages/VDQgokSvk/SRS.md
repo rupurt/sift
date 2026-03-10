@@ -19,18 +19,18 @@
 <!-- BEGIN FUNCTIONAL_REQUIREMENTS -->
 | ID | Requirement | Source | Scope | Priority | Verification |
 |----|-------------|--------|-------|----------|--------------|
-| SRS-01 | `extract_path` must detect image extensions and route to OCR. | FR-01 | SCOPE-01, SCOPE-03 | must | board: src/extract.rs |
-| SRS-02 | The OCR engine must use Tesseract via `tesseract-rs`. | FR-01 | SCOPE-02 | must | board: Cargo.toml |
-| SRS-04 | Extracted text from images must be segmented by the existing pipeline. | FR-01 | SCOPE-01 | must | manual: search test |
+| SRS-01 | `extract_path` must detect image extensions and route to OCR. | FR-01 | SCOPE-01, SCOPE-03 | must | manual: Inspect src/extract.rs |
+| SRS-02 | The OCR engine must use Tesseract via `tesseract-rs`. | FR-01 | SCOPE-02 | must | manual: Inspect Cargo.toml |
+| SRS-04 | Extracted text from images must be segmented by the existing pipeline. | FR-01 | SCOPE-01 | must | command: cargo test --features ocr |
 <!-- END FUNCTIONAL_REQUIREMENTS -->
 
 <!-- BEGIN NON_FUNCTIONAL_REQUIREMENTS -->
 | ID | Requirement | Source | Scope | Priority | Verification |
 |----|-------------|--------|-------|----------|--------------|
-| SRS-03 | Image extraction must be available under a compile-time feature `ocr`. | NFR-01 | SCOPE-02 | should | board: Cargo.toml |
+| SRS-03 | Image extraction must be available under a compile-time feature `ocr`. | NFR-01 | SCOPE-02 | should | manual: Build test |
 <!-- END NON_FUNCTIONAL_REQUIREMENTS -->
 
 ## Success Criteria
-- [ ] Images are searchable by their text content.
-- [ ] No performance regression for non-image files.
-- [ ] Clean build with and without the `ocr` feature.
+- [x] Images are searchable by their text content.
+- [x] No performance regression for non-image files.
+- [x] Clean build with and without the `ocr` feature.

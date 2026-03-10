@@ -37,6 +37,7 @@
           pkgs.cargo-nextest
           pkgs.xz
           pkgs.zlib
+          pkgs.cmake
           keelPkg
         ];
 
@@ -47,7 +48,7 @@
 
         siftPkg = pkgs.rustPlatform.buildRustPackage {
           pname = "sift";
-          version = "0.1.0";
+          version = "0.2.0";
           src = ./.;
           cargoLock = {
             lockFile = ./Cargo.lock;
@@ -59,7 +60,7 @@
 
         siftStatic = pkgs.pkgsStatic.rustPlatform.buildRustPackage {
           pname = "sift-static";
-          version = "0.1.0";
+          version = "0.2.0";
           src = ./.;
           cargoLock = {
             lockFile = ./Cargo.lock;

@@ -15,6 +15,10 @@ pub enum SourceKind {
     Docx,
     Xlsx,
     Pptx,
+    Png,
+    Jpeg,
+    Tiff,
+    Bmp,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +38,8 @@ pub fn extract_path(path: &Path) -> Result<Option<ExtractedDocument>> {
         extract_pdf(&bytes)
     } else if let Some(source_kind) = office_source_kind(path) {
         extract_office(path, source_kind)
+    } else if let Some(source_kind) = image_source_kind(path) {
+        extract_image(path, source_kind)
     } else {
         let bytes = fs::read(path)
             .with_context(|| format!("failed to read document {}", path.display()))?;
@@ -57,6 +63,16 @@ fn office_source_kind(path: &Path) -> Option<SourceKind> {
         Some("docx") => Some(SourceKind::Docx),
         Some("xlsx") => Some(SourceKind::Xlsx),
         Some("pptx") => Some(SourceKind::Pptx),
+        _ => None,
+    }
+}
+
+fn image_source_kind(path: &Path) -> Option<SourceKind> {
+    match path.extension().and_then(|ext| ext.to_str()) {
+        Some("png") => Some(SourceKind::Png),
+        Some("jpg" | "jpeg") => Some(SourceKind::Jpeg),
+        Some("tiff" | "tif") => Some(SourceKind::Tiff),
+        Some("bmp") => Some(SourceKind::Bmp),
         _ => None,
     }
 }
@@ -93,4 +109,57 @@ fn extract_office(path: &Path, source_kind: SourceKind) -> Result<Option<Extract
         .with_context(|| format!("extract office text from {}", path.display()))?;
 
     Ok(Some(ExtractedDocument { text, source_kind }))
+}
+
+#[cfg(feature = "ocr")]
+fn extract_image(path: &Path, source_kind: SourceKind) -> Result<Option<ExtractedDocument>> {
+    let tesseract = tesseract_rs::TesseractAPI::new();
+    tesseract
+        .init(".", "eng")
+        .map_err(|e| anyhow::anyhow!("failed to initialize Tesseract: {}", e))?;
+
+    let text = tesseract
+        .process_pages(
+            path.to_str()
+                .ok_or_else(|| anyhow::anyhow!("invalid image path"))?,
+            None,
+            0,
+        )
+        .map_err(|e| anyhow::anyhow!("failed to extract text via OCR: {}", e))?;
+
+    Ok(Some(ExtractedDocument { text, source_kind }))
+}
+
+#[cfg(not(feature = "ocr"))]
+fn extract_image(path: &Path, _source_kind: SourceKind) -> Result<Option<ExtractedDocument>> {
+    tracing::warn!(
+        "OCR is disabled; skipping image file: {}",
+        path.display()
+    );
+    Ok(None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_image_source_kind() {
+        assert_eq!(image_source_kind(Path::new("test.png")), Some(SourceKind::Png));
+        assert_eq!(image_source_kind(Path::new("test.jpg")), Some(SourceKind::Jpeg));
+        assert_eq!(image_source_kind(Path::new("test.jpeg")), Some(SourceKind::Jpeg));
+        assert_eq!(image_source_kind(Path::new("test.tiff")), Some(SourceKind::Tiff));
+        assert_eq!(image_source_kind(Path::new("test.tif")), Some(SourceKind::Tiff));
+        assert_eq!(image_source_kind(Path::new("test.bmp")), Some(SourceKind::Bmp));
+        assert_eq!(image_source_kind(Path::new("test.txt")), None);
+    }
+
+    #[test]
+    #[cfg(not(feature = "ocr"))]
+    fn test_extract_path_skips_image_when_ocr_disabled() {
+        // We don't need the file to exist because it should hit the image check first
+        let result = extract_path(Path::new("test.png")).unwrap();
+        assert!(result.is_none());
+    }
 }

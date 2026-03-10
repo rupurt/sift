@@ -31,6 +31,9 @@ pub fn build_segments(
         SourceKind::Pdf => build_pdf_segments(text),
         SourceKind::Pptx => build_block_segments(text, "slide"),
         SourceKind::Xlsx => build_block_segments(text, "sheet"),
+        SourceKind::Png | SourceKind::Jpeg | SourceKind::Tiff | SourceKind::Bmp => {
+            build_block_segments(text, "image")
+        }
         SourceKind::Text | SourceKind::Html | SourceKind::Docx => {
             build_block_segments(text, "section")
         }
@@ -207,6 +210,9 @@ fn default_label(source_kind: SourceKind, ordinal: usize) -> String {
         SourceKind::Pdf => label_with_heading("page", ordinal, None),
         SourceKind::Pptx => label_with_heading("slide", ordinal, None),
         SourceKind::Xlsx => label_with_heading("sheet", ordinal, None),
+        SourceKind::Png | SourceKind::Jpeg | SourceKind::Tiff | SourceKind::Bmp => {
+            label_with_heading("image", ordinal, None)
+        }
         SourceKind::Text | SourceKind::Html | SourceKind::Docx => {
             label_with_heading("section", ordinal, None)
         }
@@ -253,6 +259,20 @@ mod tests {
             first.iter().map(segment_id).collect::<Vec<_>>(),
             second.iter().map(segment_id).collect::<Vec<_>>()
         );
+    }
+
+    #[test]
+    fn image_segments_have_correct_labels() {
+        let segments = build_segments(
+            "image-doc",
+            Path::new("screenshot.png"),
+            SourceKind::Png,
+            "# Text from OCR\n\nMore content here",
+        );
+
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].label, "image 1: Text from OCR");
+        assert!(segments[0].text.contains("More content here"));
     }
 
     fn segment_id(segment: &Segment) -> String {

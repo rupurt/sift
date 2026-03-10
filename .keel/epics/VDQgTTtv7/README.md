@@ -18,8 +18,8 @@ created_at: 2026-03-09T19:56:54
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 0/1 stories done
+**Progress:** 1/1 voyages complete, 1/1 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Implement Base OCR Support](voyages/VDQgokSvk/) | draft | 0/1 |
+| [Implement Base OCR Support](voyages/VDQgokSvk/) | done | 1/1 |
 <!-- END GENERATED -->

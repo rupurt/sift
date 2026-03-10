@@ -87,9 +87,9 @@
 |--------|--------|
 | [Instrumentation Foundation](epics/1vziaX000/voyages/1vzibo000/) | done |
 
-### [OCR and Binary Format Support Options](epics/VDQgTTtv7/) (draft)
+### [OCR and Binary Format Support Options](epics/VDQgTTtv7/) (done)
 
 | Voyage | Status |
 |--------|--------|
-| [Implement Base OCR Support](epics/VDQgTTtv7/voyages/VDQgokSvk/) | draft |
+| [Implement Base OCR Support](epics/VDQgTTtv7/voyages/VDQgokSvk/) | done |
 
