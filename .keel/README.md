@@ -13,6 +13,7 @@
 | [Composable Search Strategy Architecture](bearings/1vzXLN000/) | laid | ✓ | ✓ | decision-ready | 3.31 | ✓ |
 | [Zig-Style Global File Cache](bearings/1vzfew000/) | laid | ✓ | ✓ | decision-ready | 4.44 | ✓ |
 | [Comprehensive Performance Instrumentation](bearings/1vziaX000/) | laid | ✓ | ✓ | decision-ready | 6.56 | ✓ |
+| [Embeddable Library Packaging Research](bearings/VDVQurZER/) | laid | ✓ | ✓ | decision-ready | 4.86 | ✓ |
 
 ## Epics
 
@@ -85,4 +86,10 @@
 | Voyage | Status |
 |--------|--------|
 | [Instrumentation Foundation](epics/1vziaX000/voyages/1vzibo000/) | done |
+
+### [Embeddable Library Packaging Research](epics/VDVQurZER/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Library Facade and Packaging Cutover](epics/VDVQurZER/voyages/VDVRkNjgH/) | in-progress |
 
