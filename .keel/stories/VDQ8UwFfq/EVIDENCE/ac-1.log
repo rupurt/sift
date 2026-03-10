@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T17:41:16.313256008-07:00
+mode: manual
+---
+Added [package.metadata.dist] section to Cargo.toml

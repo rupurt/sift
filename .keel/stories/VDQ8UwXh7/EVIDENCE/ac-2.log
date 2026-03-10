@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T17:41:48.101562609-07:00
+mode: manual
+---
+Workflow is configured to trigger on 'v*' tags
