@@ -55,27 +55,20 @@ pub fn load_materialized_corpus(
 
     let mut files_to_process = Vec::new();
 
-    for entry in WalkDir::new(corpus_dir).sort_by_file_name() {
-        match entry {
-            Ok(entry) => {
-                if !entry.file_type().is_file() {
-                    continue;
-                }
-
-                if is_evaluation_metadata_file(corpus_dir, entry.path()) {
-                    continue;
-                }
-
-                if let Some(ignore) = ignore {
-                    if ignore.is_ignored(entry.path()) {
-                        continue;
-                    }
-                }
-
-                files_to_process.push(entry.path().to_path_buf());
-            }
-            Err(_) => {}
+    for entry in WalkDir::new(corpus_dir).sort_by_file_name().into_iter().flatten() {
+        if !entry.file_type().is_file() {
+            continue;
         }
+
+        if is_evaluation_metadata_file(corpus_dir, entry.path()) {
+            continue;
+        }
+
+        if let Some(ignore) = ignore && ignore.is_ignored(entry.path()) {
+            continue;
+        }
+
+        files_to_process.push(entry.path().to_path_buf());
     }
 
     let mut documents = Vec::new();
@@ -161,16 +154,12 @@ pub fn load_search_corpus(
         }
     } else if root.is_dir() {
         let walk_start = std::time::Instant::now();
-        for entry in WalkDir::new(root).sort_by_file_name() {
-            if let Ok(entry) = entry {
-                if let Some(ignore) = ignore {
-                    if ignore.is_ignored(entry.path()) {
-                        continue;
-                    }
-                }
-                if entry.file_type().is_file() {
-                    files_to_process.push(entry.path().to_path_buf());
-                }
+        for entry in WalkDir::new(root).sort_by_file_name().into_iter().flatten() {
+            if let Some(ignore) = ignore && ignore.is_ignored(entry.path()) {
+                continue;
+            }
+            if entry.file_type().is_file() {
+                files_to_process.push(entry.path().to_path_buf());
             }
         }
         tracing::info!("directory walk found {} files in {:.2?}", files_to_process.len(), walk_start.elapsed());
@@ -197,23 +186,23 @@ pub fn load_search_corpus(
         };
 
         // Fast path: heuristics match manifest
-        if let Some(hash) = manifest.check_heuristics(&path, &heuristics) {
-            if let Ok(mut doc) = load_blob(&blobs_dir, &hash) {
-                tracing::debug!("cache hit (heuristic): {}", path.display());
-                doc.id = path.display().to_string();
-                doc.path = path.to_path_buf();
-                
-                telemetry.heuristic_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                
-                // If we need embeddings but they are missing, treat as a partial miss
-                if dense.is_some() && doc.segments.iter().any(|s| s.embedding.is_none()) {
-                    tracing::info!("cache hit but missing embeddings: {}", path.display());
-                    results.push(ProcessResult::Miss(doc, path, heuristics, hash));
-                } else {
-                    results.push(ProcessResult::Hit(doc));
-                }
-                continue;
+        if let Some(hash) = manifest.check_heuristics(&path, &heuristics)
+            && let Ok(mut doc) = load_blob(&blobs_dir, &hash)
+        {
+            tracing::debug!("cache hit (heuristic): {}", path.display());
+            doc.id = path.display().to_string();
+            doc.path = path.to_path_buf();
+
+            telemetry.heuristic_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+            // If we need embeddings but they are missing, treat as a partial miss
+            if dense.is_some() && doc.segments.iter().any(|s| s.embedding.is_none()) {
+                tracing::info!("cache hit but missing embeddings: {}", path.display());
+                results.push(ProcessResult::Miss(doc, path, heuristics, hash));
+            } else {
+                results.push(ProcessResult::Hit(doc));
             }
+            continue;
         }
 
         // Medium path: compute blake3 and check global blob store

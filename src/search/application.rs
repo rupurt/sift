@@ -31,20 +31,18 @@ impl SearchServiceBuilder {
         if plan.retrievers.contains(&RetrieverPolicy::Phrase) {
             service.register_retriever(Box::new(PhraseRetriever));
         }
-        if plan.retrievers.contains(&RetrieverPolicy::Vector) {
-            if let Some(e) = embedder {
-                let final_embedder = if let Some(cache) = query_cache {
-                    Arc::new(CachedEmbedder {
-                        inner: e,
-                        cache,
-                    }) as Arc<dyn Embedder>
-                } else {
-                    e
-                };
-                service.register_retriever(Box::new(SegmentVectorRetriever {
-                    embedder: final_embedder,
-                }));
-            }
+        if plan.retrievers.contains(&RetrieverPolicy::Vector) && let Some(e) = embedder {
+            let final_embedder = if let Some(cache) = query_cache {
+                Arc::new(CachedEmbedder {
+                    inner: e,
+                    cache,
+                }) as Arc<dyn Embedder>
+            } else {
+                e
+            };
+            service.register_retriever(Box::new(SegmentVectorRetriever {
+                embedder: final_embedder,
+            }));
         }
 
         service
@@ -181,6 +179,12 @@ impl StrategyPresetRegistry {
         let mut names: Vec<_> = self.presets.keys().cloned().collect();
         names.sort();
         names
+    }
+}
+
+impl Default for SearchService {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

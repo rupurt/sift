@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     #[serde(default)]
     pub search: SearchConfig,
@@ -113,15 +113,6 @@ impl Default for ModelConfig {
     }
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            search: SearchConfig::default(),
-            model: ModelConfig::default(),
-        }
-    }
-}
-
 impl Config {
     pub fn load() -> Result<Self> {
         let mut config = Config::default();
@@ -154,7 +145,7 @@ impl Config {
         for line in input.lines() {
             if line.trim().starts_with('[') && line.trim().ends_with(']') {
                 // Section header in Cyan
-                write!(output, "\x1b[36m{}\x1b[0m\n", line).unwrap();
+                writeln!(output, "\x1b[36m{}\x1b[0m", line).unwrap();
             } else if let Some((key, value)) = line.split_once('=') {
                 // Key-value pair
                 let key_part = key.trim_end();
@@ -165,20 +156,20 @@ impl Config {
 
                 if value_part.starts_with('"') {
                     // String in Green
-                    write!(output, "\x1b[32m{}\x1b[0m\n", value_part).unwrap();
+                    writeln!(output, "\x1b[32m{}\x1b[0m", value_part).unwrap();
                 } else if value_part == "true" || value_part == "false" || value_part == "null" {
                     // Boolean/Null in Yellow
-                    write!(output, "\x1b[33m{}\x1b[0m\n", value_part).unwrap();
+                    writeln!(output, "\x1b[33m{}\x1b[0m", value_part).unwrap();
                 } else if !value_part.is_empty()
                     && value_part.chars().all(|c| c.is_numeric() || c == '.')
                 {
                     // Number in Yellow
-                    write!(output, "\x1b[33m{}\x1b[0m\n", value_part).unwrap();
+                    writeln!(output, "\x1b[33m{}\x1b[0m", value_part).unwrap();
                 } else {
-                    write!(output, "{}\n", value_part).unwrap();
+                    writeln!(output, "{}", value_part).unwrap();
                 }
             } else {
-                write!(output, "{}\n", line).unwrap();
+                writeln!(output, "{}", line).unwrap();
             }
         }
         output

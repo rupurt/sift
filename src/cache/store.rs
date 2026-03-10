@@ -38,10 +38,7 @@ impl Manifest {
         let file = File::open(path).with_context(|| format!("failed to open manifest {}", path.display()))?;
         file.lock_shared().context("failed to acquire shared lock on manifest")?;
         
-        let manifest: Manifest = match bincode::deserialize_from(&file) {
-            Ok(m) => m,
-            Err(_) => Self::default(), // If corrupted, start fresh
-        };
+        let manifest: Manifest = bincode::deserialize_from(&file).unwrap_or_default();
         
         file.unlock().context("failed to release shared lock on manifest")?;
         Ok(manifest)
@@ -70,14 +67,13 @@ impl Manifest {
     }
 
     pub fn check_heuristics(&self, path: &Path, current: &CacheEntry) -> Option<String> {
-        if let Some(cached) = self.entries.get(path) {
-            if cached.inode == current.inode 
-                && cached.mtime_secs == current.mtime_secs 
-                && cached.mtime_nanos == current.mtime_nanos 
-                && cached.size == current.size 
-            {
-                return Some(cached.blake3_hash.clone());
-            }
+        if let Some(cached) = self.entries.get(path)
+            && cached.inode == current.inode 
+            && cached.mtime_secs == current.mtime_secs 
+            && cached.mtime_nanos == current.mtime_nanos 
+            && cached.size == current.size 
+        {
+            return Some(cached.blake3_hash.clone());
         }
         None
     }

@@ -663,7 +663,7 @@ pub fn run_comparative_evaluation(
         });
 
         metadata.push(build_metadata(
-            &name,
+            name,
             env.plan.clone(),
             None,
             None,

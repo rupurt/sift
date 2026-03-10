@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use sift::search::{Embedder, SearchRequest, SearchResponse, run_search, LocalFileCorpusRepository, OutputFormat, render_search_response};
+use sift::search::{Embedder, SearchRequest, run_search, LocalFileCorpusRepository};
 use sift::dense::DenseModelSpec;
 use std::sync::RwLock;
 use std::collections::HashMap;
