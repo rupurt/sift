@@ -1,0 +1,11 @@
+---
+recorded_at: 2026-03-10T15:46:33.458206350-07:00
+command: cargo check --test library_facade_test
+---
+
+--- stderr ---
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.24s

@@ -2,11 +2,12 @@
 id: VDVSF0yAX
 title: Introduce Canonical Embedded Search Facade
 type: feat
-status: backlog
+status: in-progress
 created_at: 2026-03-10T15:30:27
-updated_at: 2026-03-10T15:31:02
+updated_at: 2026-03-10T15:42:54
 scope: VDVQurZER/VDVRkNjgH
 index: 1
+started_at: 2026-03-10T15:42:54
 ---
 
 # Introduce Canonical Embedded Search Facade
@@ -19,5 +20,5 @@ internal modules manually.
 
 ## Acceptance Criteria
 
-- [ ] [SRS-01/AC-01] The library exposes one canonical embedded search facade with a high-level request/response path suitable for external Rust callers. <!-- verify: cargo test, SRS-01:start:end -->
-- [ ] [SRS-01/AC-02] Integration coverage exercises the supported facade directly rather than reaching through multiple internal modules. <!-- verify: cargo test, SRS-01:start:end -->
+- [ ] [SRS-01/AC-01] The library exposes one canonical embedded search facade with a high-level request/response path suitable for external Rust callers. <!-- verify: cargo check --tests, SRS-01:start:end, proof: ac-1.log-->
+- [ ] [SRS-01/AC-02] Integration coverage exercises the supported facade directly rather than reaching through multiple internal modules. <!-- verify: cargo check --test library_facade_test, SRS-01:start:end, proof: ac-2.log-->
