@@ -2,12 +2,14 @@
 id: VDQAq22Tq
 title: Provide Static Linux Executable
 type: feat
-status: in-progress
+status: done
 created_at: 2026-03-09T18:05:00
-updated_at: 2026-03-09T18:05:00
+updated_at: 2026-03-09T17:51:04
 scope: VDQ8Ll4DX/VDQAsfNUx
 index: 1
 started_at: 2026-03-09T18:13:12
+submitted_at: 2026-03-09T17:51:04
+completed_at: 2026-03-09T17:51:04
 ---
 
 # Provide Static Linux Executable

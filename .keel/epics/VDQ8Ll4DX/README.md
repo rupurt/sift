@@ -19,10 +19,10 @@ index: 4
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 2/3 voyages complete, 3/4 stories done
+**Progress:** 3/3 voyages complete, 4/4 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
 | [Setup Cargo Dist And Release Workflow](voyages/VDQ8Pufmv/) | done | 2/2 |
 | [Add Homebrew Platform Support](voyages/VDQ9bZoZV/) | done | 1/1 |
-| [Optimize Artifact Portability](voyages/VDQAsfNUx/) | in-progress | 0/1 |
+| [Optimize Artifact Portability](voyages/VDQAsfNUx/) | done | 1/1 |
 <!-- END GENERATED -->

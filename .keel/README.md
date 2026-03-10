@@ -35,13 +35,13 @@
 | [Query Embedding and Memory Allocation Optimization](epics/VDPy8MNer/voyages/VDPyAtjbT/) | done |
 | [Mmap-Accelerated Blob Retrieval](epics/VDPy8MNer/voyages/VDQ0Y5HBn/) | done |
 
-### [Automated Cross-Platform Release Pipeline](epics/VDQ8Ll4DX/) (active)
+### [Automated Cross-Platform Release Pipeline](epics/VDQ8Ll4DX/) (done)
 
 | Voyage | Status |
 |--------|--------|
 | [Setup Cargo Dist And Release Workflow](epics/VDQ8Ll4DX/voyages/VDQ8Pufmv/) | done |
 | [Add Homebrew Platform Support](epics/VDQ8Ll4DX/voyages/VDQ9bZoZV/) | done |
-| [Optimize Artifact Portability](epics/VDQ8Ll4DX/voyages/VDQAsfNUx/) | in-progress |
+| [Optimize Artifact Portability](epics/VDQ8Ll4DX/voyages/VDQAsfNUx/) | done |
 
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
