@@ -87,9 +87,9 @@
 |--------|--------|
 | [Instrumentation Foundation](epics/1vziaX000/voyages/1vzibo000/) | done |
 
-### [Embeddable Library Packaging Research](epics/VDVQurZER/) (active)
+### [Embeddable Library Packaging Research](epics/VDVQurZER/) (done)
 
 | Voyage | Status |
 |--------|--------|
-| [Library Facade and Packaging Cutover](epics/VDVQurZER/voyages/VDVRkNjgH/) | in-progress |
+| [Library Facade and Packaging Cutover](epics/VDVQurZER/voyages/VDVRkNjgH/) | done |
 

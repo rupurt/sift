@@ -2,12 +2,13 @@
 id: VDVSF1tAK
 title: Document The Supported Embedded API Boundary
 type: docs
-status: in-progress
+status: done
 created_at: 2026-03-10T15:30:27
-updated_at: 2026-03-10T15:59:24
+updated_at: 2026-03-10T16:04:03
 scope: VDVQurZER/VDVRkNjgH
 index: 4
 started_at: 2026-03-10T15:59:24
+completed_at: 2026-03-10T16:04:03
 ---
 
 # Document The Supported Embedded API Boundary

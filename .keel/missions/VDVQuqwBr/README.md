@@ -1,10 +1,12 @@
 ---
 id: VDVQuqwBr
 title: Embeddable Library and Executable Packaging
-status: active
+status: verified
 created_at: 2026-03-10T15:25:11
-updated_at: 2026-03-10T15:27:58
+updated_at: 2026-03-10T16:05:13
 activated_at: 2026-03-10T15:27:58
+achieved_at: 2026-03-10T16:05:02
+verified_at: 2026-03-10T16:05:13
 ---
 
 # Embeddable Library and Executable Packaging
