@@ -46,6 +46,7 @@ mod tests {
                 reranking: None,
                 telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
                 cache_dir: Some(self.cache.path().to_path_buf()),
+                query_cache: None,
             }
         }
     }

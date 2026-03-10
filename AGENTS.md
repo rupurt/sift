@@ -246,6 +246,7 @@ Use one path for each concern:
 | Category | Commands |
 |----------|----------|
 | Setup | `keel init` `keel config show` `keel generate` |
+| Mission | `keel mission new <name>` `keel mission activate <id>` `keel mission log <id> --msg <msg>` `keel mission digest <id>` `keel mission achieve <id>` `keel mission verify <id>` |
 | Discovery | `keel bearing new <name>` `keel bearing survey <id>` `keel bearing assess <id>` `keel bearing list` |
 | Planning | `keel epic new <name> --problem <problem>` `keel voyage new <name> --epic <epic-id> --goal <goal>` `keel voyage plan <id>` |
 | Execution | `keel next --agent` `keel story new <title>` `keel story thaw <id>` `keel story start <id>` `keel story record <id>` `keel story reflect <id>` `keel story submit <id>` `keel story accept <id>` |

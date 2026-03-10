@@ -233,6 +233,7 @@ fn main() -> Result<()> {
     let config = Config::load().unwrap_or_default();
     let ignore = sift::config::Ignore::load();
     let telemetry = Arc::new(Telemetry::new());
+    let query_cache = Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
 
     match cli.command {
         Commands::Dataset { command } => match command {
@@ -442,6 +443,7 @@ fn main() -> Result<()> {
                     reranking: search.reranking,
                     telemetry: telemetry.clone(),
                     cache_dir: None,
+                    query_cache: Some(query_cache.clone()),
                 },
                 Some(&ignore),
                 &LocalFileCorpusRepository,

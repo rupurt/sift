@@ -28,6 +28,12 @@
 |--------|--------|
 | [Refresh README For Current Retrieval Contract](epics/1vzNFk000/voyages/1vzNFu000/) | done |
 
+### [High-Performance Retrieval Refinements](epics/VDPy8MNer/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Query Embedding and Memory Allocation Optimization](epics/VDPy8MNer/voyages/VDPyAtjbT/) | in-progress |
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |

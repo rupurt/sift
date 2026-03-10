@@ -9,9 +9,13 @@ use crate::config::Ignore;
 pub struct SearchServiceBuilder;
 
 impl SearchServiceBuilder {
-    pub fn build(plan: &SearchPlan, embedder: Option<Arc<dyn Embedder>>) -> SearchService {
+    pub fn build(
+        plan: &SearchPlan,
+        embedder: Option<Arc<dyn Embedder>>,
+        query_cache: Option<QueryEmbeddingCache>,
+    ) -> SearchService {
         let mut service = SearchService::new();
-        
+
         // Register mandatory components
         service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
         service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
@@ -29,7 +33,17 @@ impl SearchServiceBuilder {
         }
         if plan.retrievers.contains(&RetrieverPolicy::Vector) {
             if let Some(e) = embedder {
-                service.register_retriever(Box::new(SegmentVectorRetriever { embedder: e }));
+                let final_embedder = if let Some(cache) = query_cache {
+                    Arc::new(CachedEmbedder {
+                        inner: e,
+                        cache,
+                    }) as Arc<dyn Embedder>
+                } else {
+                    e
+                };
+                service.register_retriever(Box::new(SegmentVectorRetriever {
+                    embedder: final_embedder,
+                }));
             }
         }
 
@@ -293,7 +307,7 @@ impl<'a> SearchEnvironment<'a> {
             plan.reranking = reranking;
         }
 
-        let service = SearchServiceBuilder::build(&plan, embedder);
+        let service = SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone());
 
         Ok(Self {
             service,
@@ -378,7 +392,7 @@ pub fn run_search(
         corpus_start.elapsed()
     );
 
-    let service = SearchServiceBuilder::build(&plan, embedder);
+    let service = SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone());
 
     let index_start = std::time::Instant::now();
     let index = Bm25Index::build(&corpus.documents);

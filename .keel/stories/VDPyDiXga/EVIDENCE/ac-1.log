@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T17:04:46.650880670-07:00
+mode: manual
+---
+DenseReranker implements query caching via CachedEmbedder decorator

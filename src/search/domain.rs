@@ -33,7 +33,9 @@ pub enum OutputFormat {
 }
 
 use crate::system::Telemetry;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
+
+pub type QueryEmbeddingCache = Arc<RwLock<HashMap<String, Vec<f32>>>>;
 
 #[derive(Debug, Clone)]
 pub struct SearchRequest {
@@ -49,6 +51,7 @@ pub struct SearchRequest {
     pub reranking: Option<RerankingPolicy>,
     pub telemetry: Arc<Telemetry>,
     pub cache_dir: Option<PathBuf>,
+    pub query_cache: Option<QueryEmbeddingCache>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -355,6 +358,49 @@ pub trait Embedder: Send + Sync {
     fn dimension(&self) -> usize;
 }
 
+pub struct CachedEmbedder {
+    pub inner: Arc<dyn Embedder>,
+    pub cache: QueryEmbeddingCache,
+}
+
+impl Embedder for CachedEmbedder {
+    fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+        let mut results = Vec::with_capacity(texts.len());
+        let mut missing_indices = Vec::new();
+        let mut missing_texts = Vec::new();
+
+        {
+            let cache = self.cache.read().unwrap();
+            for (i, text) in texts.iter().enumerate() {
+                if let Some(embedding) = cache.get(text) {
+                    tracing::debug!("query cache hit for: '{}'", text);
+                    results.push((i, embedding.clone()));
+                } else {
+                    tracing::debug!("query cache miss for: '{}'", text);
+                    missing_indices.push(i);
+                    missing_texts.push(text.clone());
+                }
+            }
+        }
+
+        if !missing_texts.is_empty() {
+            let embeddings = self.inner.embed(&missing_texts)?;
+            let mut cache = self.cache.write().unwrap();
+            for (i, embedding) in missing_indices.into_iter().zip(embeddings) {
+                cache.insert(texts[i].clone(), embedding.clone());
+                results.push((i, embedding));
+            }
+        }
+
+        results.sort_by_key(|(i, _)| *i);
+        Ok(results.into_iter().map(|(_, e)| e).collect())
+    }
+
+    fn dimension(&self) -> usize {
+        self.inner.dimension()
+    }
+}
+
 pub trait Retriever: Send + Sync {
     fn retrieve(
         &self,
@@ -377,4 +423,56 @@ pub trait Expander: Send + Sync {
 pub trait Reranker: Send + Sync {
     fn rerank(&self, query: &str, candidates: CandidateList, limit: usize)
     -> Result<CandidateList>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct MockEmbedder {
+        call_count: Arc<AtomicUsize>,
+    }
+
+    impl Embedder for MockEmbedder {
+        fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+            self.call_count.fetch_add(1, Ordering::SeqCst);
+            Ok(texts.iter().map(|_| vec![0.0; 384]).collect())
+        }
+
+        fn dimension(&self) -> usize {
+            384
+        }
+    }
+
+    #[test]
+    fn cached_embedder_avoids_redundant_calls() {
+        let call_count = Arc::new(AtomicUsize::new(0));
+        let inner = Arc::new(MockEmbedder {
+            call_count: call_count.clone(),
+        });
+        let cache = Arc::new(RwLock::new(HashMap::new()));
+        let embedder = CachedEmbedder {
+            inner: inner.clone(),
+            cache: cache.clone(),
+        };
+
+        let texts = vec!["query1".to_string(), "query2".to_string()];
+
+        // First call: 1 call to inner (for both texts)
+        let res1 = embedder.embed(&texts).unwrap();
+        assert_eq!(res1.len(), 2);
+        assert_eq!(call_count.load(Ordering::SeqCst), 1);
+
+        // Second call with same texts: 0 additional calls to inner
+        let res2 = embedder.embed(&texts).unwrap();
+        assert_eq!(res2.len(), 2);
+        assert_eq!(call_count.load(Ordering::SeqCst), 1);
+
+        // Third call with one new text: 1 additional call to inner (for the new text)
+        let texts2 = vec!["query1".to_string(), "query3".to_string()];
+        let res3 = embedder.embed(&texts2).unwrap();
+        assert_eq!(res3.len(), 2);
+        assert_eq!(call_count.load(Ordering::SeqCst), 2);
+    }
 }
