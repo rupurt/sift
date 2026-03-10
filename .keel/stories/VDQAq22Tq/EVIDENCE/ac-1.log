@@ -1,5 +1,5 @@
 ---
-recorded_at: 2026-03-09T17:50:48.804468191-07:00
+recorded_at: 2026-03-09T18:53:25.678405857-07:00
 mode: manual
 ---
-Added 'x86_64-unknown-linux-musl' to targets in Cargo.toml
+Updated flake.nix and justfile to support truly static builds via nix build .#sift-static

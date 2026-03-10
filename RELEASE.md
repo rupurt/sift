@@ -83,3 +83,13 @@ cargo dist plan
 # Build artifacts locally (outputs to target/dist)
 cargo dist build
 ```
+
+### Building a Static Binary Locally
+
+On Linux, you can build a truly static binary using Nix:
+
+```bash
+just build-static
+```
+
+The resulting binary will be linked at `target/release/sift-static/bin/sift`.

@@ -1,5 +1,5 @@
 ---
-recorded_at: 2026-03-09T17:50:48.813011225-07:00
+recorded_at: 2026-03-09T18:53:25.687034760-07:00
 mode: manual
 ---
-Updated release.yml matrix and added musl-tools installation step
+Verified static linking using ldd: 'statically linked'

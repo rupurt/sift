@@ -29,6 +29,28 @@ There is no external database, no daemon, and no background indexing service.
   both dense embeddings and advanced LLM reranking (e.g., Qwen2.5).
 - **Supported Inputs:** Text, HTML, PDF, and OOXML files (`.docx`, `.xlsx`, `.pptx`).
 
+## Installation
+
+### Homebrew (macOS and Linux)
+
+```bash
+brew tap rupurt/homebrew-tap
+brew install sift
+```
+
+### One-liner Install (macOS and Linux)
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/rupurt/sift/releases/latest/download/sift-installer.sh | sh
+```
+
+### Manual Download
+
+Download the latest pre-built binaries and installers for your platform from the [GitHub Releases](https://github.com/rupurt/sift/releases) page. We provide:
+- **Linux:** `.tar.gz`, `.deb`, `.rpm` (standard glibc and static musl versions)
+- **macOS:** `.tar.gz`, `.dmg`
+- **Windows:** `.zip`, `.msi`
+
 ## How Sift Works
 
 At runtime, `sift` orchestrates a high-performance asset pipeline:
