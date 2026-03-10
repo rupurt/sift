@@ -57,5 +57,5 @@ publish-jobs = []
 # Whether to install an updater program
 install-updater = true
 
-[package.metadata.dist.installers.homebrew]
+[package.metadata.dist.homebrew]
 tap = "rupurt/homebrew-tap"
