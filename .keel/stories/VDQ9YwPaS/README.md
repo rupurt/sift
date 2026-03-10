@@ -2,12 +2,14 @@
 id: VDQ9YwPaS
 title: Add Homebrew Installer Support
 type: feat
-status: in-progress
+status: done
 created_at: 2026-03-09T17:55:00
-updated_at: 2026-03-09T17:55:00
+updated_at: 2026-03-09T17:46:06
 scope: VDQ8Ll4DX/VDQ9bZoZV
 index: 1
 started_at: 2026-03-09T17:58:12
+submitted_at: 2026-03-09T17:46:06
+completed_at: 2026-03-09T17:46:06
 ---
 
 # Add Homebrew Installer Support
