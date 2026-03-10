@@ -266,11 +266,11 @@ impl SearchPlan {
             return ScoreConfidence::Low;
         }
 
-        let normalized = score / max_possible;
+        let normalized = (score / max_possible).min(1.0);
 
-        if normalized > 0.7 {
+        if normalized > 0.8 {
             ScoreConfidence::High
-        } else if normalized > 0.3 {
+        } else if normalized > 0.5 {
             ScoreConfidence::Medium
         } else {
             ScoreConfidence::Low
