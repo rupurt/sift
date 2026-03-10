@@ -2,12 +2,13 @@
 id: VDVkxNXc4
 title: Add Sift-Embed Example Crate And Just Recipes
 type: feat
-status: in-progress
+status: done
 created_at: 2026-03-10T16:44:47
-updated_at: 2026-03-10T16:46:04
+updated_at: 2026-03-10T16:51:33
 scope: VDVkH5a6M/VDVkORseE
 index: 2
 started_at: 2026-03-10T16:46:05
+completed_at: 2026-03-10T16:51:33
 ---
 
 # Add Sift-Embed Example Crate And Just Recipes

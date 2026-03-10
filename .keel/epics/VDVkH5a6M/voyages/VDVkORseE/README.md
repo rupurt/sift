@@ -25,10 +25,10 @@ started_at: 2026-03-10T16:45:35
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/2 stories complete
+**Progress:** 1/2 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
 | [Document The Runnable Embedded Example](../../../../stories/VDVkxNEcJ/README.md) | docs | backlog |
-| [Add Sift-Embed Example Crate And Just Recipes](../../../../stories/VDVkxNXc4/README.md) | feat | backlog |
+| [Add Sift-Embed Example Crate And Just Recipes](../../../../stories/VDVkxNXc4/README.md) | feat | done |
 <!-- END GENERATED -->

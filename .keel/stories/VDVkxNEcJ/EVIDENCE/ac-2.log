@@ -1,0 +1,8 @@
+---
+recorded_at: 2026-03-10T16:52:58.620596728-07:00
+command: sh -lc 'cd /home/alex/workspace/rupurt/sift && rg -n "just embed-build|just embed-search" README.md examples/sift-embed/README.md'
+---
+examples/sift-embed/README.md:17:just embed-build
+examples/sift-embed/README.md:18:just embed-search tests/fixtures/rich-docs "architecture decision"
+README.md:80:just embed-build
+README.md:81:just embed-search tests/fixtures/rich-docs "architecture decision"

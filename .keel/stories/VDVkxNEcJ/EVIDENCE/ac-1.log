@@ -1,0 +1,14 @@
+---
+recorded_at: 2026-03-10T16:52:58.630436741-07:00
+command: sh -lc 'cd /home/alex/workspace/rupurt/sift && rg -n "sift-embed search|canonical runnable embedding reference|examples/sift-embed" README.md examples/sift-embed/README.md'
+---
+examples/sift-embed/README.md:3:`sift-embed` is the canonical runnable embedding reference for consuming
+examples/sift-embed/README.md:24:cargo run --manifest-path examples/sift-embed/Cargo.toml -- search "hybrid search"
+examples/sift-embed/README.md:25:cargo run --manifest-path examples/sift-embed/Cargo.toml -- search tests/fixtures/rich-docs "architecture decision"
+examples/sift-embed/README.md:31:sift-embed search [OPTIONS] [PATH] <QUERY>
+examples/sift-embed/README.md:34:If `PATH` is omitted, `sift-embed search "<term>"` searches the current
+README.md:73:[`examples/sift-embed`](examples/sift-embed) is the canonical runnable
+README.md:87:cargo run --manifest-path examples/sift-embed/Cargo.toml -- search "hybrid search"
+README.md:88:cargo run --manifest-path examples/sift-embed/Cargo.toml -- search tests/fixtures/rich-docs "architecture decision"
+README.md:91:If `PATH` is omitted, `sift-embed search "<term>"` searches the current
+README.md:92:directory. See [`examples/sift-embed/README.md`](examples/sift-embed/README.md)

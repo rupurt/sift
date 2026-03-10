@@ -68,6 +68,30 @@ Everything under `sift::internal` exists to support the bundled executable,
 benchmarks, and repository-internal tests. It is not part of the supported
 embedding contract and may change without notice.
 
+### Runnable Example Consumer
+
+[`examples/sift-embed`](examples/sift-embed) is the canonical runnable
+embedding reference. It is a standalone Rust crate that depends on `sift`
+through the crate-root facade and exposes a minimal `sift-embed` CLI.
+
+From the repo root:
+
+```bash
+just embed-build
+just embed-search tests/fixtures/rich-docs "architecture decision"
+```
+
+The embedded example supports the same shape directly:
+
+```bash
+cargo run --manifest-path examples/sift-embed/Cargo.toml -- search "hybrid search"
+cargo run --manifest-path examples/sift-embed/Cargo.toml -- search tests/fixtures/rich-docs "architecture decision"
+```
+
+If `PATH` is omitted, `sift-embed search "<term>"` searches the current
+directory. See [`examples/sift-embed/README.md`](examples/sift-embed/README.md)
+for the full runnable example notes.
+
 ### Add The Dependency
 
 Use the git repository until a versioned registry release is part of your
