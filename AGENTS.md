@@ -74,6 +74,8 @@ broad product or feature goal.
 Treat verification as the steering loop for every story instead of a final
 cleanup step.
 
+1. **Mandatory quality gates before any change is accepted**: For every code/config/documentation change, run `just check` before continuing. If `just check` cannot run, record the exact failing command, truncated output, and blocker reason in the story/handoff before proceeding.
+
 1. **Plan Proof Before Editing**: Before changing code, map every acceptance
    criterion to a concrete proof path:
    - automated test

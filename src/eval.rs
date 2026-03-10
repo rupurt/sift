@@ -391,8 +391,14 @@ pub fn run_quality_evaluation(
         Some(dense_for_load.clone()),
     )?;
 
-    let (metrics, _telemetry) =
-        evaluate_quality(&queries, &qrels, &env, request.verbose, request.query_limit)?;
+    let (metrics, _telemetry) = evaluate_quality(
+        &queries,
+        &qrels,
+        &env,
+        request.shortlist,
+        request.verbose,
+        request.query_limit,
+    )?;
 
     let baseline_strategy = request
         .baseline
@@ -425,6 +431,7 @@ pub fn run_quality_evaluation(
                 &queries,
                 &qrels,
                 &baseline_env,
+                request.shortlist,
                 request.verbose,
                 request.query_limit,
             )?;
@@ -459,6 +466,7 @@ pub fn run_quality_evaluation(
             &queries,
             &qrels,
             &champion_env,
+            request.shortlist,
             request.verbose,
             request.query_limit,
         )?;
@@ -547,7 +555,7 @@ pub fn run_latency_evaluation(
 
     for query_text in queries_vec.iter().take(total_queries) {
         let started = Instant::now();
-        let _ = env.search(query_text, 10, request.verbose)?;
+        let _ = env.search(query_text, 10, request.shortlist, request.verbose)?;
         timings.push(started.elapsed().as_secs_f64() * 1000.0)
     }
 
@@ -641,8 +649,14 @@ pub fn run_comparative_evaluation(
         )?;
 
         // Quality
-        let (quality, telemetry) =
-            evaluate_quality(&queries, &qrels, &env, request.verbose, request.query_limit)?;
+        let (quality, telemetry) = evaluate_quality(
+            &queries,
+            &qrels,
+            &env,
+            request.shortlist,
+            request.verbose,
+            request.query_limit,
+        )?;
 
         // Latency
         let prepare_started = Instant::now();
@@ -660,7 +674,7 @@ pub fn run_comparative_evaluation(
 
         for query_text in queries_vec.iter().take(total_queries) {
             let started = Instant::now();
-            let _ = env.search(query_text, 10, request.verbose)?;
+            let _ = env.search(query_text, 10, request.shortlist, request.verbose)?;
             timings.push(started.elapsed().as_secs_f64() * 1000.0);
         }
         timings.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
@@ -891,6 +905,7 @@ fn evaluate_quality(
     queries: &HashMap<String, String>,
     qrels: &HashMap<String, HashMap<String, u32>>,
     env: &crate::search::SearchEnvironment,
+    shortlist: usize,
     verbose: u8,
     query_limit: Option<usize>,
 ) -> Result<(QualityMetrics, crate::search::SearchTelemetry)> {
@@ -916,7 +931,7 @@ fn evaluate_quality(
             .get(*query_id)
             .with_context(|| format!("missing query text for qrels query-id '{query_id}'"))?;
 
-        let response = env.search(query_text, 10, verbose)?;
+        let response = env.search(query_text, 10, shortlist, verbose)?;
 
         let ranked_ids: Vec<String> = response
             .results

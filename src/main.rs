@@ -61,8 +61,11 @@ struct SearchCommand {
     json: bool,
 
     #[arg(long)]
+    /// Maximum number of results returned.
     limit: Option<usize>,
 
+    /// Number of candidates to score in reranking (defaults to config `shortlist`).
+    /// This does not set the final return size; `limit` does.
     #[arg(long)]
     shortlist: Option<usize>,
 

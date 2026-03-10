@@ -236,17 +236,21 @@ impl SearchService {
         self.rerankers.insert(policy, reranker);
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn execute(
         &self,
         plan: &SearchPlan,
         query: &str,
         corpus: &PreparedCorpus,
         limit: usize,
+        shortlist: usize,
         _verbose: u8,
         telemetry: &crate::system::Telemetry,
     ) -> Result<CandidateList> {
         let start = std::time::Instant::now();
         tracing::info!("executing strategy: {} for query: '{}'", plan.name, query);
+
+        let retrieval_limit = std::cmp::max(limit, shortlist);
 
         // 1. Query Expansion
         let expand_start = std::time::Instant::now();
@@ -275,7 +279,7 @@ impl SearchService {
                 .get(policy)
                 .ok_or_else(|| anyhow!("retriever not found for policy: {:?}", policy))?;
             // Note: adapters will be updated to use tracing internally later, for now we pass 0 as verbose
-            let list = retriever.retrieve(&query_variants, corpus, limit, 0)?;
+            let list = retriever.retrieve(&query_variants, corpus, retrieval_limit, 0)?;
             tracing::info!(
                 "{:?}: found {} candidates in {:.2?}",
                 policy,
@@ -298,7 +302,7 @@ impl SearchService {
             .fusers
             .get(&plan.fusion)
             .ok_or_else(|| anyhow!("fuser not found for policy: {:?}", plan.fusion))?;
-        let fused = fuser.fuse(&candidate_lists, limit, 0)?;
+        let fused = fuser.fuse(&candidate_lists, retrieval_limit, 0)?;
         tracing::info!(
             "fused into {} candidates in {:.2?}",
             fused.results.len(),
@@ -311,7 +315,31 @@ impl SearchService {
             .rerankers
             .get(&plan.reranking)
             .ok_or_else(|| anyhow!("reranker not found for policy: {:?}", plan.reranking))?;
-        let final_list = reranker.rerank(query, fused, limit)?;
+        let mut final_list = if shortlist < fused.results.len() {
+            let mut shortlist_results = fused.results;
+            let remaining = shortlist_results.split_off(shortlist);
+
+            let mut final_list = reranker.rerank(
+                query,
+                CandidateList {
+                    results: shortlist_results,
+                },
+                limit.min(shortlist),
+            )?;
+
+            let missing = limit.saturating_sub(final_list.results.len());
+            final_list
+                .results
+                .extend(remaining.into_iter().take(missing));
+
+            final_list
+        } else {
+            reranker.rerank(query, fused, limit.min(shortlist))?
+        };
+
+        if final_list.results.len() > limit {
+            final_list.results.truncate(limit);
+        }
         tracing::info!("reranking complete in {:.2?}", rerank_start.elapsed());
 
         tracing::info!("search complete in {:.2?}", start.elapsed());
@@ -364,12 +392,19 @@ impl<'a> SearchEnvironment<'a> {
         })
     }
 
-    pub fn search(&self, query: &str, limit: usize, verbose: u8) -> Result<SearchResponse> {
+    pub fn search(
+        &self,
+        query: &str,
+        limit: usize,
+        shortlist: usize,
+        verbose: u8,
+    ) -> Result<SearchResponse> {
         let candidates = self.service.execute(
             &self.plan,
             query,
             &self.prepared,
             limit,
+            shortlist,
             verbose,
             &self.telemetry,
         )?;
@@ -468,6 +503,7 @@ pub fn run_search(
         &request.query,
         &prepared,
         request.limit,
+        request.shortlist,
         verbose,
         &request.telemetry,
     )?;
@@ -523,6 +559,7 @@ fn resolve_snippet_from_candidate(
 mod tests {
     use super::super::adapters::*;
     use super::*;
+    use std::sync::{Arc, Mutex};
 
     struct MockRetriever {
         policy: RetrieverPolicy,
@@ -554,6 +591,72 @@ mod tests {
         }
     }
 
+    struct MockRankedRetriever {
+        policy: RetrieverPolicy,
+        count: usize,
+    }
+
+    impl Retriever for MockRankedRetriever {
+        fn retrieve(
+            &self,
+            _variants: &[QueryVariant],
+            _corpus: &PreparedCorpus,
+            limit: usize,
+            _verbose: u8,
+        ) -> Result<CandidateList> {
+            let mut results = Vec::new();
+            for index in 0..self.count.min(limit) {
+                results.push(Candidate {
+                    id: format!("doc{index:02}"),
+                    path: std::path::PathBuf::from("mock"),
+                    score: (self.count - index) as f64,
+                    contributors: vec![],
+                    snippet: None,
+                    snippet_location: None,
+                });
+            }
+            Ok(CandidateList { results })
+        }
+
+        fn policy(&self) -> RetrieverPolicy {
+            self.policy
+        }
+    }
+
+    struct CapturingReranker {
+        observed_input_sizes: Arc<Mutex<Vec<usize>>>,
+    }
+
+    impl CapturingReranker {
+        fn new() -> (Self, Arc<Mutex<Vec<usize>>>) {
+            let observed_input_sizes = Arc::new(Mutex::new(Vec::new()));
+            (
+                Self {
+                    observed_input_sizes: observed_input_sizes.clone(),
+                },
+                observed_input_sizes,
+            )
+        }
+    }
+
+    impl Reranker for CapturingReranker {
+        fn rerank(
+            &self,
+            _query: &str,
+            mut candidates: CandidateList,
+            limit: usize,
+        ) -> Result<CandidateList> {
+            if let Ok(mut observed) = self.observed_input_sizes.lock() {
+                observed.push(candidates.results.len());
+            }
+
+            candidates.results.sort_by(|a, b| b.id.cmp(&a.id));
+            Ok(CandidateList {
+                results: candidates.results.into_iter().take(limit).collect(),
+            })
+        }
+    }
+
     #[test]
     fn search_service_orchestrates_multiple_variants_and_retrievers() {
         let mut service = SearchService::new();
@@ -578,7 +681,7 @@ mod tests {
         };
         let telemetry = crate::system::Telemetry::new();
         let results = service
-            .execute(&plan, "search", &corpus, 10, 0, &telemetry)
+            .execute(&plan, "search", &corpus, 10, 10, 0, &telemetry)
             .unwrap();
 
         // "search" expansion with SynonymExpander gives "search" and "retrieval"
@@ -614,7 +717,7 @@ mod tests {
         };
         let telemetry = crate::system::Telemetry::new();
         let results = service
-            .execute(&plan, "query", &corpus, 10, 0, &telemetry)
+            .execute(&plan, "query", &corpus, 10, 10, 0, &telemetry)
             .unwrap();
 
         // Both retrievers should return "query"
@@ -639,5 +742,81 @@ mod tests {
         let hybrid = registry.resolve("hybrid").unwrap();
         // hybrid resolves to the champion which is currently page-index-hybrid
         assert_eq!(hybrid.name, "page-index-hybrid");
+    }
+
+    #[test]
+    fn search_service_shortlist_only_limits_rerank_input() {
+        let mut service = SearchService::new();
+        service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
+        service.register_retriever(Box::new(MockRankedRetriever {
+            policy: RetrieverPolicy::Bm25,
+            count: 10,
+        }));
+        service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
+        let (reranker, observed_sizes) = CapturingReranker::new();
+        service.register_reranker(RerankingPolicy::Llm, Box::new(reranker));
+
+        let plan = SearchPlan {
+            name: "test".to_string(),
+            query_expansion: QueryExpansionPolicy::None,
+            retrievers: vec![RetrieverPolicy::Bm25],
+            fusion: FusionPolicy::Rrf,
+            reranking: RerankingPolicy::Llm,
+        };
+
+        let corpus = PreparedCorpus {
+            documents: &[],
+            bm25_index: None,
+        };
+        let telemetry = crate::system::Telemetry::new();
+        let results = service
+            .execute(&plan, "query", &corpus, 5, 3, 0, &telemetry)
+            .unwrap();
+
+        let observed_sizes = observed_sizes.lock().unwrap();
+        assert_eq!(observed_sizes.as_slice(), [3]);
+        assert_eq!(results.results.len(), 5);
+        assert_eq!(results.results[0].id, "doc02");
+        assert_eq!(results.results[1].id, "doc01");
+        assert_eq!(results.results[2].id, "doc00");
+        assert_eq!(results.results[3].id, "doc03");
+        assert_eq!(results.results[4].id, "doc04");
+    }
+
+    #[test]
+    fn search_service_reranks_shortlist_if_larger_than_limit() {
+        let mut service = SearchService::new();
+        service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
+        service.register_retriever(Box::new(MockRankedRetriever {
+            policy: RetrieverPolicy::Bm25,
+            count: 10,
+        }));
+        service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
+        let (reranker, observed_sizes) = CapturingReranker::new();
+        service.register_reranker(RerankingPolicy::Llm, Box::new(reranker));
+
+        let plan = SearchPlan {
+            name: "test".to_string(),
+            query_expansion: QueryExpansionPolicy::None,
+            retrievers: vec![RetrieverPolicy::Bm25],
+            fusion: FusionPolicy::Rrf,
+            reranking: RerankingPolicy::Llm,
+        };
+
+        let corpus = PreparedCorpus {
+            documents: &[],
+            bm25_index: None,
+        };
+        let telemetry = crate::system::Telemetry::new();
+        let results = service
+            .execute(&plan, "query", &corpus, 3, 6, 0, &telemetry)
+            .unwrap();
+
+        let observed_sizes = observed_sizes.lock().unwrap();
+        assert_eq!(observed_sizes.as_slice(), [6]);
+        assert_eq!(results.results.len(), 3);
+        assert_eq!(results.results[0].id, "doc05");
+        assert_eq!(results.results[1].id, "doc04");
+        assert_eq!(results.results[2].id, "doc03");
     }
 }

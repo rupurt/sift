@@ -51,7 +51,7 @@ data/raw/
 |-----|------|---------|-------------|
 | `strategy` | String | `"page-index-hybrid"` | The named search strategy to use. |
 | `limit` | Integer | `10` | The maximum number of results to return. |
-| `shortlist` | Integer | `8` | The number of candidates to pass to the reranking phase. |
+| `shortlist` | Integer | `8` | The number of candidates passed into reranking. |
 
 #### Available Strategies
 - **`page-index-hybrid`** (default): Our champion strategy. Combines BM25, Phrase matching, and Vector search, followed by Position-Aware reranking.
@@ -75,8 +75,15 @@ sift search --retrievers bm25,phrase --reranking position-aware "my query"
 - `--retrievers`: Comma-separated list (`bm25`, `phrase`, `vector`).
 - `--fusion`: Currently only `rrf` is supported.
 - `--reranking`: `none`, `position-aware`, or `llm`.
+- `--shortlist`: Number of fused candidates passed to reranking.
 - `--model-id`: Override the embedding model ID.
 - `--rerank-model-id`: Override the LLM rerank model ID.
+
+`shortlist` controls how many fused candidates are scored by the reranker. It does **not** cap the final output size.
+Higher values can improve reranking quality but increase CPU latency for `page-index-llm`; lower values are usually faster and better for interactive use.
+`limit` controls how many search results are returned.
+If `shortlist` is smaller than `limit`, results beyond the reranked shortlist are filled with the highest-scoring fused results that were not reranked.
+If `shortlist` is larger than `limit`, reranking runs on a wider pool and still returns only the top `limit` final results.
 
 ---
 
