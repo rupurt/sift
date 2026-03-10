@@ -1,12 +1,13 @@
 ---
 id: VDVkORseE
 title: Example Consumer CLI
-status: in-progress
+status: done
 epic: VDVkH5a6M
 created_at: 2026-03-10T16:42:33
 index: 1
 updated_at: 2026-03-10T16:45:26
 started_at: 2026-03-10T16:45:35
+completed_at: 2026-03-10T16:54:45
 ---
 
 # Example Consumer CLI
@@ -20,15 +21,17 @@ started_at: 2026-03-10T16:45:35
 |----------|-------------|
 | [SRS.md](SRS.md) | Requirements and verification criteria |
 | [SDD.md](SDD.md) | Architecture and implementation details |
+| [VOYAGE_REPORT.md](VOYAGE_REPORT.md) | Narrative summary of implementation and evidence |
+| [COMPLIANCE_REPORT.md](COMPLIANCE_REPORT.md) | Traceability matrix and verification proof |
 <!-- END DOCUMENTS -->
 
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 1/2 stories complete
+**Progress:** 2/2 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
-| [Document The Runnable Embedded Example](../../../../stories/VDVkxNEcJ/README.md) | docs | backlog |
+| [Document The Runnable Embedded Example](../../../../stories/VDVkxNEcJ/README.md) | docs | done |
 | [Add Sift-Embed Example Crate And Just Recipes](../../../../stories/VDVkxNXc4/README.md) | feat | done |
 <!-- END GENERATED -->

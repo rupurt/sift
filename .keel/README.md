@@ -50,11 +50,11 @@
 |--------|--------|
 | [Implement Qwen Model Integration](epics/VDQEsPjsm/voyages/VDQEwIQMs/) | done |
 
-### [Runnable Embedded Example Consumer](epics/VDVkH5a6M/) (active)
+### [Runnable Embedded Example Consumer](epics/VDVkH5a6M/) (done)
 
 | Voyage | Status |
 |--------|--------|
-| [Example Consumer CLI](epics/VDVkH5a6M/voyages/VDVkORseE/) | in-progress |
+| [Example Consumer CLI](epics/VDVkH5a6M/voyages/VDVkORseE/) | done |
 
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 

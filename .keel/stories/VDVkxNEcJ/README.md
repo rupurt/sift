@@ -2,12 +2,13 @@
 id: VDVkxNEcJ
 title: Document The Runnable Embedded Example
 type: docs
-status: in-progress
+status: done
 created_at: 2026-03-10T16:44:47
-updated_at: 2026-03-10T16:51:53
+updated_at: 2026-03-10T16:53:43
 scope: VDVkH5a6M/VDVkORseE
 index: 1
 started_at: 2026-03-10T16:51:53
+completed_at: 2026-03-10T16:53:43
 ---
 
 # Document The Runnable Embedded Example

@@ -19,8 +19,8 @@ index: 6
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 1/2 stories done
+**Progress:** 1/1 voyages complete, 2/2 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Example Consumer CLI](voyages/VDVkORseE/) | in-progress | 1/2 |
+| [Example Consumer CLI](voyages/VDVkORseE/) | done | 2/2 |
 <!-- END GENERATED -->
