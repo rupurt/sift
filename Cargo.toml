@@ -16,6 +16,7 @@ flate2 = { version = "1.1.9", features = ["rust_backend"], default-features = fa
 fs2 = "0.4.3"
 html2text = "0.15.3"
 ignore = "0.4.25"
+memmap2 = "0.9.10"
 pdf-extract = "0.10.0"
 rayon = "1.11.0"
 rust_tokenizers = { version = "8.1.1", default-features = false }

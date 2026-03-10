@@ -32,7 +32,8 @@
 
 | Voyage | Status |
 |--------|--------|
-| [Query Embedding and Memory Allocation Optimization](epics/VDPy8MNer/voyages/VDPyAtjbT/) | in-progress |
+| [Query Embedding and Memory Allocation Optimization](epics/VDPy8MNer/voyages/VDPyAtjbT/) | done |
+| [Mmap-Accelerated Blob Retrieval](epics/VDPy8MNer/voyages/VDQ0Y5HBn/) | in-progress |
 
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 

@@ -109,8 +109,16 @@ pub fn load_blob(blobs_dir: &Path, hash: &str) -> Result<Document> {
     let path = blobs_dir.join(hash);
     let file = File::open(&path).with_context(|| format!("failed to open blob {}", path.display()))?;
     
-    let document: Document = bincode::deserialize_from(&file)
-        .with_context(|| format!("failed to deserialize document blob from {}", path.display()))?;
-        
+    // Attempt mmap loading, fallback to standard I/O if it fails (e.g. empty file or OS restriction)
+    let document: Document = match unsafe { memmap2::Mmap::map(&file) } {
+        Ok(mmap) => bincode::deserialize(&mmap)
+            .with_context(|| format!("failed to deserialize document blob from mmap {}", path.display()))?,
+        Err(e) => {
+            tracing::warn!("failed to mmap blob {}, falling back to standard I/O: {}", path.display(), e);
+            bincode::deserialize_from(&file)
+                .with_context(|| format!("failed to deserialize document blob from file {}", path.display()))?
+        }
+    };
+    
     Ok(document)
 }

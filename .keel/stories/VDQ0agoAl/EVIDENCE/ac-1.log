@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T17:09:34.171502699-07:00
+mode: manual
+---
+load_blob successfully uses memmap2::Mmap for retrieval

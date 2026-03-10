@@ -2181,6 +2181,7 @@ dependencies = [
  "fs2",
  "html2text",
  "ignore",
+ "memmap2",
  "pdf-extract",
  "rayon",
  "rust_tokenizers",

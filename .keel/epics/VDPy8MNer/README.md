@@ -19,8 +19,9 @@ index: 3
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 2/3 stories done
+**Progress:** 1/2 voyages complete, 3/4 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Query Embedding and Memory Allocation Optimization](voyages/VDPyAtjbT/) | in-progress | 2/3 |
+| [Query Embedding and Memory Allocation Optimization](voyages/VDPyAtjbT/) | done | 3/3 |
+| [Mmap-Accelerated Blob Retrieval](voyages/VDQ0Y5HBn/) | in-progress | 0/1 |
 <!-- END GENERATED -->

@@ -2,12 +2,14 @@
 id: VDPyDj6iA
 title: Reduce Search Pipeline Memory Allocations
 type: feat
-status: in-progress
+status: done
 created_at: 2026-03-09T17:02:00
-updated_at: 2026-03-09T17:02:00
+updated_at: 2026-03-09T17:08:49
 scope: VDPy8MNer/VDPyAtjbT
 index: 3
 started_at: 2026-03-09T17:15:35
+submitted_at: 2026-03-09T17:08:49
+completed_at: 2026-03-09T17:08:49
 ---
 
 # Reduce Search Pipeline Memory Allocations
