@@ -182,7 +182,12 @@ At this stage of development, this repository uses a hard cutover policy by defa
 
 These define current constraints and workflow:
 
+- `CONSTITUTION.md` — non-negotiable product and engineering principles.
 - `README.md` — repository intent and product positioning.
+- `ARCHITECTURE.md` — system design principles, execution model, and core boundaries.
+- `CONFIGURATION.md` — configuration sources, overrides, and ignore-file behavior.
+- `EVALUATION.md` — evaluation datasets, benchmarking workflow, and measurement guidance.
+- `RELEASE.md` — release automation, packaging, and versioning process.
 - `flake.nix` — Nix development environment and shared tooling entrypoint.
 - `Cargo.toml` — crate dependencies and current package metadata.
 - `src/main.rs` — current CLI surface and execution entrypoint.
@@ -190,7 +195,8 @@ These define current constraints and workflow:
 - `.keel/` planning artifacts — executable requirements, design, and work breakdown.
 
 Use this order when interpreting constraints: ADRs, when present, then
-`README.md`, then planning artifacts.
+`CONSTITUTION.md`, `README.md`, `ARCHITECTURE.md`, `CONFIGURATION.md`,
+`EVALUATION.md`, `RELEASE.md`, then planning artifacts.
 
 ## Project Overview
 
