@@ -2,12 +2,13 @@
 id: VDVSF1KAM
 title: Decouple Public API From CLI Concerns
 type: feat
-status: in-progress
+status: done
 created_at: 2026-03-10T15:30:27
-updated_at: 2026-03-10T15:48:50
+updated_at: 2026-03-10T15:52:51
 scope: VDVQurZER/VDVRkNjgH
 index: 2
 started_at: 2026-03-10T15:48:50
+completed_at: 2026-03-10T15:52:51
 ---
 
 # Decouple Public API From CLI Concerns

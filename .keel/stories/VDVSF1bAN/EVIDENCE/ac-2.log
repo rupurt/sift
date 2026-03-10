@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-10T15:57:44.374199733-07:00
+mode: manual
+---
+Manual review of /home/alex/workspace/rupurt/sift/src/main.rs confirmed the CLI contract remains intact: the top-level Commands enum still exposes Dataset, Eval, Config, and Search(SearchCommand); the search subcommand keeps override_usage and after_help text; and the retriever/fusion/reranking value names are pinned explicitly to bm25, phrase, vector, rrf, none, position-aware, and llm. Attempted runtime help proofs with cargo run -- --help and cargo run -- search --help are blocked in this environment by the known mold/glibc linker failure with symbols including open64, lseek64, and gnu_get_libc_version.

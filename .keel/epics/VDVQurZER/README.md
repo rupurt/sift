@@ -20,8 +20,8 @@ created_at: 2026-03-10T15:28:07
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 1/4 stories done
+**Progress:** 0/1 voyages complete, 2/4 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Library Facade and Packaging Cutover](voyages/VDVRkNjgH/) | in-progress | 1/4 |
+| [Library Facade and Packaging Cutover](voyages/VDVRkNjgH/) | in-progress | 2/4 |
 <!-- END GENERATED -->

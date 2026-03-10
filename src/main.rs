@@ -1,22 +1,20 @@
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use sift::cache::cache_dir;
 use sift::config::Config;
-use sift::dense::{DenseModelSpec, DenseReranker};
+use sift::dense::DenseModelSpec;
 use sift::eval::{
     LatencyEvaluationRequest, QualityEvaluationRequest, download_scifact_dataset,
     materialize_scifact_dir, render_comparative_report, run_comparative_evaluation,
     run_latency_evaluation, run_quality_evaluation,
 };
 use sift::search::adapters::qwen::{DEFAULT_QWEN_MODEL_ID, DEFAULT_QWEN_REVISION, QwenModelSpec};
-use sift::search::{
-    Embedder, FusionPolicy, LocalFileCorpusRepository, OutputFormat, RerankingPolicy,
-    RetrieverPolicy, SearchRequest, StrategyPresetRegistry, render_search_response, run_search,
-};
+use sift::search::{OutputFormat, render_search_response};
 use sift::system::Telemetry;
-use std::sync::Arc;
+use sift::{Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 const SCIFACT_BASE_URL: &str = "https://huggingface.co/datasets/BeIR/scifact/resolve/main";
@@ -88,17 +86,71 @@ struct SearchCommand {
     verbose: u8,
 
     #[arg(long, value_delimiter = ',', num_args = 1..)]
-    retrievers: Option<Vec<RetrieverPolicy>>,
+    retrievers: Option<Vec<SearchRetriever>>,
 
     #[arg(long)]
-    fusion: Option<FusionPolicy>,
+    fusion: Option<SearchFusion>,
 
     #[arg(long)]
-    reranking: Option<RerankingPolicy>,
+    reranking: Option<SearchReranking>,
 
     /// Provide QUERY to search the current directory, or PATH QUERY to search a specific corpus.
     #[arg(num_args = 1..=2, value_names = ["PATH", "QUERY"])]
     targets: Vec<String>,
+}
+
+#[derive(clap::ValueEnum, Clone, Copy)]
+enum SearchRetriever {
+    #[value(name = "bm25")]
+    Bm25,
+    #[value(name = "phrase")]
+    Phrase,
+    #[value(name = "vector")]
+    Vector,
+}
+
+impl From<SearchRetriever> for Retriever {
+    fn from(value: SearchRetriever) -> Self {
+        match value {
+            SearchRetriever::Bm25 => Retriever::Bm25,
+            SearchRetriever::Phrase => Retriever::Phrase,
+            SearchRetriever::Vector => Retriever::Vector,
+        }
+    }
+}
+
+#[derive(clap::ValueEnum, Clone, Copy)]
+enum SearchFusion {
+    #[value(name = "rrf")]
+    Rrf,
+}
+
+impl From<SearchFusion> for Fusion {
+    fn from(value: SearchFusion) -> Self {
+        match value {
+            SearchFusion::Rrf => Fusion::Rrf,
+        }
+    }
+}
+
+#[derive(clap::ValueEnum, Clone, Copy)]
+enum SearchReranking {
+    #[value(name = "none")]
+    None,
+    #[value(name = "position-aware")]
+    PositionAware,
+    #[value(name = "llm")]
+    Llm,
+}
+
+impl From<SearchReranking> for Reranking {
+    fn from(value: SearchReranking) -> Self {
+        match value {
+            SearchReranking::None => Reranking::None,
+            SearchReranking::PositionAware => Reranking::PositionAware,
+            SearchReranking::Llm => Reranking::Llm,
+        }
+    }
 }
 
 impl SearchCommand {
@@ -108,6 +160,82 @@ impl SearchCommand {
             [path, query] => (PathBuf::from(path), query.clone()),
             _ => unreachable!("clap enforces one or two search targets"),
         }
+    }
+
+    fn output_format(&self) -> OutputFormat {
+        if self.json {
+            OutputFormat::Json
+        } else {
+            OutputFormat::Text
+        }
+    }
+
+    fn to_input(&self, config: &Config) -> SearchInput {
+        let (path, query) = self.resolve_targets();
+        let mut options = SearchOptions::default().with_verbose(self.verbose);
+
+        if let Some(strategy) = &self.strategy {
+            options = options.with_strategy(strategy.clone());
+        }
+        if let Some(limit) = self.limit {
+            options = options.with_limit(limit);
+        }
+        if let Some(shortlist) = self.shortlist {
+            options = options.with_shortlist(shortlist);
+        }
+        if let Some(dense_model) = self.resolve_dense_model(config) {
+            options = options.with_dense_model(dense_model);
+        }
+        if let Some(rerank_model) = self.resolve_rerank_model(config) {
+            options = options.with_rerank_model(rerank_model);
+        }
+        if let Some(retrievers) = &self.retrievers {
+            options = options.with_retrievers(retrievers.iter().copied().map(Into::into).collect());
+        }
+        if let Some(fusion) = self.fusion {
+            options = options.with_fusion(fusion.into());
+        }
+        if let Some(reranking) = self.reranking {
+            options = options.with_reranking(reranking.into());
+        }
+
+        SearchInput::new(path, query).with_options(options)
+    }
+
+    fn resolve_dense_model(&self, config: &Config) -> Option<DenseModelSpec> {
+        if self.model_id.is_none() && self.model_revision.is_none() && self.max_length.is_none() {
+            return None;
+        }
+
+        Some(DenseModelSpec::with_overrides(
+            self.model_id
+                .clone()
+                .or(Some(config.embedding.model_id.clone())),
+            self.model_revision
+                .clone()
+                .or(Some(config.embedding.model_revision.clone())),
+            self.max_length.or(Some(config.embedding.max_length)),
+        ))
+    }
+
+    fn resolve_rerank_model(&self, config: &Config) -> Option<QwenModelSpec> {
+        if self.rerank_model_id.is_none() && self.rerank_revision.is_none() {
+            return None;
+        }
+
+        Some(QwenModelSpec {
+            model_id: self
+                .rerank_model_id
+                .clone()
+                .or(Some(config.rerank.model_id.clone()))
+                .unwrap_or_else(|| DEFAULT_QWEN_MODEL_ID.to_string()),
+            revision: self
+                .rerank_revision
+                .clone()
+                .or(Some(config.rerank.model_revision.clone()))
+                .unwrap_or_else(|| DEFAULT_QWEN_REVISION.to_string()),
+            max_length: config.rerank.max_length,
+        })
     }
 }
 
@@ -458,88 +586,15 @@ fn main() -> Result<()> {
             println!("{}", Config::highlight_toml(&toml_string));
         }
         Commands::Search(search) => {
-            let (path, query) = search.resolve_targets();
-            let strategy = search
-                .strategy
-                .unwrap_or_else(|| config.search.strategy.clone());
-            let limit = search.limit.unwrap_or(config.search.limit);
-            let shortlist = search.shortlist.unwrap_or(config.search.shortlist);
-
-            let spec = DenseModelSpec::with_overrides(
-                search
-                    .model_id
-                    .clone()
-                    .or(Some(config.embedding.model_id.clone())),
-                search
-                    .model_revision
-                    .clone()
-                    .or(Some(config.embedding.model_revision.clone())),
-                search.max_length.or(Some(config.embedding.max_length)),
-            );
-
-            let registry = StrategyPresetRegistry::default_registry();
-            let plan = registry.resolve(&strategy)?;
-            let mut embedder = None;
-            if plan.retrievers.contains(&RetrieverPolicy::Vector)
-                || search
-                    .retrievers
-                    .as_ref()
-                    .map(|r| r.contains(&RetrieverPolicy::Vector))
-                    .unwrap_or(false)
-            {
-                embedder = Some(Arc::new(DenseReranker::load(spec.clone())?) as Arc<dyn Embedder>);
-            }
-
-            let rerank_spec = if search.rerank_model_id.is_some()
-                || search.rerank_revision.is_some()
-                || plan.reranking == RerankingPolicy::Llm
-            {
-                Some(QwenModelSpec {
-                    model_id: search
-                        .rerank_model_id
-                        .clone()
-                        .or(Some(config.rerank.model_id.clone()))
-                        .unwrap_or_else(|| DEFAULT_QWEN_MODEL_ID.to_string()),
-                    revision: search
-                        .rerank_revision
-                        .clone()
-                        .or(Some(config.rerank.model_revision.clone()))
-                        .unwrap_or_else(|| DEFAULT_QWEN_REVISION.to_string()),
-                    max_length: config.rerank.max_length,
-                })
-            } else {
-                None
-            };
-
-            let response = run_search(
-                &SearchRequest {
-                    strategy,
-                    query,
-                    path,
-                    limit,
-                    shortlist,
-                    dense_model: spec,
-                    rerank_model: rerank_spec,
-                    verbose: search.verbose,
-                    retrievers: search.retrievers.clone(),
-                    fusion: search.fusion,
-                    reranking: search.reranking,
-                    telemetry: telemetry.clone(),
-                    cache_dir: None,
-                    query_cache: Some(query_cache.clone()),
-                },
-                Some(&ignore),
-                &LocalFileCorpusRepository,
-                embedder,
-            )?;
-            let output = render_search_response(
-                &response,
-                if search.json {
-                    OutputFormat::Json
-                } else {
-                    OutputFormat::Text
-                },
-            )?;
+            let input = search.to_input(&config);
+            let response = Sift::builder()
+                .with_config(config)
+                .with_ignore(ignore)
+                .with_telemetry(telemetry)
+                .with_query_cache(query_cache)
+                .build()
+                .search(input)?;
+            let output = render_search_response(&response, search.output_format())?;
             println!("{output}");
         }
     }

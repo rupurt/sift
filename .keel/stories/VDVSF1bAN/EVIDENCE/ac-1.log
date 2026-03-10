@@ -1,0 +1,8 @@
+---
+recorded_at: 2026-03-10T15:57:34.518608839-07:00
+command: sh -lc 'cd /home/alex/workspace/rupurt/sift && cargo check --bin sift && rg -n "Sift::builder" /home/alex/workspace/rupurt/sift/src/main.rs && ! rg -n "SearchRequest|run_search|LocalFileCorpusRepository|StrategyPresetRegistry|DenseReranker|Embedder|RetrieverPolicy|FusionPolicy|RerankingPolicy" /home/alex/workspace/rupurt/sift/src/main.rs'
+---
+590:            let response = Sift::builder()
+
+--- stderr ---
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.14s
