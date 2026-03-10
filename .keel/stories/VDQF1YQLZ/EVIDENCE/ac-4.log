@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T18:21:53.519622961-07:00
+mode: manual
+---
+Reranking phase uses tracing spans correctly

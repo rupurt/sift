@@ -42,6 +42,7 @@ mod tests {
                 limit: 10,
                 shortlist: 10,
                 dense_model: DenseModelSpec::default(),
+                rerank_model: None,
                 verbose: 0,
                 retrievers: None,
                 fusion: None,

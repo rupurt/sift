@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T18:21:53.490794238-07:00
+mode: manual
+---
+SearchServiceBuilder now instantiates QwenReranker for Llm policy

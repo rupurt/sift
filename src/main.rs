@@ -5,6 +5,9 @@ use clap::{Args, Parser, Subcommand};
 use sift::cache::cache_dir;
 use sift::config::Config;
 use sift::dense::{DenseModelSpec, DenseReranker};
+use sift::search::adapters::qwen::{
+    DEFAULT_QWEN_MAX_LENGTH, DEFAULT_QWEN_MODEL_ID, DEFAULT_QWEN_REVISION, QwenModelSpec,
+};
 use sift::eval::{
     LatencyEvaluationRequest, QualityEvaluationRequest, download_scifact_dataset,
     materialize_scifact_dir, render_comparative_report, run_comparative_evaluation,
@@ -70,6 +73,12 @@ struct SearchCommand {
 
     #[arg(long)]
     model_revision: Option<String>,
+
+    #[arg(long)]
+    rerank_model_id: Option<String>,
+
+    #[arg(long)]
+    rerank_revision: Option<String>,
 
     #[arg(long)]
     max_length: Option<usize>,
@@ -442,6 +451,22 @@ fn main() -> Result<()> {
                 embedder = Some(Arc::new(DenseReranker::load(spec.clone())?) as Arc<dyn Embedder>);
             }
 
+            let rerank_spec = if search.rerank_model_id.is_some() || search.rerank_revision.is_some() {
+                Some(QwenModelSpec {
+                    model_id: search
+                        .rerank_model_id
+                        .clone()
+                        .unwrap_or_else(|| DEFAULT_QWEN_MODEL_ID.to_string()),
+                    revision: search
+                        .rerank_revision
+                        .clone()
+                        .unwrap_or_else(|| DEFAULT_QWEN_REVISION.to_string()),
+                    max_length: DEFAULT_QWEN_MAX_LENGTH,
+                })
+            } else {
+                None
+            };
+
             let response = run_search(
                 &SearchRequest {
                     strategy,
@@ -450,6 +475,7 @@ fn main() -> Result<()> {
                     limit,
                     shortlist,
                     dense_model: spec,
+                    rerank_model: rerank_spec,
                     verbose: search.verbose,
                     retrievers: search.retrievers.clone(),
                     fusion: search.fusion,

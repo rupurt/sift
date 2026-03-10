@@ -2,6 +2,7 @@ use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use super::adapters::qwen::{QwenModelSpec, QwenReranker};
 use super::adapters::*;
 use super::domain::*;
 use crate::config::Ignore;
@@ -13,6 +14,7 @@ impl SearchServiceBuilder {
         plan: &SearchPlan,
         embedder: Option<Arc<dyn Embedder>>,
         query_cache: Option<QueryEmbeddingCache>,
+        llm_reranker: Option<Box<dyn Reranker>>,
     ) -> SearchService {
         let mut service = SearchService::new();
 
@@ -25,7 +27,12 @@ impl SearchServiceBuilder {
             RerankingPolicy::PositionAware,
             Box::new(PositionAwareReranker),
         );
-        service.register_reranker(RerankingPolicy::Llm, Box::new(MockLlmReranker));
+
+        if let Some(r) = llm_reranker {
+            service.register_reranker(RerankingPolicy::Llm, r);
+        } else {
+            service.register_reranker(RerankingPolicy::Llm, Box::new(MockLlmReranker));
+        }
 
         // Register retrievers based on plan
         if plan.retrievers.contains(&RetrieverPolicy::Bm25) {
@@ -143,6 +150,22 @@ impl StrategyPresetRegistry {
             "page-index-llm",
             SearchPlan {
                 name: "page-index-llm".to_string(),
+                query_expansion: QueryExpansionPolicy::None,
+                retrievers: vec![
+                    RetrieverPolicy::Bm25,
+                    RetrieverPolicy::Phrase,
+                    RetrieverPolicy::Vector,
+                ],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::Llm,
+            },
+        );
+
+        // page-index-qwen (alias for page-index-llm for explicit Qwen testing)
+        registry.register(
+            "page-index-qwen",
+            SearchPlan {
+                name: "page-index-qwen".to_string(),
                 query_expansion: QueryExpansionPolicy::None,
                 retrievers: vec![
                     RetrieverPolicy::Bm25,
@@ -326,7 +349,7 @@ impl<'a> SearchEnvironment<'a> {
             plan.reranking = reranking;
         }
 
-        let service = SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone());
+        let service = SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone(), None);
 
         Ok(Self {
             service,
@@ -418,7 +441,22 @@ pub fn run_search(
         corpus_start.elapsed()
     );
 
-    let service = SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone());
+    let llm_reranker = if plan.reranking == RerankingPolicy::Llm {
+        if let Some(spec) = &request.rerank_model {
+            Some(Box::new(QwenReranker::load(spec.clone())?) as Box<dyn Reranker>)
+        } else {
+            Some(Box::new(QwenReranker::load(QwenModelSpec::default())?) as Box<dyn Reranker>)
+        }
+    } else {
+        None
+    };
+
+    let service = SearchServiceBuilder::build(
+        &plan,
+        embedder,
+        request.query_cache.clone(),
+        llm_reranker,
+    );
 
     let index_start = std::time::Instant::now();
     let index = Bm25Index::build(&corpus.documents);

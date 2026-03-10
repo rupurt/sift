@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T18:21:35.502479686-07:00
+mode: manual
+---
+Successfully implemented QwenReranker loading Qwen2.5-0.5B-Instruct weights

@@ -43,6 +43,12 @@
 | [Add Homebrew Platform Support](epics/VDQ8Ll4DX/voyages/VDQ9bZoZV/) | done |
 | [Optimize Artifact Portability](epics/VDQ8Ll4DX/voyages/VDQAsfNUx/) | done |
 
+### [Qwen LLM Reranking Architecture](epics/VDQEsPjsm/) (done)
+
+| Voyage | Status |
+|--------|--------|
+| [Implement Qwen Model Integration](epics/VDQEsPjsm/voyages/VDQEwIQMs/) | done |
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |

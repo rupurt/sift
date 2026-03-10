@@ -37,6 +37,8 @@ use std::sync::{Arc, RwLock};
 
 pub type QueryEmbeddingCache = Arc<RwLock<HashMap<String, Vec<f32>>>>;
 
+use crate::search::adapters::qwen::QwenModelSpec;
+
 #[derive(Debug, Clone)]
 pub struct SearchRequest {
     pub strategy: String,
@@ -45,6 +47,7 @@ pub struct SearchRequest {
     pub limit: usize,
     pub shortlist: usize,
     pub dense_model: DenseModelSpec,
+    pub rerank_model: Option<QwenModelSpec>,
     pub verbose: u8,
     pub retrievers: Option<Vec<RetrieverPolicy>>,
     pub fusion: Option<FusionPolicy>,

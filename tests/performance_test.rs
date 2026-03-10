@@ -42,6 +42,7 @@ fn test_query_embedding_cache_avoids_redundant_calls() {
         limit: 10,
         shortlist: 10,
         dense_model: DenseModelSpec::default(),
+        rerank_model: None,
         verbose: 0,
         retrievers: None,
         fusion: None,

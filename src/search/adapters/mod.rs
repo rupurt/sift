@@ -434,4 +434,5 @@ mod tests {
 }
 
 pub mod cli;
+pub mod qwen;
 pub use cli::*;
