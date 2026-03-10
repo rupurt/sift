@@ -26,6 +26,7 @@
         pkgs = import nixpkgs { inherit system overlays; };
         rust = pkgs.rust-bin.stable.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" ];
+          targets = [ "x86_64-unknown-linux-gnu" "x86_64-unknown-linux-musl" ];
         };
         isLinux = pkgs.stdenv.isLinux;
         keelPkg = keel.packages.${system}.keel;
@@ -41,11 +42,38 @@
 
         linuxInputs = pkgs.lib.optionals isLinux [
           pkgs.mold
+          pkgs.musl
         ];
+
+        siftPkg = pkgs.rustPlatform.buildRustPackage {
+          pname = "sift";
+          version = "0.1.0";
+          src = ./.;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [ pkgs.xz pkgs.zlib ];
+          doCheck = false;
+        };
+
+        siftStatic = pkgs.pkgsStatic.rustPlatform.buildRustPackage {
+          pname = "sift-static";
+          version = "0.1.0";
+          src = ./.;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
+          nativeBuildInputs = [ pkgs.pkg-config ];
+          buildInputs = [ pkgs.xz pkgs.zlib ];
+          doCheck = false;
+        };
       in {
         packages = {
+          sift = siftPkg;
+          sift-static = siftStatic;
           keel = keelPkg;
-          default = keelPkg;
+          default = siftPkg;
         };
 
         devShells.default = pkgs.mkShell {

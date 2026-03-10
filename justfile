@@ -58,6 +58,16 @@ check:
     cargo nextest run
     cargo test --doc
 
+build-static:
+    @if [ -f "flake.nix" ]; then \
+        echo "Building static binary using Nix..."; \
+        nix build .#sift-static --out-link target/release/sift-static; \
+        echo "Static binary created at target/release/sift-static/bin/sift"; \
+    else \
+        echo "Static build only supported via Nix in this recipe."; \
+        exit 1; \
+    fi
+
 search *args:
     cargo run --release -- search {{args}}
 
