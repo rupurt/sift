@@ -63,7 +63,8 @@ Once the GitHub Action completes:
 
 | Platform | Target Triple | Artifacts |
 |----------|---------------|-----------|
-| **Linux (x86_64)** | `x86_64-unknown-linux-gnu` | `.tar.gz`, `.deb`, `.rpm`, shell script |
+| **Linux (x86_64, glibc)** | `x86_64-unknown-linux-gnu` | `.tar.gz`, `.deb`, `.rpm`, shell script |
+| **Linux (x86_64, static)** | `x86_64-unknown-linux-musl` | `.tar.gz`, `.deb`, `.rpm` |
 | **Linux (ARM64)** | `aarch64-unknown-linux-gnu` | `.tar.gz`, `.deb`, `.rpm` |
 | **macOS (Intel)** | `x86_64-apple-darwin` | `.tar.gz`, `.dmg` |
 | **macOS (Apple Silicon)** | `aarch64-apple-darwin` | `.tar.gz`, `.dmg` |
