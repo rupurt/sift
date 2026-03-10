@@ -135,11 +135,13 @@ enum EvalCommands {
     /// Compare all available strategies
     All {
         #[arg(long)]
-        corpus: PathBuf,
+        dataset: Option<Dataset>,
+        #[arg(long)]
+        corpus: Option<PathBuf>,
         #[arg(long)]
         queries: Option<PathBuf>,
         #[arg(long)]
-        qrels: PathBuf,
+        qrels: Option<PathBuf>,
         #[arg(long)]
         shortlist: Option<usize>,
         #[arg(long)]
@@ -162,11 +164,13 @@ enum EvalCommands {
         #[arg(long)]
         baseline: Option<String>,
         #[arg(long)]
-        corpus: PathBuf,
+        dataset: Option<Dataset>,
+        #[arg(long)]
+        corpus: Option<PathBuf>,
         #[arg(long)]
         queries: Option<PathBuf>,
         #[arg(long)]
-        qrels: PathBuf,
+        qrels: Option<PathBuf>,
         #[arg(long)]
         shortlist: Option<usize>,
         #[arg(long)]
@@ -185,9 +189,11 @@ enum EvalCommands {
         #[arg(long)]
         strategy: Option<String>,
         #[arg(long)]
-        corpus: PathBuf,
+        dataset: Option<Dataset>,
         #[arg(long)]
-        queries: PathBuf,
+        corpus: Option<PathBuf>,
+        #[arg(long)]
+        queries: Option<PathBuf>,
         #[arg(long)]
         shortlist: Option<usize>,
         #[arg(long)]
@@ -206,6 +212,26 @@ enum EvalCommands {
 #[derive(clap::ValueEnum, Clone, Copy)]
 enum Dataset {
     Scifact,
+}
+
+fn resolve_eval_paths(
+    dataset: Option<Dataset>,
+    corpus: Option<PathBuf>,
+    qrels: Option<PathBuf>,
+    queries: Option<PathBuf>,
+) -> Result<(PathBuf, Option<PathBuf>, Option<PathBuf>)> {
+    match (dataset, corpus, qrels) {
+        (Some(Dataset::Scifact), None, None) => {
+            let base = cache_dir("eval")?.join("scifact");
+            let corpus = cache_dir("eval")?.join("scifact-files");
+            let qrels = base.join("qrels").join("test.tsv");
+            let queries = queries.or_else(|| Some(corpus.join("test-queries.tsv")));
+            Ok((corpus, Some(qrels), queries))
+        }
+        (None, Some(c), q) => Ok((c, q, queries)),
+        (Some(_), Some(c), q) => Ok((c, q, queries)),
+        _ => anyhow::bail!("either --dataset or --corpus must be provided"),
+    }
 }
 
 fn main() -> Result<()> {
@@ -299,6 +325,7 @@ fn main() -> Result<()> {
         },
         Commands::Eval { command } => match command {
             EvalCommands::All {
+                dataset,
                 corpus,
                 queries,
                 qrels,
@@ -310,6 +337,7 @@ fn main() -> Result<()> {
                 verbose,
                 query_limit,
             } => {
+                let (corpus, qrels, queries) = resolve_eval_paths(dataset, corpus, qrels, queries)?;
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
                 let report = run_comparative_evaluation(
                     &QualityEvaluationRequest {
@@ -318,7 +346,9 @@ fn main() -> Result<()> {
                         command: command_line,
                         corpus_dir: corpus,
                         queries_path: queries,
-                        qrels_path: qrels,
+                        qrels_path: qrels.ok_or_else(|| {
+                            anyhow::anyhow!("qrels file must be provided for quality evaluation")
+                        })?,
                         shortlist,
                         dense_model: DenseModelSpec::with_overrides(
                             model_id.clone().or(Some(config.embedding.model_id.clone())),
@@ -342,6 +372,7 @@ fn main() -> Result<()> {
             EvalCommands::Quality {
                 strategy,
                 baseline,
+                dataset,
                 corpus,
                 queries,
                 qrels,
@@ -352,6 +383,7 @@ fn main() -> Result<()> {
                 verbose,
                 query_limit,
             } => {
+                let (corpus, qrels, queries) = resolve_eval_paths(dataset, corpus, qrels, queries)?;
                 let strategy = strategy.unwrap_or_else(|| config.search.strategy.clone());
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
                 let report = run_quality_evaluation(
@@ -361,7 +393,9 @@ fn main() -> Result<()> {
                         command: command_line,
                         corpus_dir: corpus,
                         queries_path: queries,
-                        qrels_path: qrels,
+                        qrels_path: qrels.ok_or_else(|| {
+                            anyhow::anyhow!("qrels file must be provided for quality evaluation")
+                        })?,
                         shortlist,
                         dense_model: DenseModelSpec::with_overrides(
                             model_id.clone().or(Some(config.embedding.model_id.clone())),
@@ -379,6 +413,7 @@ fn main() -> Result<()> {
             }
             EvalCommands::Latency {
                 strategy,
+                dataset,
                 corpus,
                 queries,
                 shortlist,
@@ -388,6 +423,7 @@ fn main() -> Result<()> {
                 verbose,
                 query_limit,
             } => {
+                let (corpus, _, queries) = resolve_eval_paths(dataset, corpus, None, queries)?;
                 let strategy = strategy.unwrap_or_else(|| config.search.strategy.clone());
                 let shortlist = shortlist.unwrap_or(config.search.shortlist);
                 let report = run_latency_evaluation(
@@ -395,7 +431,9 @@ fn main() -> Result<()> {
                         strategy,
                         command: command_line,
                         corpus_dir: corpus,
-                        queries_path: queries,
+                        queries_path: queries.ok_or_else(|| {
+                            anyhow::anyhow!("queries file must be provided for latency evaluation")
+                        })?,
                         shortlist,
                         dense_model: DenseModelSpec::with_overrides(
                             model_id.clone().or(Some(config.embedding.model_id.clone())),

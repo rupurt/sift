@@ -14,14 +14,14 @@ Sift includes a built-in evaluation harness to measure retrieval quality and lat
 
 Before running evaluations, you must download and materialize an evaluation dataset (e.g., SciFact). Sift automates this via the `dataset` subcommand.
 
-All files are stored in your standard user cache directory (e.g., `~/.cache/sift/eval` on Linux).
+All files are stored in your standard user cache directory (e.g., `~/.cache/sift/eval` on Linux or `~/Library/Caches/com.rupurt.sift/eval` on macOS).
 
 ### 1. The SciFact Dataset
 SciFact is our primary dataset for local retrieval testing.
 
 ```bash
 # Downloads and prepares the SciFact dataset automatically
-# Files will be placed in $HOME/.cache/sift/eval/
+# Files will be placed in your user cache directory
 just dataset prepare
 ```
 
@@ -48,21 +48,21 @@ Runs all available strategies (BM25, Vector, Hybrid, etc.) and compares their me
 **Note:** Comparative evaluations are significantly accelerated by the **Query Embedding Cache**. Once a query is embedded for the first strategy, all subsequent strategies will reuse that embedding, reducing total runtime by hundreds of milliseconds per query.
 
 ```bash
-just eval all --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv
+just eval all --dataset scifact
 ```
 
 ### 2. Champion Evaluation (`eval hybrid`)
 Runs a comprehensive quality and latency report for the current champion strategy (`page-index-hybrid`) against the `bm25` baseline.
 
 ```bash
-just eval hybrid --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv --queries $HOME/.cache/sift/eval/scifact-files/test-queries.tsv
+just eval hybrid --dataset scifact
 ```
 
 ### 3. Baseline Evaluation (`eval baseline`)
 Runs a report for the standard `bm25` strategy.
 
 ```bash
-just eval baseline --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv --queries $HOME/.cache/sift/eval/scifact-files/test-queries.tsv
+just eval baseline --dataset scifact
 ```
 
 ### 4. Running a Subset (`--query-limit`)
@@ -70,7 +70,7 @@ For large datasets like SciFact, you can limit the number of queries evaluated t
 
 ```bash
 # Evaluate only the first 5 queries
-just eval all --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv --query-limit 5
+just eval all --dataset scifact --query-limit 5
 ```
 
 ---
@@ -89,7 +89,7 @@ Identify CPU bottlenecks and visualize where time is being spent in the search p
 
 ```bash
 # Requires cargo-flamegraph installed
-just eval-flamegraph all --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv
+just eval-flamegraph all --dataset scifact
 ```
 
 ---
