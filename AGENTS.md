@@ -237,9 +237,18 @@ Use one path for each concern:
 
 - `nix develop` for the repository shell and shared tooling.
 - `keel ...` for planning, execution, research, and verification workflows.
-- `cargo run -- ...` for the current CLI surface.
-- `cargo check` and `cargo test` for Rust verification as the codebase grows.
-- Project-specific workflows should be documented in `README.md` or a future `justfile` as the codebase grows.
+- `just ...` for primary development workflows (search, test, bench, eval).
+- `cargo ...` for low-level Rust operations.
+
+### Core `just` Recipes
+
+| Recipe | Description |
+|--------|-------------|
+| `just search` | Run a release search (e.g., `just search . "query"`) |
+| `just test` | Run the full verification suite (fmt, clippy, nextest) |
+| `just build` | Build the project and sync the binary to `target/debug` |
+| `just dataset prepare` | Download and materialize the evaluation dataset |
+| `just eval all` | Run comparative benchmarks across all strategies |
 
 ### Core `keel` Commands
 

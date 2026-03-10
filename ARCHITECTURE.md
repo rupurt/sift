@@ -11,22 +11,22 @@ Sift is designed using **Domain-Driven Design (DDD)** and **Hexagonal Architectu
 
 ## Execution Model
 
-### Parallel Processing (`rayon`)
-Sift leverages multi-core parallelism via the `rayon` crate during two critical phases:
-1. **Corpus Loading:** Files are extracted, segmented, and vectorized in parallel across all available CPU cores.
-2. **Evaluation Execution:** Multiple queries are evaluated concurrently during quality and latency testing.
-
-This parallel execution, combined with the heuristic cache, allows `sift` to scale to large repositories while maintaining sub-second search latency.
+### Optimized Retrieval Pipeline
+Sift is designed for maximum throughput on local hardware by minimizing I/O overhead and maximizing CPU efficiency:
+1. **Mapped I/O:** Uses `mmap` for reading document blobs from the global cache, allowing the OS to handle paging and reducing system call overhead.
+2. **SIMD Acceleration:** The core `dot_product` calculation for vector similarity is optimized using architecture-specific SIMD instructions (via the `wide` crate), achieving up to 7x speedup over scalar iterators.
+3. **Query Embedding Cache:** A session-level cache eliminates redundant neural network inference for identical queries during complex search strategies or batch evaluations.
+4. **Memory Optimization:** Critical scoring paths use pre-allocated buffers and zero-copy references to minimize heap allocations and pressure on the Rust allocator.
 
 ## Observability & Performance
 
 ### Structured Telemetry
 Sift uses the `tracing` crate to provide a detailed view of search execution.
 - **Spans:** Major search phases (Expansion, Retrieval, Fusion, Reranking) are wrapped in spans, enabling waterfall visualization of latency.
-- **Cache Telemetry:** The `Telemetry` module uses atomic counters to track the effectiveness of the asset pipeline across multi-threaded operations.
+- **Cache Telemetry:** The `Telemetry` module uses atomic counters to track the effectiveness of the asset pipeline.
 
 ### Performance Guardrails
-- **Micro-benchmarks:** Crucial low-level functions (e.g., `tokenize`) are protected by `criterion` benchmarks in the `benches/` directory.
+- **Micro-benchmarks:** Crucial low-level functions (e.g., `tokenize`, `dot_product`) are protected by `criterion` benchmarks in the `benches/` directory.
 - **Flamegraphs:** Integration with `cargo-flamegraph` allows for deep inspection of CPU bottlenecks.
 
 ## Hexagonal Boundaries
@@ -56,6 +56,8 @@ Adapters are the concrete implementations of the domain ports.
 - `Bm25Retriever`: Uses the in-memory term-frequency index to score documents.
 - `PhraseRetriever`: Performs exact string matching.
 - `SegmentVectorRetriever`: Uses the `candle` machine learning framework to embed queries and document segments.
+- `QwenReranker`: Uses a local LLM (Qwen2.5) to perform deep semantic relevance scoring of top candidates.
+- `PositionAwareReranker`: Applies structural heuristics (filename/heading matches) to boost relevance.
 - `RrfFuser`: Implements Reciprocal Rank Fusion to balance scores between different retrieval methods.
 
 ## The Incremental File Cache (`src/cache/`)

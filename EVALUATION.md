@@ -45,6 +45,8 @@ The `eval` subcommand (and the `just eval` module) is used to measure search per
 ### 1. Comparative Evaluation (`eval all`)
 Runs all available strategies (BM25, Vector, Hybrid, etc.) and compares their metrics.
 
+**Note:** Comparative evaluations are significantly accelerated by the **Query Embedding Cache**. Once a query is embedded for the first strategy, all subsequent strategies will reuse that embedding, reducing total runtime by hundreds of milliseconds per query.
+
 ```bash
 just eval all --corpus $HOME/.cache/sift/eval/scifact-files --qrels $HOME/.cache/sift/eval/scifact/qrels/test.tsv
 ```
