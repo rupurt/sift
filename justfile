@@ -84,6 +84,12 @@ build-static:
 search *args:
     cargo run --release -- search {{args}}
 
+embed-build:
+    cargo build --manifest-path examples/sift-embed/Cargo.toml
+
+embed-search *args:
+    cargo run --manifest-path examples/sift-embed/Cargo.toml -- search {{args}}
+
 config:
     cargo run --release -- config
 

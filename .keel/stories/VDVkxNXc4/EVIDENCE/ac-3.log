@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-10T16:48:18.814032101-07:00
+command: sh -lc 'cd /home/alex/workspace/rupurt/sift && ! rg -n "^\[workspace\]" Cargo.toml && ! rg -n "sift::internal" examples/sift-embed/src/main.rs && rg -n "^\[workspace\]$" examples/sift-embed/Cargo.toml'
+---
+7:[workspace]

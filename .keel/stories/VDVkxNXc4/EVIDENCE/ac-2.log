@@ -1,0 +1,6 @@
+---
+recorded_at: 2026-03-10T16:48:06.358254994-07:00
+command: sh -lc 'cd /home/alex/workspace/rupurt/sift && rg -n "^embed-build:|^embed-search" justfile'
+---
+87:embed-build:
+90:embed-search *args:
