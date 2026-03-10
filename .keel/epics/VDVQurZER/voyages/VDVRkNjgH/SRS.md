@@ -45,6 +45,7 @@
 | SRS-02 | The supported public library API must not require `clap`-derived types, terminal rendering helpers, or other CLI-only concerns in its contract. | SCOPE-02 | FR-02 | cargo test + file inspection |
 | SRS-03 | The `sift` executable must continue to build and expose the current command contract while consuming the curated library boundary. | SCOPE-03 | FR-03 | cargo test + `cargo run -- --help` + `cargo run -- search --help` |
 | SRS-04 | The cutover must explicitly document which exports and modules are supported public API versus internal implementation detail. | SCOPE-04 | FR-04 | docs review + public export inspection |
+| SRS-05 | Repository documentation must include a concrete guide showing how another Rust project depends on and invokes the supported embedded `sift` API. | SCOPE-04 | FR-05 | docs review + example inspection |
 <!-- END FUNCTIONAL_REQUIREMENTS -->
 
 ### Non-Functional Requirements
@@ -52,5 +53,5 @@
 <!-- BEGIN NON_FUNCTIONAL_REQUIREMENTS -->
 | ID | Requirement | Scope | Source | Verification |
 |----|-------------|-------|--------|--------------|
-| SRS-05 | The public API cutover must minimize avoidable semver surface area and package/release churn by keeping the initial rollout inside the existing package unless stronger evidence emerges. | SCOPE-01 | NFR-01 | module/export inspection + release-path review |
+| SRS-06 | The public API cutover must minimize avoidable semver surface area and package/release churn by keeping the initial rollout inside the existing package unless stronger evidence emerges. | SCOPE-01 | NFR-01 | module/export inspection + release-path review |
 <!-- END NON_FUNCTIONAL_REQUIREMENTS -->

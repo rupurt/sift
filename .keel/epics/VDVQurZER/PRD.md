@@ -69,6 +69,7 @@ avoidable churn to the current executable and release flow."
 | FR-02 | The supported library entrypoint must not require CLI parsing/rendering concerns or other terminal-specific helpers in its public contract. | GOAL-01 | must | External consumers should depend on search concepts, not CLI glue. |
 | FR-03 | The existing `sift` executable must continue to build and preserve its user-facing command contract while consuming the curated library boundary. | GOAL-02 | must | The packaging cutover should not regress current CLI users. |
 | FR-04 | The library packaging plan must explicitly document which modules and types are stable public surface versus internal implementation detail. | GOAL-01, GOAL-03 | should | This prevents accidental semver commitments. |
+| FR-05 | Repository documentation must include a concrete guide for using `sift` as a library from another Rust project. | GOAL-01 | must | An embeddable library is incomplete if consumers cannot discover the supported dependency and invocation pattern. |
 <!-- END FUNCTIONAL_REQUIREMENTS -->
 
 ### Non-Functional Requirements
@@ -104,6 +105,7 @@ avoidable churn to the current executable and release flow."
 - [x] The epic is grounded in a bearing-backed recommendation that favors a curated single-package facade before any workspace split.
 - [x] The initial voyage decomposes the cutover into implementable public-API and CLI-boundary slices.
 - [x] The scope explicitly preserves the existing executable contract while narrowing the supported library surface.
+- [x] The planned documentation work now includes a how-to-use-it-as-a-library requirement instead of only boundary/reference notes.
 <!-- END SUCCESS_CRITERIA -->
 
 ## Research Analysis

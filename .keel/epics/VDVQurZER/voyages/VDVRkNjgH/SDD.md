@@ -109,6 +109,8 @@ Expected interface direction:
 - high-level constructor/builder for default runtime wiring
 - search request/options type without CLI derives
 - search response/results type suitable for both CLI and library callers
+- documentation examples that show the supported dependency and invocation path
+  for Rust embedders
 - explicit internal modules that stay non-canonical even if still `pub(crate)`
   or otherwise available for tests/internal wiring
 
