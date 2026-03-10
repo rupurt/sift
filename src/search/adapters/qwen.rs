@@ -105,10 +105,10 @@ impl QwenReranker {
         })
     }
 
-    pub fn score_pair(&self, query: &str, document: &str) -> Result<f64> {
+    pub fn score_pair(&self, query: &str, filename: &str, document: &str) -> Result<f64> {
         let prompt = format!(
-            "<|im_start|>user\nQuery: {}\nDocument: {}\nIs this document relevant to the query? Answer with only 'Yes' or 'No'.<|im_end|>\n<|im_start|>assistant\n",
-            query, document
+            "<|im_start|>system\nYou are a technical search expert. Evaluate if the document snippet provides the logic, implementation, or test case for the user's query.\n\nFocus on matching the logical intent, not just common words like 'test' or 'config'.<|im_end|>\n<|im_start|>user\nQuery: {}\nFile: {}\nSnippet: {}\nIs this document a strong match for the query logic? Answer with only 'Yes' or 'No'.<|im_end|>\n<|im_start|>assistant\n",
+            query, filename, document
         );
         
         let encoding = self.tokenizer.encode(prompt, true)
@@ -154,7 +154,8 @@ impl Reranker for QwenReranker {
         for candidate in &mut candidates.results {
             let snippet = candidate.snippet.as_deref().unwrap_or("");
             if !snippet.is_empty() {
-                candidate.score = self.score_pair(query, snippet)?;
+                candidate.score =
+                    self.score_pair(query, &candidate.path.display().to_string(), snippet)?;
             }
         }
 
