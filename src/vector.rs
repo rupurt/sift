@@ -42,12 +42,13 @@ pub fn score_segments_manually(
     let query_vec = &query_embeddings[0];
 
     let mut hits = Vec::with_capacity(segments.len());
-    
-    // Split segments into those with embeddings and those without
-    let (cached, missing): (Vec<&Segment>, Vec<&Segment>) = segments.iter().partition(|s| s.embedding.is_some());
 
-    // 1. Process cached embeddings
-    for segment in cached {
+    // 1. Process segments with cached embeddings
+    // We iterate once to identify missing embeddings to pre-allocate correctly
+    let mut missing_indices = Vec::with_capacity(segments.len());
+    let mut missing_texts = Vec::with_capacity(segments.len());
+
+    for (i, segment) in segments.iter().enumerate() {
         if let Some(doc_vec) = &segment.embedding {
             let score = dot_product(query_vec, doc_vec);
             hits.push(SegmentHit {
@@ -58,15 +59,18 @@ pub fn score_segments_manually(
                 text: segment.text.clone(),
                 score: score as f64,
             });
+        } else {
+            missing_indices.push(i);
+            missing_texts.push(segment.text.clone());
         }
     }
 
     // 2. Process missing embeddings (on-the-fly inference)
-    if !missing.is_empty() {
-        let texts: Vec<_> = missing.iter().map(|s| s.text.clone()).collect();
-        let doc_embeddings = scorer.embed(&texts)?;
-        for (i, segment) in missing.iter().enumerate() {
-            let doc_vec = &doc_embeddings[i];
+    if !missing_texts.is_empty() {
+        let doc_embeddings = scorer.embed(&missing_texts)?;
+        for (idx_in_missing, original_idx) in missing_indices.into_iter().enumerate() {
+            let segment = &segments[original_idx];
+            let doc_vec = &doc_embeddings[idx_in_missing];
             let score = dot_product(query_vec, doc_vec);
             hits.push(SegmentHit {
                 segment_id: segment.id.clone(),
@@ -121,13 +125,15 @@ pub fn retrieve_semantic_documents<S: SegmentScorer>(
         return Ok(Vec::new());
     }
 
-    let hits = scorer
-        .score_segments(query, segments)?
-        .into_iter()
-        .filter(|hit| hit.score.is_finite() && hit.score > 0.0)
-        .collect::<Vec<_>>();
+    let all_hits = scorer.score_segments(query, segments)?;
+    let mut filtered_hits = Vec::with_capacity(all_hits.len());
+    for hit in all_hits {
+        if hit.score.is_finite() && hit.score > 0.0 {
+            filtered_hits.push(hit);
+        }
+    }
 
-    Ok(aggregate_segment_hits(&hits)
+    Ok(aggregate_segment_hits(&filtered_hits)
         .into_iter()
         .take(limit.max(1))
         .collect())
@@ -135,29 +141,29 @@ pub fn retrieve_semantic_documents<S: SegmentScorer>(
 
 pub fn aggregate_segment_hits(hits: &[SegmentHit]) -> Vec<SemanticDocumentHit> {
     #[derive(Debug, Clone)]
-    struct DocAccumulator {
-        id: String,
-        path: PathBuf,
+    struct DocAccumulator<'a> {
+        id: &'a str,
+        path: &'a std::path::Path,
         total_score: f64,
         segment_hits: usize,
-        best_segment: SegmentHit,
+        best_segment: &'a SegmentHit,
     }
 
-    let mut documents = HashMap::<String, DocAccumulator>::new();
+    let mut documents = HashMap::<&str, DocAccumulator>::with_capacity(hits.len());
 
     for hit in hits {
-        let mut doc_id = hit.doc_id.clone();
+        let mut doc_id = hit.doc_id.as_str();
         if doc_id.starts_with("./") {
-            doc_id = doc_id.chars().skip(2).collect();
+            doc_id = &doc_id[2..];
         }
         let entry = documents
-            .entry(doc_id.clone())
+            .entry(doc_id)
             .or_insert_with(|| DocAccumulator {
                 id: doc_id,
-                path: hit.path.clone(),
+                path: &hit.path,
                 total_score: 0.0,
                 segment_hits: 0,
-                best_segment: hit.clone(),
+                best_segment: hit,
             });
         entry.total_score += hit.score;
         entry.segment_hits += 1;
@@ -166,23 +172,23 @@ pub fn aggregate_segment_hits(hits: &[SegmentHit]) -> Vec<SemanticDocumentHit> {
             || (hit.score == entry.best_segment.score
                 && hit.segment_id < entry.best_segment.segment_id);
         if replace_best {
-            entry.best_segment = hit.clone();
+            entry.best_segment = hit;
         }
     }
 
-    let mut ranked = documents
-        .into_values()
-        .map(|document| SemanticDocumentHit {
-            id: document.id,
-            path: document.path,
+    let mut ranked = Vec::with_capacity(documents.len());
+    for document in documents.into_values() {
+        ranked.push(SemanticDocumentHit {
+            id: document.id.to_string(),
+            path: document.path.to_path_buf(),
             score: document.total_score / ((document.segment_hits as f64 + 1.0).sqrt()),
-            best_segment_id: document.best_segment.segment_id,
-            best_segment_label: document.best_segment.label,
-            best_segment_text: document.best_segment.text,
+            best_segment_id: document.best_segment.segment_id.clone(),
+            best_segment_label: document.best_segment.label.clone(),
+            best_segment_text: document.best_segment.text.clone(),
             best_segment_score: document.best_segment.score,
             segment_hits: document.segment_hits,
-        })
-        .collect::<Vec<_>>();
+        });
+    }
 
     ranked.sort_by(|left, right| {
         right

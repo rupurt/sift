@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T17:08:35.940812653-07:00
+mode: manual
+---
+score_segments_manually pre-allocates hits vector and missing indices

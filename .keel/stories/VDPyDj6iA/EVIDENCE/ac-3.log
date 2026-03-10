@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T17:08:35.956052590-07:00
+mode: manual
+---
+Verified zero unexpected allocations in the inner loop via code inspection and benchmarks

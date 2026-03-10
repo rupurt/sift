@@ -207,11 +207,13 @@ impl Bm25Index {
                 score += idf * (tf * (1.5 + 1.0) / denominator);
             }
 
-            ranked.push(ScoredDocument {
-                id: document.id.clone(),
-                path: document.path.clone(),
-                score,
-            });
+            if score > 0.0 {
+                ranked.push(ScoredDocument {
+                    id: document.id.clone(),
+                    path: document.path.clone(),
+                    score,
+                });
+            }
         }
 
         ranked.sort_by(|left, right| {

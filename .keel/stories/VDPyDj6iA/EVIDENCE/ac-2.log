@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T17:08:35.948478860-07:00
+mode: manual
+---
+aggregate_segment_hits uses lifetime-bound references in DocAccumulator to avoid String/PathBuf cloning in the inner loop
