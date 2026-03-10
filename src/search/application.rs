@@ -21,7 +21,10 @@ impl SearchServiceBuilder {
         service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
         service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
         service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
-        service.register_reranker(RerankingPolicy::PositionAware, Box::new(PositionAwareReranker));
+        service.register_reranker(
+            RerankingPolicy::PositionAware,
+            Box::new(PositionAwareReranker),
+        );
         service.register_reranker(RerankingPolicy::Llm, Box::new(MockLlmReranker));
 
         // Register retrievers based on plan
@@ -31,12 +34,11 @@ impl SearchServiceBuilder {
         if plan.retrievers.contains(&RetrieverPolicy::Phrase) {
             service.register_retriever(Box::new(PhraseRetriever));
         }
-        if plan.retrievers.contains(&RetrieverPolicy::Vector) && let Some(e) = embedder {
+        if plan.retrievers.contains(&RetrieverPolicy::Vector)
+            && let Some(e) = embedder
+        {
             let final_embedder = if let Some(cache) = query_cache {
-                Arc::new(CachedEmbedder {
-                    inner: e,
-                    cache,
-                }) as Arc<dyn Embedder>
+                Arc::new(CachedEmbedder { inner: e, cache }) as Arc<dyn Embedder>
             } else {
                 e
             };
@@ -114,10 +116,7 @@ impl StrategyPresetRegistry {
             SearchPlan {
                 name: "page-index".to_string(),
                 query_expansion: QueryExpansionPolicy::None,
-                retrievers: vec![
-                    RetrieverPolicy::Bm25,
-                    RetrieverPolicy::Phrase,
-                ],
+                retrievers: vec![RetrieverPolicy::Bm25, RetrieverPolicy::Phrase],
                 fusion: FusionPolicy::Rrf,
                 reranking: RerankingPolicy::PositionAware,
             },
@@ -233,8 +232,15 @@ impl SearchService {
             .get(&plan.query_expansion)
             .ok_or_else(|| anyhow!("expander not found for policy: {:?}", plan.query_expansion))?;
         let query_variants = expander.expand(query);
-        tracing::info!("expanded query into {} variants in {:.2?}", query_variants.len(), expand_start.elapsed());
-        tracing::debug!("variants: {:?}", query_variants.iter().map(|v| &v.text).collect::<Vec<_>>());
+        tracing::info!(
+            "expanded query into {} variants in {:.2?}",
+            query_variants.len(),
+            expand_start.elapsed()
+        );
+        tracing::debug!(
+            "variants: {:?}",
+            query_variants.iter().map(|v| &v.text).collect::<Vec<_>>()
+        );
 
         // 2. Retrieval
         let retrieval_start = std::time::Instant::now();
@@ -247,7 +253,12 @@ impl SearchService {
                 .ok_or_else(|| anyhow!("retriever not found for policy: {:?}", policy))?;
             // Note: adapters will be updated to use tracing internally later, for now we pass 0 as verbose
             let list = retriever.retrieve(&query_variants, corpus, limit, 0)?;
-            tracing::info!("{:?}: found {} candidates in {:.2?}", policy, list.results.len(), retrieve_start.elapsed());
+            tracing::info!(
+                "{:?}: found {} candidates in {:.2?}",
+                policy,
+                list.results.len(),
+                retrieve_start.elapsed()
+            );
             candidate_lists.push(list);
         }
         tracing::info!("retrieval complete in {:.2?}", retrieval_start.elapsed());
@@ -265,7 +276,11 @@ impl SearchService {
             .get(&plan.fusion)
             .ok_or_else(|| anyhow!("fuser not found for policy: {:?}", plan.fusion))?;
         let fused = fuser.fuse(&candidate_lists, limit, 0)?;
-        tracing::info!("fused into {} candidates in {:.2?}", fused.results.len(), fuse_start.elapsed());
+        tracing::info!(
+            "fused into {} candidates in {:.2?}",
+            fused.results.len(),
+            fuse_start.elapsed()
+        );
 
         // 4. Reranking
         let rerank_start = std::time::Instant::now();
@@ -326,7 +341,14 @@ impl<'a> SearchEnvironment<'a> {
     }
 
     pub fn search(&self, query: &str, limit: usize, verbose: u8) -> Result<SearchResponse> {
-        let candidates = self.service.execute(&self.plan, query, &self.prepared, limit, verbose, &self.telemetry)?;
+        let candidates = self.service.execute(
+            &self.plan,
+            query,
+            &self.prepared,
+            limit,
+            verbose,
+            &self.telemetry,
+        )?;
 
         let results = candidates
             .results
@@ -520,7 +542,9 @@ mod tests {
             bm25_index: None,
         };
         let telemetry = crate::system::Telemetry::new();
-        let results = service.execute(&plan, "search", &corpus, 10, 0, &telemetry).unwrap();
+        let results = service
+            .execute(&plan, "search", &corpus, 10, 0, &telemetry)
+            .unwrap();
 
         // "search" expansion with SynonymExpander gives "search" and "retrieval"
         // MockRetriever returns them as candidates
@@ -554,7 +578,9 @@ mod tests {
             bm25_index: None,
         };
         let telemetry = crate::system::Telemetry::new();
-        let results = service.execute(&plan, "query", &corpus, 10, 0, &telemetry).unwrap();
+        let results = service
+            .execute(&plan, "query", &corpus, 10, 0, &telemetry)
+            .unwrap();
 
         // Both retrievers should return "query"
         // RRF should fuse them

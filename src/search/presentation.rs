@@ -11,8 +11,10 @@ pub fn build_snippet(text: &str, query: &str) -> String {
         .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
         .filter(|line| !line.is_empty())
         .collect::<Vec<_>>()
-        .join("
-");
+        .join(
+            "
+",
+        );
     let lowercase_text = collapsed.to_lowercase();
 
     // Find the first occurrence of any query term
@@ -67,8 +69,10 @@ pub fn build_simple_snippet(text: &str, limit: usize) -> String {
         .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
         .filter(|line| !line.is_empty())
         .collect::<Vec<_>>()
-        .join("
-");
+        .join(
+            "
+",
+        );
     if collapsed.is_empty() {
         return String::new();
     }
@@ -92,7 +96,9 @@ fn highlight_matches(text: &str, terms: &[String]) -> String {
     sorted_terms.sort_by_key(|b| std::cmp::Reverse(b.len()));
 
     for term in sorted_terms {
-        if term.is_empty() { continue; }
+        if term.is_empty() {
+            continue;
+        }
         for (pos, _) in lowercase_text.match_indices(&term) {
             let end = pos + term.len();
             // Check if this range overlaps with an existing highlight

@@ -16,7 +16,9 @@ mod tests {
         fn embed(&self, texts: &[String]) -> anyhow::Result<Vec<Vec<f32>>> {
             Ok(texts.iter().map(|_| vec![0.1; 384]).collect())
         }
-        fn dimension(&self) -> usize { 384 }
+        fn dimension(&self) -> usize {
+            384
+        }
     }
 
     struct TestEnv {
@@ -57,8 +59,13 @@ mod tests {
         #[test]
         fn bm25_ranks_recursive_utf8_files() {
             let env = TestEnv::new(sample_search_tree());
-            let response = run_search(&env.request("bm25", "retrieval architecture"), None, &LocalFileCorpusRepository, None)
-                .expect("search response");
+            let response = run_search(
+                &env.request("bm25", "retrieval architecture"),
+                None,
+                &LocalFileCorpusRepository,
+                None,
+            )
+            .expect("search response");
 
             assert_eq!(response.indexed_files, 3);
             assert_eq!(response.skipped_files, 1);
@@ -74,8 +81,13 @@ mod tests {
         #[test]
         fn json_output_contains_result_fields() {
             let env = TestEnv::new(sample_search_tree());
-            let response = run_search(&env.request("bm25", "retrieval architecture"), None, &LocalFileCorpusRepository, None)
-                .expect("search response");
+            let response = run_search(
+                &env.request("bm25", "retrieval architecture"),
+                None,
+                &LocalFileCorpusRepository,
+                None,
+            )
+            .expect("search response");
 
             let output =
                 render_search_response(&response, OutputFormat::Json).expect("json rendering");
@@ -124,17 +136,17 @@ mod tests {
                     snippet_location: Some("slide 1".to_string()),
                 };
 
-                                // run_search uses resolve_snippet_from_candidate internally
-                                // We can test that via run_search or just check the resolve function if we exported it
-                
-                                                let _response = run_search(
-                                                    &env.request("legacy-hybrid", "service catalog"),
-                                                    None,
-                                                    &LocalFileCorpusRepository,
-                                                    Some(Arc::new(MockEmbedder)),
-                                                )
-                                                .expect("search response");
-                                
+                // run_search uses resolve_snippet_from_candidate internally
+                // We can test that via run_search or just check the resolve function if we exported it
+
+                let _response = run_search(
+                    &env.request("legacy-hybrid", "service catalog"),
+                    None,
+                    &LocalFileCorpusRepository,
+                    Some(Arc::new(MockEmbedder)),
+                )
+                .expect("search response");
+
                 // This is a bit hard to test precisely here without mock retrievers,
                 // but we check if any result has our expected snippet.
                 // Actually, the original test was mocking RankedDocument.
@@ -150,10 +162,20 @@ mod tests {
         fn filtering_skips_invalid_utf8_without_crashing() {
             let env = TestEnv::new(sample_search_tree());
 
-            let first = run_search(&env.request("bm25", "agent memory"), None, &LocalFileCorpusRepository, None)
-                .expect("first search");
-            let second = run_search(&env.request("bm25", "agent memory"), None, &LocalFileCorpusRepository, None)
-                .expect("second search");
+            let first = run_search(
+                &env.request("bm25", "agent memory"),
+                None,
+                &LocalFileCorpusRepository,
+                None,
+            )
+            .expect("first search");
+            let second = run_search(
+                &env.request("bm25", "agent memory"),
+                None,
+                &LocalFileCorpusRepository,
+                None,
+            )
+            .expect("second search");
 
             assert_eq!(first.indexed_files, 3);
             assert_eq!(first.skipped_files, 1);
@@ -412,8 +434,13 @@ mod tests {
             #[test]
             fn html_files_are_searchable_without_preprocessing() {
                 let env = TestEnv::new(sample_rich_search_tree());
-                let response = run_search(&env.request("bm25", "html heading"), None, &LocalFileCorpusRepository, None)
-                    .expect("search response");
+                let response = run_search(
+                    &env.request("bm25", "html heading"),
+                    None,
+                    &LocalFileCorpusRepository,
+                    None,
+                )
+                .expect("search response");
 
                 assert_eq!(response.results[0].rank, 1);
                 assert!(response.results[0].path.ends_with("docs/service.html"));
@@ -435,8 +462,13 @@ mod tests {
             #[test]
             fn pdf_files_are_searchable_without_external_conversion() {
                 let env = TestEnv::new(supported_fixture_tree());
-                let response = run_search(&env.request("bm25", "architecture decision"), None, &LocalFileCorpusRepository, None)
-                    .expect("search response");
+                let response = run_search(
+                    &env.request("bm25", "architecture decision"),
+                    None,
+                    &LocalFileCorpusRepository,
+                    None,
+                )
+                .expect("search response");
 
                 assert_eq!(response.results[0].rank, 1);
                 assert!(response.results[0].path.ends_with("docs/architecture.pdf"));
@@ -462,8 +494,13 @@ mod tests {
             #[test]
             fn office_documents_are_searchable_without_external_conversion() {
                 let env = TestEnv::new(supported_fixture_tree());
-                let response = run_search(&env.request("bm25", "quarterly roadmap"), None, &LocalFileCorpusRepository, None)
-                    .expect("search response");
+                let response = run_search(
+                    &env.request("bm25", "quarterly roadmap"),
+                    None,
+                    &LocalFileCorpusRepository,
+                    None,
+                )
+                .expect("search response");
 
                 let paths = response
                     .results
@@ -497,10 +534,20 @@ mod tests {
             fn mixed_format_search_results_are_deterministic() {
                 let env = TestEnv::new(supported_fixture_tree());
 
-                let first = run_search(&env.request("bm25", "quarterly roadmap"), None, &LocalFileCorpusRepository, None)
-                    .expect("first search");
-                let second = run_search(&env.request("bm25", "quarterly roadmap"), None, &LocalFileCorpusRepository, None)
-                    .expect("second search");
+                let first = run_search(
+                    &env.request("bm25", "quarterly roadmap"),
+                    None,
+                    &LocalFileCorpusRepository,
+                    None,
+                )
+                .expect("first search");
+                let second = run_search(
+                    &env.request("bm25", "quarterly roadmap"),
+                    None,
+                    &LocalFileCorpusRepository,
+                    None,
+                )
+                .expect("second search");
 
                 assert_eq!(first.indexed_files, second.indexed_files);
                 assert_eq!(first.skipped_files, second.skipped_files);
@@ -515,10 +562,20 @@ mod tests {
             fn invalid_binary_files_are_skipped_deterministically() {
                 let env = TestEnv::new(sample_rich_search_tree());
 
-                let first = run_search(&env.request("bm25", "service catalog"), None, &LocalFileCorpusRepository, None)
-                    .expect("first search");
-                let second = run_search(&env.request("bm25", "service catalog"), None, &LocalFileCorpusRepository, None)
-                    .expect("second search");
+                let first = run_search(
+                    &env.request("bm25", "service catalog"),
+                    None,
+                    &LocalFileCorpusRepository,
+                    None,
+                )
+                .expect("first search");
+                let second = run_search(
+                    &env.request("bm25", "service catalog"),
+                    None,
+                    &LocalFileCorpusRepository,
+                    None,
+                )
+                .expect("second search");
 
                 assert_eq!(first.indexed_files, 2);
                 assert_eq!(first.skipped_files, 1);

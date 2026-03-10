@@ -156,15 +156,13 @@ pub fn aggregate_segment_hits(hits: &[SegmentHit]) -> Vec<SemanticDocumentHit> {
         if doc_id.starts_with("./") {
             doc_id = &doc_id[2..];
         }
-        let entry = documents
-            .entry(doc_id)
-            .or_insert_with(|| DocAccumulator {
-                id: doc_id,
-                path: &hit.path,
-                total_score: 0.0,
-                segment_hits: 0,
-                best_segment: hit,
-            });
+        let entry = documents.entry(doc_id).or_insert_with(|| DocAccumulator {
+            id: doc_id,
+            path: &hit.path,
+            total_score: 0.0,
+            segment_hits: 0,
+            best_segment: hit,
+        });
         entry.total_score += hit.score;
         entry.segment_hits += 1;
 

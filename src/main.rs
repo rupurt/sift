@@ -6,9 +6,9 @@ use sift::cache::cache_dir;
 use sift::config::Config;
 use sift::dense::{DenseModelSpec, DenseReranker};
 use sift::eval::{
-    download_scifact_dataset, materialize_scifact_dir,
-    LatencyEvaluationRequest, QualityEvaluationRequest, render_comparative_report,
-    run_comparative_evaluation, run_latency_evaluation, run_quality_evaluation,
+    LatencyEvaluationRequest, QualityEvaluationRequest, download_scifact_dataset,
+    materialize_scifact_dir, render_comparative_report, run_comparative_evaluation,
+    run_latency_evaluation, run_quality_evaluation,
 };
 use sift::search::{
     Embedder, FusionPolicy, LocalFileCorpusRepository, OutputFormat, RerankingPolicy,
@@ -16,7 +16,7 @@ use sift::search::{
 };
 use sift::system::Telemetry;
 use std::sync::Arc;
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 const SCIFACT_BASE_URL: &str = "https://huggingface.co/datasets/BeIR/scifact/resolve/main";
 const SCIFACT_QRELS_BASE_URL: &str =
@@ -237,7 +237,11 @@ fn main() -> Result<()> {
 
     match cli.command {
         Commands::Dataset { command } => match command {
-            DatasetCommands::Download { dataset, out, verbose: _ } => {
+            DatasetCommands::Download {
+                dataset,
+                out,
+                verbose: _,
+            } => {
                 let dataset_name = match dataset {
                     Dataset::Scifact => "scifact",
                 };
@@ -311,7 +315,9 @@ fn main() -> Result<()> {
                         shortlist,
                         dense_model: DenseModelSpec::with_overrides(
                             model_id.clone().or(Some(config.model.model_id.clone())),
-                            model_revision.clone().or(Some(config.model.model_revision.clone())),
+                            model_revision
+                                .clone()
+                                .or(Some(config.model.model_revision.clone())),
                             max_length.or(Some(config.model.max_length)),
                         ),
                         verbose,
@@ -352,7 +358,9 @@ fn main() -> Result<()> {
                         shortlist,
                         dense_model: DenseModelSpec::with_overrides(
                             model_id.clone().or(Some(config.model.model_id.clone())),
-                            model_revision.clone().or(Some(config.model.model_revision.clone())),
+                            model_revision
+                                .clone()
+                                .or(Some(config.model.model_revision.clone())),
                             max_length.or(Some(config.model.max_length)),
                         ),
                         verbose,
@@ -384,7 +392,9 @@ fn main() -> Result<()> {
                         shortlist,
                         dense_model: DenseModelSpec::with_overrides(
                             model_id.clone().or(Some(config.model.model_id.clone())),
-                            model_revision.clone().or(Some(config.model.model_revision.clone())),
+                            model_revision
+                                .clone()
+                                .or(Some(config.model.model_revision.clone())),
                             max_length.or(Some(config.model.max_length)),
                         ),
                         verbose,
@@ -408,7 +418,10 @@ fn main() -> Result<()> {
             let shortlist = search.shortlist.unwrap_or(config.search.shortlist);
 
             let spec = DenseModelSpec::with_overrides(
-                search.model_id.clone().or(Some(config.model.model_id.clone())),
+                search
+                    .model_id
+                    .clone()
+                    .or(Some(config.model.model_id.clone())),
                 search
                     .model_revision
                     .clone()

@@ -281,7 +281,7 @@ impl crate::search::domain::Embedder for DenseReranker {
 
     fn dimension(&self) -> usize {
         // all-MiniLM-L6-v2 is 384 dimensions
-        384 
+        384
     }
 }
 

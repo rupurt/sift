@@ -37,7 +37,11 @@ impl Retriever for SegmentVectorRetriever {
 
         tracing::info!("vector: scoring {} segments", segments.len());
         let start = std::time::Instant::now();
-        segment_hits.extend(score_segments_manually(self.embedder.as_ref(), query, &segments)?);
+        segment_hits.extend(score_segments_manually(
+            self.embedder.as_ref(),
+            query,
+            &segments,
+        )?);
         tracing::debug!("vector: scoring complete in {:.2?}", start.elapsed());
 
         tracing::debug!("vector: aggregating hits");
@@ -187,7 +191,12 @@ impl Retriever for Bm25Retriever {
 pub struct RrfFuser;
 
 impl Fuser for RrfFuser {
-    fn fuse(&self, candidate_lists: &[CandidateList], limit: usize, _verbose: u8) -> Result<CandidateList> {
+    fn fuse(
+        &self,
+        candidate_lists: &[CandidateList],
+        limit: usize,
+        _verbose: u8,
+    ) -> Result<CandidateList> {
         tracing::debug!("fusing {} candidate lists", candidate_lists.len());
         // Implement RRF fusion
         // This can be adapted from src/hybrid.rs
@@ -202,16 +211,14 @@ impl Fuser for RrfFuser {
                 if id.starts_with("./") {
                     id = id.chars().skip(2).collect();
                 }
-                let entry = documents
-                    .entry(id.clone())
-                    .or_insert_with(|| Candidate {
-                        id,
-                        path: candidate.path.clone(),
-                        score: 0.0,
-                        contributors: Vec::new(),
-                        snippet: candidate.snippet.clone(),
-                        snippet_location: candidate.snippet_location.clone(),
-                    });
+                let entry = documents.entry(id.clone()).or_insert_with(|| Candidate {
+                    id,
+                    path: candidate.path.clone(),
+                    score: 0.0,
+                    contributors: Vec::new(),
+                    snippet: candidate.snippet.clone(),
+                    snippet_location: candidate.snippet_location.clone(),
+                });
 
                 entry.score += 1.0 / (RRF_K + (index + 1) as f64);
                 entry.contributors.extend(candidate.contributors.clone());
@@ -230,7 +237,10 @@ impl Fuser for RrfFuser {
                 .then_with(|| a.id.cmp(&b.id))
         });
 
-        tracing::debug!("fusion complete, sorted {} unique candidates", results.len());
+        tracing::debug!(
+            "fusion complete, sorted {} unique candidates",
+            results.len()
+        );
 
         Ok(CandidateList {
             results: results.into_iter().take(limit).collect(),
@@ -307,7 +317,7 @@ impl Reranker for PositionAwareReranker {
                 .and_then(|f| f.to_str())
                 .unwrap_or("")
                 .to_lowercase();
-            
+
             for term in &query_terms {
                 if filename.contains(term) {
                     bonus += 0.05;

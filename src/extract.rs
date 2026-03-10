@@ -3,7 +3,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 const HTML_RENDER_WIDTH: usize = 200;
 

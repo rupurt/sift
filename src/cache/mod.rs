@@ -16,7 +16,9 @@ pub fn cache_dir(cache_type: &str) -> Result<PathBuf> {
     }
 
     // Backward compatibility for SIFT_MODEL_CACHE
-    if cache_type == "models" && let Some(path) = env::var_os("SIFT_MODEL_CACHE") {
+    if cache_type == "models"
+        && let Some(path) = env::var_os("SIFT_MODEL_CACHE")
+    {
         return Ok(PathBuf::from(path));
     }
 

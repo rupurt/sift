@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 use super::domain::*;
+use crate::cache::{Manifest, cache_dir, get_file_heuristics, hash_file, load_blob, save_blob};
 use crate::config::Ignore;
 use crate::extract::extract_path;
 use crate::segment::build_segments;
-use crate::cache::{Manifest, get_file_heuristics, hash_file, load_blob, save_blob, cache_dir};
 
 pub struct LocalFileCorpusRepository;
 
@@ -55,7 +55,11 @@ pub fn load_materialized_corpus(
 
     let mut files_to_process = Vec::new();
 
-    for entry in WalkDir::new(corpus_dir).sort_by_file_name().into_iter().flatten() {
+    for entry in WalkDir::new(corpus_dir)
+        .sort_by_file_name()
+        .into_iter()
+        .flatten()
+    {
         if !entry.file_type().is_file() {
             continue;
         }
@@ -64,7 +68,9 @@ pub fn load_materialized_corpus(
             continue;
         }
 
-        if let Some(ignore) = ignore && ignore.is_ignored(entry.path()) {
+        if let Some(ignore) = ignore
+            && ignore.is_ignored(entry.path())
+        {
             continue;
         }
 
@@ -141,7 +147,7 @@ pub fn load_search_corpus(
     } else {
         cache_dir("blobs")?
     };
-    
+
     let mut files_to_process = Vec::new();
 
     if root.is_file() {
@@ -155,14 +161,20 @@ pub fn load_search_corpus(
     } else if root.is_dir() {
         let walk_start = std::time::Instant::now();
         for entry in WalkDir::new(root).sort_by_file_name().into_iter().flatten() {
-            if let Some(ignore) = ignore && ignore.is_ignored(entry.path()) {
+            if let Some(ignore) = ignore
+                && ignore.is_ignored(entry.path())
+            {
                 continue;
             }
             if entry.file_type().is_file() {
                 files_to_process.push(entry.path().to_path_buf());
             }
         }
-        tracing::info!("directory walk found {} files in {:.2?}", files_to_process.len(), walk_start.elapsed());
+        tracing::info!(
+            "directory walk found {} files in {:.2?}",
+            files_to_process.len(),
+            walk_start.elapsed()
+        );
     } else {
         bail!(
             "search path '{}' is neither a regular file nor directory",
@@ -172,7 +184,9 @@ pub fn load_search_corpus(
 
     let process_start = std::time::Instant::now();
     let total_files = files_to_process.len();
-    telemetry.total_files.fetch_add(total_files, std::sync::atomic::Ordering::Relaxed);
+    telemetry
+        .total_files
+        .fetch_add(total_files, std::sync::atomic::Ordering::Relaxed);
 
     // Stage 1: Sequential cache check and extraction (lexical only)
     let mut results = Vec::new();
@@ -193,7 +207,9 @@ pub fn load_search_corpus(
             doc.id = path.display().to_string();
             doc.path = path.to_path_buf();
 
-            telemetry.heuristic_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            telemetry
+                .heuristic_hits
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
             // If we need embeddings but they are missing, treat as a partial miss
             if dense.is_some() && doc.segments.iter().any(|s| s.embedding.is_none()) {
@@ -212,7 +228,9 @@ pub fn load_search_corpus(
                 doc.id = path.display().to_string();
                 doc.path = path.to_path_buf();
 
-                telemetry.blob_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                telemetry
+                    .blob_hits
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
                 // If we need embeddings but they are missing, treat as a partial miss
                 if dense.is_some() && doc.segments.iter().any(|s| s.embedding.is_none()) {
@@ -240,7 +258,7 @@ pub fn load_search_corpus(
     let mut total_bytes = 0_u64;
     let mut skipped_files = 0_usize;
     let mut manifest_updated = false;
-    
+
     // We'll collect documents that need embedding
     let mut docs_to_embed = Vec::new();
 
@@ -268,16 +286,27 @@ pub fn load_search_corpus(
     }
 
     for doc in &documents {
-        telemetry.total_segments.fetch_add(doc.segments.len(), std::sync::atomic::Ordering::Relaxed);
-        let embedded = doc.segments.iter().filter(|s| s.embedding.is_some()).count();
-        telemetry.embedding_hits.fetch_add(embedded, std::sync::atomic::Ordering::Relaxed);
+        telemetry
+            .total_segments
+            .fetch_add(doc.segments.len(), std::sync::atomic::Ordering::Relaxed);
+        let embedded = doc
+            .segments
+            .iter()
+            .filter(|s| s.embedding.is_some())
+            .count();
+        telemetry
+            .embedding_hits
+            .fetch_add(embedded, std::sync::atomic::Ordering::Relaxed);
     }
 
     // Perform batch embedding if model is present and we have misses
     if let Some(dense) = dense {
         if !docs_to_embed.is_empty() {
-            tracing::info!("vectorizing {} new/changed documents...", docs_to_embed.len());
-            
+            tracing::info!(
+                "vectorizing {} new/changed documents...",
+                docs_to_embed.len()
+            );
+
             // Flatten all segments from all documents into a single batch
             let mut all_texts = Vec::new();
             let mut segment_refs = Vec::new(); // (doc_idx, segment_idx)
@@ -294,7 +323,7 @@ pub fn load_search_corpus(
                 let embed_start = std::time::Instant::now();
                 const LOAD_BATCH_SIZE: usize = 128;
                 let mut current_idx = 0;
-                
+
                 for chunk in all_texts.chunks(LOAD_BATCH_SIZE) {
                     if let Ok(embeddings) = dense.embed(chunk) {
                         for embedding in embeddings {
@@ -306,7 +335,11 @@ pub fn load_search_corpus(
                         current_idx += chunk.len();
                     }
                 }
-                tracing::info!("embedded {} segments in {:.2?}", all_texts.len(), embed_start.elapsed());
+                tracing::info!(
+                    "embedded {} segments in {:.2?}",
+                    all_texts.len(),
+                    embed_start.elapsed()
+                );
             }
 
             // Save new blobs and update manifest after embedding
@@ -331,7 +364,11 @@ pub fn load_search_corpus(
         }
     }
 
-    tracing::info!("processing {} files took: {:.2?}", total_files, process_start.elapsed());
+    tracing::info!(
+        "processing {} files took: {:.2?}",
+        total_files,
+        process_start.elapsed()
+    );
 
     if manifest_updated {
         let save_start = std::time::Instant::now();
@@ -349,12 +386,6 @@ pub fn load_search_corpus(
         skipped_files,
     })
 }
-
-
-
-
-
-
 
 fn index_document(
     id: String,

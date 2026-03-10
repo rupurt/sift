@@ -1,6 +1,6 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Manifest {

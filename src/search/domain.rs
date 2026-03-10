@@ -415,7 +415,12 @@ pub trait Retriever: Send + Sync {
 }
 
 pub trait Fuser: Send + Sync {
-    fn fuse(&self, candidate_lists: &[CandidateList], limit: usize, verbose: u8) -> Result<CandidateList>;
+    fn fuse(
+        &self,
+        candidate_lists: &[CandidateList],
+        limit: usize,
+        verbose: u8,
+    ) -> Result<CandidateList>;
 }
 
 pub trait Expander: Send + Sync {

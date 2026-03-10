@@ -348,7 +348,14 @@ pub fn run_quality_evaluation(
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
     let query_cache = std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(dense_for_load.as_ref()), &telemetry_for_load, None)?;
+    let corpus = load_search_corpus(
+        &request.corpus_dir,
+        ignore,
+        request.verbose,
+        Some(dense_for_load.as_ref()),
+        &telemetry_for_load,
+        None,
+    )?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
@@ -383,13 +390,8 @@ pub fn run_quality_evaluation(
         Some(dense_for_load.clone()),
     )?;
 
-    let (metrics, _telemetry) = evaluate_quality(
-        &queries,
-        &qrels,
-        &env,
-        request.verbose,
-        request.query_limit,
-    )?;
+    let (metrics, _telemetry) =
+        evaluate_quality(&queries, &qrels, &env, request.verbose, request.query_limit)?;
 
     let baseline_strategy = request
         .baseline
@@ -425,7 +427,7 @@ pub fn run_quality_evaluation(
                 request.query_limit,
             )?;
             Some(m)
-        },
+        }
         None => None,
     };
 
@@ -492,7 +494,14 @@ pub fn run_latency_evaluation(
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
     let query_cache = std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(dense_for_load.as_ref()), &telemetry_for_load, None)?;
+    let corpus = load_search_corpus(
+        &request.corpus_dir,
+        ignore,
+        request.verbose,
+        Some(dense_for_load.as_ref()),
+        &telemetry_for_load,
+        None,
+    )?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries = load_queries(&request.queries_path)?;
     let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
@@ -525,7 +534,7 @@ pub fn run_latency_evaluation(
     let mut timings = Vec::with_capacity(queries.len());
     let mut queries_vec: Vec<_> = queries.values().collect();
     queries_vec.sort(); // Deterministic order
-    
+
     let total_queries = if let Some(limit) = request.query_limit {
         limit.min(queries_vec.len())
     } else {
@@ -580,7 +589,14 @@ pub fn run_comparative_evaluation(
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
     let query_cache = std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
-    let corpus = load_search_corpus(&request.corpus_dir, ignore, request.verbose, Some(dense_for_load.as_ref()), &telemetry_for_load, None)?;
+    let corpus = load_search_corpus(
+        &request.corpus_dir,
+        ignore,
+        request.verbose,
+        Some(dense_for_load.as_ref()),
+        &telemetry_for_load,
+        None,
+    )?;
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
@@ -592,7 +608,12 @@ pub fn run_comparative_evaluation(
 
     let total_strategies = names.len();
     for (idx, name) in names.iter().enumerate() {
-        tracing::info!("→ evaluation strategy {}/{} : {}", idx + 1, total_strategies, name);
+        tracing::info!(
+            "→ evaluation strategy {}/{} : {}",
+            idx + 1,
+            total_strategies,
+            name
+        );
         let env = crate::search::SearchEnvironment::new(
             &SearchRequest {
                 strategy: name.clone(),
@@ -615,13 +636,8 @@ pub fn run_comparative_evaluation(
         )?;
 
         // Quality
-        let (quality, telemetry) = evaluate_quality(
-            &queries,
-            &qrels,
-            &env,
-            request.verbose,
-            request.query_limit,
-        )?;
+        let (quality, telemetry) =
+            evaluate_quality(&queries, &qrels, &env, request.verbose, request.query_limit)?;
 
         // Latency
         let prepare_started = Instant::now();
@@ -698,15 +714,28 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
     )
     .unwrap();
 
-    let ndcgs: Vec<f64> = report.results.iter().map(|r| r.quality.ndcg_at_10).collect();
+    let ndcgs: Vec<f64> = report
+        .results
+        .iter()
+        .map(|r| r.quality.ndcg_at_10)
+        .collect();
     let mrrs: Vec<f64> = report.results.iter().map(|r| r.quality.mrr_at_10).collect();
-    let recalls: Vec<f64> = report.results.iter().map(|r| r.quality.recall_at_10).collect();
+    let recalls: Vec<f64> = report
+        .results
+        .iter()
+        .map(|r| r.quality.recall_at_10)
+        .collect();
     let latencies: Vec<f64> = report.results.iter().map(|r| r.latency.p50_ms).collect();
 
     for res in &report.results {
         let bar = render_bar(res.quality.ndcg_at_10, 10);
         let hits = if let Some(t) = &res.telemetry {
-            format!("{:.0}/{:.0}/{:.0}%", t.heuristic_hit_rate * 100.0, t.blob_hit_rate * 100.0, t.embedding_hit_rate * 100.0)
+            format!(
+                "{:.0}/{:.0}/{:.0}%",
+                t.heuristic_hit_rate * 100.0,
+                t.blob_hit_rate * 100.0,
+                t.embedding_hit_rate * 100.0
+            )
         } else {
             "-".to_string()
         };
@@ -778,7 +807,11 @@ fn get_color(value: f64, all_values: &[f64], higher_is_better: bool) -> &'static
         return "";
     }
 
-    let (best, worst) = if higher_is_better { (max, min) } else { (min, max) };
+    let (best, worst) = if higher_is_better {
+        (max, min)
+    } else {
+        (min, max)
+    };
 
     if (value - best).abs() < f64::EPSILON {
         return "\x1b[1;32m"; // Bold Green
@@ -863,7 +896,7 @@ fn evaluate_quality(
 
     let mut qrels_vec: Vec<_> = qrels.iter().collect();
     qrels_vec.sort_by_key(|(id, _)| *id);
-    
+
     let total_queries = if let Some(limit) = query_limit {
         limit.min(qrels_vec.len())
     } else {
