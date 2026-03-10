@@ -26,3 +26,7 @@ Standardized CI pipeline to include strict linting (Clippy) and formatting (fmt)
 ## 2026-03-09T17:59:48
 
 Improved search result quality for the public release by adding default exclusion patterns for metadata (.keel, .git, target) and refining the score confidence thresholds to better represent result relevance.
+
+## 2026-03-09T18:00:24
+
+Reverted hardcoded project-specific exclusions in favor of a local .siftignore file to keep the core engine project-agnostic while still improving search quality for this repository.

@@ -46,11 +46,8 @@ impl Ignore {
 
         // 4. Default exclusions for search quality (noise reduction)
         let default_exclusions = [
-            ".keel/**",
             "target/**",
             ".git/**",
-            ".direnv/**",
-            "flake.lock",
         ];
         for pattern in default_exclusions {
             let _ = builder.add_line(None, pattern);

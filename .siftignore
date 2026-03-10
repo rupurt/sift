@@ -1,0 +1,3 @@
+.keel/**
+.direnv/**
+flake.lock
