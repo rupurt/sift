@@ -55,7 +55,7 @@ data/raw/
 
 #### Available Strategies
 - **`page-index-hybrid`** (default): Our champion strategy. Combines BM25, Phrase matching, and Vector search, followed by Position-Aware reranking.
-- **`page-index-llm`**: Combines BM25, Phrase matching, and Vector search, followed by an LLM-based re-scoring pass (currently using a mock reranker for testing).
+- **`page-index-llm`**: Combines BM25, Phrase matching, and Vector search, followed by a **Qwen-based LLM reranker**.
 - **`page-index`**: Lexical-focused strategy (inspired by qmd). Uses BM25 and Phrase matching with Position-Aware reranking (no vectors).
 - **`bm25`**: Lexical search only. Fast and strictly keyword-based.
 - **`vector`**: Semantic search only. Uses dense embeddings.
@@ -74,11 +74,14 @@ sift search --retrievers bm25,phrase --reranking position-aware "my query"
 ### Override Flags
 - `--retrievers`: Comma-separated list (`bm25`, `phrase`, `vector`).
 - `--fusion`: Currently only `rrf` is supported.
-- `--reranking`: `none` or `position-aware`.
+- `--reranking`: `none`, `position-aware`, or `llm`.
+- `--model-id`: Override the embedding model ID.
+- `--rerank-model-id`: Override the LLM rerank model ID.
 
 ---
 
-### `[model]` Section
+### `[embedding]` Section
+*Previously `[model]`, which is still supported for backward compatibility.*
 
 These settings control the local machine learning model used for semantic vector search.
 
@@ -90,12 +93,27 @@ These settings control the local machine learning model used for semantic vector
 
 ---
 
+### `[rerank]` Section
+
+These settings control the local LLM model used for semantic reranking.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `model_id` | String | `"Qwen/Qwen2.5-0.5B-Instruct"` | HuggingFace model ID for the reranker. |
+| `model_revision` | String | `"main"` | The specific git revision/branch of the rerank model. |
+| `max_length` | Integer | `512` | Maximum sequence length (tokens) for reranking. |
+
+---
+
 ## Ranking & Reranking
 
 ### Position-Aware Reranking
 Applies "soft bonuses" to prioritizing structural matches:
 - **Filename Bonus (+0.05):** Added if the query matches the file name.
 - **Heading/Location Bonus (+0.02):** Added if the query matches a structural label (e.g., a PDF Page or HTML Heading).
+
+### LLM Reranking (Qwen)
+Performs a deep semantic pass over the top candidates. It prompts a local LLM to evaluate the relevance of each document to the query, providing the highest accuracy but with more computational overhead.
 
 ---
 

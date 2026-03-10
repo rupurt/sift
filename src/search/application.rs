@@ -349,7 +349,8 @@ impl<'a> SearchEnvironment<'a> {
             plan.reranking = reranking;
         }
 
-        let service = SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone(), None);
+        let service =
+            SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone(), None);
 
         Ok(Self {
             service,
@@ -451,12 +452,8 @@ pub fn run_search(
         None
     };
 
-    let service = SearchServiceBuilder::build(
-        &plan,
-        embedder,
-        request.query_cache.clone(),
-        llm_reranker,
-    );
+    let service =
+        SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone(), llm_reranker);
 
     let index_start = std::time::Instant::now();
     let index = Bm25Index::build(&corpus.documents);

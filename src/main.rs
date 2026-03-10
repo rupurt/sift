@@ -5,14 +5,12 @@ use clap::{Args, Parser, Subcommand};
 use sift::cache::cache_dir;
 use sift::config::Config;
 use sift::dense::{DenseModelSpec, DenseReranker};
-use sift::search::adapters::qwen::{
-    DEFAULT_QWEN_MAX_LENGTH, DEFAULT_QWEN_MODEL_ID, DEFAULT_QWEN_REVISION, QwenModelSpec,
-};
 use sift::eval::{
     LatencyEvaluationRequest, QualityEvaluationRequest, download_scifact_dataset,
     materialize_scifact_dir, render_comparative_report, run_comparative_evaluation,
     run_latency_evaluation, run_quality_evaluation,
 };
+use sift::search::adapters::qwen::{DEFAULT_QWEN_MODEL_ID, DEFAULT_QWEN_REVISION, QwenModelSpec};
 use sift::search::{
     Embedder, FusionPolicy, LocalFileCorpusRepository, OutputFormat, RerankingPolicy,
     RetrieverPolicy, SearchRequest, StrategyPresetRegistry, render_search_response, run_search,
@@ -323,11 +321,11 @@ fn main() -> Result<()> {
                         qrels_path: qrels,
                         shortlist,
                         dense_model: DenseModelSpec::with_overrides(
-                            model_id.clone().or(Some(config.model.model_id.clone())),
+                            model_id.clone().or(Some(config.embedding.model_id.clone())),
                             model_revision
                                 .clone()
-                                .or(Some(config.model.model_revision.clone())),
-                            max_length.or(Some(config.model.max_length)),
+                                .or(Some(config.embedding.model_revision.clone())),
+                            max_length.or(Some(config.embedding.max_length)),
                         ),
                         verbose,
                         query_limit,
@@ -366,11 +364,11 @@ fn main() -> Result<()> {
                         qrels_path: qrels,
                         shortlist,
                         dense_model: DenseModelSpec::with_overrides(
-                            model_id.clone().or(Some(config.model.model_id.clone())),
+                            model_id.clone().or(Some(config.embedding.model_id.clone())),
                             model_revision
                                 .clone()
-                                .or(Some(config.model.model_revision.clone())),
-                            max_length.or(Some(config.model.max_length)),
+                                .or(Some(config.embedding.model_revision.clone())),
+                            max_length.or(Some(config.embedding.max_length)),
                         ),
                         verbose,
                         query_limit,
@@ -400,11 +398,11 @@ fn main() -> Result<()> {
                         queries_path: queries,
                         shortlist,
                         dense_model: DenseModelSpec::with_overrides(
-                            model_id.clone().or(Some(config.model.model_id.clone())),
+                            model_id.clone().or(Some(config.embedding.model_id.clone())),
                             model_revision
                                 .clone()
-                                .or(Some(config.model.model_revision.clone())),
-                            max_length.or(Some(config.model.max_length)),
+                                .or(Some(config.embedding.model_revision.clone())),
+                            max_length.or(Some(config.embedding.max_length)),
                         ),
                         verbose,
                         query_limit,
@@ -430,12 +428,12 @@ fn main() -> Result<()> {
                 search
                     .model_id
                     .clone()
-                    .or(Some(config.model.model_id.clone())),
+                    .or(Some(config.embedding.model_id.clone())),
                 search
                     .model_revision
                     .clone()
-                    .or(Some(config.model.model_revision.clone())),
-                search.max_length.or(Some(config.model.max_length)),
+                    .or(Some(config.embedding.model_revision.clone())),
+                search.max_length.or(Some(config.embedding.max_length)),
             );
 
             let registry = StrategyPresetRegistry::default_registry();
@@ -451,17 +449,22 @@ fn main() -> Result<()> {
                 embedder = Some(Arc::new(DenseReranker::load(spec.clone())?) as Arc<dyn Embedder>);
             }
 
-            let rerank_spec = if search.rerank_model_id.is_some() || search.rerank_revision.is_some() {
+            let rerank_spec = if search.rerank_model_id.is_some()
+                || search.rerank_revision.is_some()
+                || plan.reranking == RerankingPolicy::Llm
+            {
                 Some(QwenModelSpec {
                     model_id: search
                         .rerank_model_id
                         .clone()
+                        .or(Some(config.rerank.model_id.clone()))
                         .unwrap_or_else(|| DEFAULT_QWEN_MODEL_ID.to_string()),
                     revision: search
                         .rerank_revision
                         .clone()
+                        .or(Some(config.rerank.model_revision.clone()))
                         .unwrap_or_else(|| DEFAULT_QWEN_REVISION.to_string()),
-                    max_length: DEFAULT_QWEN_MAX_LENGTH,
+                    max_length: config.rerank.max_length,
                 })
             } else {
                 None

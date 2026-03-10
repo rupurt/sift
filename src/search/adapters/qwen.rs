@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::Mutex;
 
 use anyhow::{Result, anyhow, bail};
-use candle_core::{Device, Tensor, DType};
+use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::qwen2::{Config as QwenConfig, ModelForCausalLM as QwenModel};
 use serde::Deserialize;
@@ -69,8 +69,9 @@ impl QwenReranker {
         ensure_qwen_asset(&spec, &tokenizer_path, "tokenizer.json")?;
         ensure_qwen_asset(&spec, &weights_path, "model.safetensors")?;
 
-        let config_partial: QwenConfigPartial = serde_json::from_str(&fs::read_to_string(&config_path)?)?;
-        
+        let config_partial: QwenConfigPartial =
+            serde_json::from_str(&fs::read_to_string(&config_path)?)?;
+
         let config = QwenConfig {
             vocab_size: config_partial.vocab_size,
             hidden_size: config_partial.hidden_size,
@@ -86,16 +87,19 @@ impl QwenReranker {
             rms_norm_eps: config_partial.rms_norm_eps,
             rope_theta: config_partial.rope_theta,
             use_sliding_window: config_partial.sliding_window.is_some(),
-            sliding_window: config_partial.sliding_window.unwrap_or(config_partial.max_position_embeddings),
+            sliding_window: config_partial
+                .sliding_window
+                .unwrap_or(config_partial.max_position_embeddings),
             max_window_layers: config_partial.num_hidden_layers,
             tie_word_embeddings: true,
         };
 
         let tokenizer = Tokenizer::from_file(&tokenizer_path)
             .map_err(|m| anyhow!("failed to load tokenizer: {}", m))?;
-        
+
         let device = Device::Cpu;
-        let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[weights_path], DType::F32, &device)? };
+        let vb =
+            unsafe { VarBuilder::from_mmaped_safetensors(&[weights_path], DType::F32, &device)? };
         let model = QwenModel::new(&config, vb)?;
 
         Ok(Self {
@@ -110,19 +114,24 @@ impl QwenReranker {
             "<|im_start|>system\nYou are a technical search expert. Evaluate if the document snippet provides the logic, implementation, or test case for the user's query.\n\nFocus on matching the logical intent, not just common words like 'test' or 'config'.<|im_end|>\n<|im_start|>user\nQuery: {}\nFile: {}\nSnippet: {}\nIs this document a strong match for the query logic? Answer with only 'Yes' or 'No'.<|im_end|>\n<|im_start|>assistant\n",
             query, filename, document
         );
-        
-        let encoding = self.tokenizer.encode(prompt, true)
+
+        let encoding = self
+            .tokenizer
+            .encode(prompt, true)
             .map_err(|m| anyhow!("encoding failed: {}", m))?;
-        
+
         let tokens = encoding.get_ids();
         let tokens_tensor = Tensor::new(tokens, &self.device)?.unsqueeze(0)?;
-        
-        let mut model = self.model.lock().map_err(|_| anyhow!("model mutex poisoned"))?;
-        
-        // ModelForCausalLM handles slicing hidden states internally. 
+
+        let mut model = self
+            .model
+            .lock()
+            .map_err(|_| anyhow!("model mutex poisoned"))?;
+
+        // ModelForCausalLM handles slicing hidden states internally.
         // It returns [batch, 1, vocab_size] for the LAST token.
         let logits = model.forward(&tokens_tensor, 0)?;
-        
+
         let last_logit = logits.get(0)?.get(0)?;
         let probs = candle_nn::ops::softmax(&last_logit, 0)?;
         let probs_vec = probs.to_vec1::<f32>()?;
@@ -134,21 +143,29 @@ impl QwenReranker {
         let no_prob = probs_vec.get(no_id).cloned().unwrap_or(0.0) as f64;
 
         let score = yes_prob / (yes_prob + no_prob + 1e-6);
-        
+
         // Ensure we don't carry over KV cache between documents
         model.clear_kv_cache();
-        
+
         Ok(score)
     }
 }
 
 impl Reranker for QwenReranker {
-    fn rerank(&self, query: &str, mut candidates: CandidateList, limit: usize) -> Result<CandidateList> {
+    fn rerank(
+        &self,
+        query: &str,
+        mut candidates: CandidateList,
+        limit: usize,
+    ) -> Result<CandidateList> {
         if candidates.results.is_empty() {
             return Ok(candidates);
         }
 
-        tracing::info!("reranking {} candidates with Qwen2.5-0.5B...", candidates.results.len());
+        tracing::info!(
+            "reranking {} candidates with Qwen2.5-0.5B...",
+            candidates.results.len()
+        );
         let start = std::time::Instant::now();
 
         for candidate in &mut candidates.results {
@@ -187,12 +204,12 @@ fn ensure_qwen_asset(spec: &QwenModelSpec, path: &Path, filename: &str) -> Resul
         "https://huggingface.co/{}/resolve/{}/{}",
         spec.model_id, spec.revision, filename
     );
-    
+
     tracing::info!("downloading {}...", url);
     let mut response = ureq::get(&url).call()?;
     let mut file = fs::File::create(path)?;
     let mut reader = response.body_mut().as_reader();
     std::io::copy(&mut reader, &mut file)?;
-    
+
     Ok(())
 }

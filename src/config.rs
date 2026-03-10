@@ -10,7 +10,9 @@ pub struct Config {
     #[serde(default)]
     pub search: SearchConfig,
     #[serde(default)]
-    pub model: ModelConfig,
+    pub embedding: EmbeddingConfig,
+    #[serde(default)]
+    pub rerank: RerankConfig,
 }
 
 pub struct Ignore {
@@ -45,10 +47,7 @@ impl Ignore {
         }
 
         // 4. Default exclusions for search quality (noise reduction)
-        let default_exclusions = [
-            "target/**",
-            ".git/**",
-        ];
+        let default_exclusions = ["target/**", ".git/**"];
         for pattern in default_exclusions {
             let _ = builder.add_line(None, pattern);
         }
@@ -74,12 +73,22 @@ pub struct SearchConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelConfig {
+pub struct EmbeddingConfig {
     #[serde(default = "default_model_id")]
     pub model_id: String,
     #[serde(default = "default_model_revision")]
     pub model_revision: String,
     #[serde(default = "default_max_length")]
+    pub max_length: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RerankConfig {
+    #[serde(default = "default_rerank_model_id")]
+    pub model_id: String,
+    #[serde(default = "default_rerank_model_revision")]
+    pub model_revision: String,
+    #[serde(default = "default_rerank_max_length")]
     pub max_length: usize,
 }
 
@@ -102,6 +111,16 @@ fn default_max_length() -> usize {
     crate::dense::DEFAULT_MAX_LENGTH
 }
 
+fn default_rerank_model_id() -> String {
+    crate::search::adapters::qwen::DEFAULT_QWEN_MODEL_ID.to_string()
+}
+fn default_rerank_model_revision() -> String {
+    crate::search::adapters::qwen::DEFAULT_QWEN_REVISION.to_string()
+}
+fn default_rerank_max_length() -> usize {
+    crate::search::adapters::qwen::DEFAULT_QWEN_MAX_LENGTH
+}
+
 impl Default for SearchConfig {
     fn default() -> Self {
         Self {
@@ -112,12 +131,22 @@ impl Default for SearchConfig {
     }
 }
 
-impl Default for ModelConfig {
+impl Default for EmbeddingConfig {
     fn default() -> Self {
         Self {
             model_id: default_model_id(),
             model_revision: default_model_revision(),
             max_length: default_max_length(),
+        }
+    }
+}
+
+impl Default for RerankConfig {
+    fn default() -> Self {
+        Self {
+            model_id: default_rerank_model_id(),
+            model_revision: default_rerank_model_revision(),
+            max_length: default_rerank_max_length(),
         }
     }
 }
@@ -204,15 +233,30 @@ impl Config {
             }
         }
 
-        if let Some(model) = partial.model {
-            if let Some(model_id) = model.model_id {
-                self.model.model_id = model_id;
+        // Handle both legacy [model] and new [embedding]
+        let embedding_part = partial.embedding.or(partial.model);
+
+        if let Some(embedding) = embedding_part {
+            if let Some(model_id) = embedding.model_id {
+                self.embedding.model_id = model_id;
             }
-            if let Some(model_revision) = model.model_revision {
-                self.model.model_revision = model_revision;
+            if let Some(model_revision) = embedding.model_revision {
+                self.embedding.model_revision = model_revision;
             }
-            if let Some(max_length) = model.max_length {
-                self.model.max_length = max_length;
+            if let Some(max_length) = embedding.max_length {
+                self.embedding.max_length = max_length;
+            }
+        }
+
+        if let Some(rerank) = partial.rerank {
+            if let Some(model_id) = rerank.model_id {
+                self.rerank.model_id = model_id;
+            }
+            if let Some(model_revision) = rerank.model_revision {
+                self.rerank.model_revision = model_revision;
+            }
+            if let Some(max_length) = rerank.max_length {
+                self.rerank.max_length = max_length;
             }
         }
 
@@ -223,7 +267,9 @@ impl Config {
 #[derive(Debug, Deserialize)]
 struct PartialConfig {
     search: Option<PartialSearchConfig>,
-    model: Option<PartialModelConfig>,
+    embedding: Option<PartialModelConfig>,
+    model: Option<PartialModelConfig>, // Legacy
+    rerank: Option<PartialModelConfig>,
 }
 
 #[derive(Debug, Deserialize)]
