@@ -26,8 +26,8 @@ Add the necessary metadata to `Cargo.toml` to configure `cargo-dist` for multi-p
 #### Verified Evidence
 - [ac-4.log](../../../../stories/VDQ8UwFfq/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/VDQ8UwFfq/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDQ8UwFfq/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDQ8UwFfq/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDQ8UwFfq/EVIDENCE/ac-3.log)
 
 ### Create Github Action For Releases
 - **ID:** VDQ8UwXh7
@@ -45,7 +45,7 @@ Generate and configure the `.github/workflows/release.yml` file to automate the 
 #### Verified Evidence
 - [ac-4.log](../../../../stories/VDQ8UwXh7/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/VDQ8UwXh7/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDQ8UwXh7/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDQ8UwXh7/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDQ8UwXh7/EVIDENCE/ac-3.log)
 
 

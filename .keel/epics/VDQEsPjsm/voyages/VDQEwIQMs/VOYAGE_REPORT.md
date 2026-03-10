@@ -26,8 +26,8 @@ Implement the core logic to load Qwen2.5-0.5B-Instruct weights and configuration
 #### Verified Evidence
 - [ac-4.log](../../../../stories/VDQF1XzKi/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/VDQF1XzKi/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDQF1XzKi/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDQF1XzKi/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDQF1XzKi/EVIDENCE/ac-3.log)
 
 ### Integrate Qwen Reranker Into Search Service
 - **ID:** VDQF1YQLZ
@@ -45,7 +45,7 @@ Replace the `MockLlmReranker` with the real `QwenReranker` in the `SearchService
 #### Verified Evidence
 - [ac-4.log](../../../../stories/VDQF1YQLZ/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/VDQF1YQLZ/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDQF1YQLZ/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDQF1YQLZ/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDQF1YQLZ/EVIDENCE/ac-3.log)
 
 

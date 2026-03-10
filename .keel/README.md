@@ -13,6 +13,7 @@
 | [Composable Search Strategy Architecture](bearings/1vzXLN000/) | laid | ✓ | ✓ | decision-ready | 3.31 | ✓ |
 | [Zig-Style Global File Cache](bearings/1vzfew000/) | laid | ✓ | ✓ | decision-ready | 4.44 | ✓ |
 | [Comprehensive Performance Instrumentation](bearings/1vziaX000/) | laid | ✓ | ✓ | decision-ready | 6.56 | ✓ |
+| [OCR and Binary Format Support Options](bearings/VDQgTTtv7/) | laid | ✓ | ✓ | decision-ready | 4.59 | ✓ |
 
 ## Epics
 
@@ -85,4 +86,10 @@
 | Voyage | Status |
 |--------|--------|
 | [Instrumentation Foundation](epics/1vziaX000/voyages/1vzibo000/) | done |
+
+### [OCR and Binary Format Support Options](epics/VDQgTTtv7/) (draft)
+
+| Voyage | Status |
+|--------|--------|
+| [Implement Base OCR Support](epics/VDQgTTtv7/voyages/VDQgokSvk/) | draft |
 

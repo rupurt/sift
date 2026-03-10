@@ -26,8 +26,8 @@ execution all share the same orchestration model.
 
 #### Verified Evidence
 - [ac-1.log](../../../../stories/1vzdDJ000/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/1vzdDJ000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzdDJ000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzdDJ000/EVIDENCE/ac-3.log)
 
 ### Add Query Expansion And Phrase Retrieval
 - **ID:** 1vzdDn000
@@ -47,8 +47,8 @@ parallel option that can complement vector search.
 #### Verified Evidence
 - [ac-4.log](../../../../stories/1vzdDn000/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/1vzdDn000/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/1vzdDn000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzdDn000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzdDn000/EVIDENCE/ac-3.log)
 
 ### Add Fusion And Reranking Layers
 - **ID:** 1vzdDu000
@@ -66,8 +66,8 @@ behind its own port.
 
 #### Verified Evidence
 - [ac-1.log](../../../../stories/1vzdDu000/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/1vzdDu000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzdDu000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzdDu000/EVIDENCE/ac-3.log)
 
 ### Add Named Hybrid Strategy Presets
 - **ID:** 1vzdE0000
@@ -85,8 +85,8 @@ alias to the current champion preset.
 
 #### Verified Evidence
 - [ac-1.log](../../../../stories/1vzdE0000/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/1vzdE0000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzdE0000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzdE0000/EVIDENCE/ac-3.log)
 
 ### Benchmark Strategies Against Baseline And Champion
 - **ID:** 1vzdE8000
@@ -104,7 +104,7 @@ current champion preset with exact recorded evidence.
 
 #### Verified Evidence
 - [ac-1.log](../../../../stories/1vzdE8000/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/1vzdE8000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzdE8000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzdE8000/EVIDENCE/ac-3.log)
 
 
