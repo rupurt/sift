@@ -25,11 +25,11 @@ started_at: 2026-03-09T17:01:19
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/3 stories complete
+**Progress:** 1/3 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
-| [Implement Session-Level Query Embedding Cache](../../../../stories/VDPyDiXga/README.md) | feat | backlog |
+| [Implement Session-Level Query Embedding Cache](../../../../stories/VDPyDiXga/README.md) | feat | done |
 | [SIMD-Optimized Dot-Product Calculation](../../../../stories/VDPyDiqht/README.md) | feat | backlog |
 | [Reduce Search Pipeline Memory Allocations](../../../../stories/VDPyDj6iA/README.md) | feat | backlog |
 <!-- END GENERATED -->

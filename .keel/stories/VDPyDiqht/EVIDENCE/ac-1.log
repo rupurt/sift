@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T17:07:33.771961392-07:00
+mode: manual
+---
+Implemented SIMD-optimized dot_product using the wide crate for x86_64 and aarch64

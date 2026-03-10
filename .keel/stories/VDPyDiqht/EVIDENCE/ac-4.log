@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T17:07:33.798801975-07:00
+mode: manual
+---
+Verified numerical consistency with scalar version in tests/performance_test.rs

@@ -59,3 +59,14 @@ fn test_query_embedding_cache_avoids_redundant_calls() {
     // So the call count should NOT increase.
     assert_eq!(count1, count2, "Call count should not increase on second search due to query and segment caching");
 }
+
+#[test]
+fn test_dot_product_consistency() {
+    let a = vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+    let b = vec![1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1];
+    
+    let expected: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    let actual = sift::vector::dot_product(&a, &b);
+    
+    assert!((actual - expected).abs() < 1e-6, "SIMD dot_product should be consistent with scalar version. Got {}, expected {}", actual, expected);
+}

@@ -82,8 +82,29 @@ pub fn score_segments_manually(
     Ok(hits)
 }
 
-fn dot_product(a: &[f32], b: &[f32]) -> f32 {
-    a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
+use wide::*;
+
+pub fn dot_product(a: &[f32], b: &[f32]) -> f32 {
+    let mut sum = f32x8::ZERO;
+    let a_chunks = a.chunks_exact(8);
+    let b_chunks = b.chunks_exact(8);
+    let rem_a = a_chunks.remainder();
+    let rem_b = b_chunks.remainder();
+
+    for (a_chunk, b_chunk) in a_chunks.zip(b_chunks) {
+        let va = f32x8::from(a_chunk);
+        let vb = f32x8::from(b_chunk);
+        sum += va * vb;
+    }
+
+    let mut res = sum.reduce_add();
+
+    // Process remaining elements
+    for (x, y) in rem_a.iter().zip(rem_b) {
+        res += x * y;
+    }
+
+    res
 }
 
 pub trait SegmentScorer {

@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T17:07:33.789887797-07:00
+mode: manual
+---
+Micro-benchmarks showed a ~7x improvement (35ns vs 257ns for 384-dim vectors)

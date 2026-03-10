@@ -28,6 +28,7 @@ tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 undoc = "0.1.15"
 ureq = "3.2.0"
 walkdir = "2.5.0"
+wide = "1.1.1"
 xz2 = { version = "0.1.7", features = ["static"] }
 
 [dev-dependencies]
