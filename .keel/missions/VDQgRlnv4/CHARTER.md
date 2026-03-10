@@ -4,11 +4,11 @@
 
 | ID | Description | Verification |
 |----|-------------|--------------|
-| MG-01 | Support text extraction from common image formats (PNG, JPEG, TIFF, BMP) via OCR | board: src/extract.rs |
-| MG-02 | Implement a fallback mechanism for scanned PDFs (image-only) using OCR | board: src/extract.rs |
-| MG-03 | Improve binary document extraction for existing formats (Office, PDF) where applicable | board: src/extract.rs |
+| MG-01 | Support text extraction from common image formats (PNG, JPEG, TIFF, BMP) via OCR | board: VDQgTTtv7 |
+| MG-02 | Implement a fallback mechanism for scanned PDFs (image-only) using OCR | board: VDQgTTtv7 |
+| MG-03 | Improve binary document extraction for existing formats (Office, PDF) where applicable | board: VDQgTTtv7 |
 | MG-04 | Evaluate and minimize the performance impact of OCR on indexing latency | metric: p50_ms |
-| MG-05 | Maintain a clean, platform-compatible dependency model for OCR | board: Cargo.toml |
+| MG-05 | Maintain a clean, platform-compatible dependency model for OCR | board: VDQgTTtv7 |
 
 ## Constraints
 

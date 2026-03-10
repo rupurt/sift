@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T20:18:45.822735-07:00
+mode: manual
+---
+Refactored OCR into a reusable perform_ocr helper

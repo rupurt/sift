@@ -92,4 +92,5 @@
 | Voyage | Status |
 |--------|--------|
 | [Implement Base OCR Support](epics/VDQgTTtv7/voyages/VDQgokSvk/) | done |
+| [Implement Scanned PDF Fallback](epics/VDQgTTtv7/voyages/VDQlaCkJk/) | done |
 

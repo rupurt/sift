@@ -35,7 +35,7 @@ pub fn extract_path(path: &Path) -> Result<Option<ExtractedDocument>> {
     } else if is_pdf_path(path) {
         let bytes = fs::read(path)
             .with_context(|| format!("failed to read document {}", path.display()))?;
-        extract_pdf(&bytes)
+        extract_pdf(path, &bytes)
     } else if let Some(source_kind) = office_source_kind(path) {
         extract_office(path, source_kind)
     } else if let Some(source_kind) = image_source_kind(path) {
@@ -95,8 +95,35 @@ fn extract_html(bytes: &[u8]) -> Result<Option<ExtractedDocument>> {
     }))
 }
 
-fn extract_pdf(bytes: &[u8]) -> Result<Option<ExtractedDocument>> {
+fn is_scanned_pdf_heuristic(text: &str) -> bool {
+    let alphanumeric_count = text.chars().filter(|c| c.is_alphanumeric()).count();
+    alphanumeric_count < 50
+}
+
+fn extract_pdf(path: &Path, bytes: &[u8]) -> Result<Option<ExtractedDocument>> {
+    #[cfg(feature = "ocr")]
+    let mut text = pdf_extract::extract_text_from_mem(bytes).context("extract pdf text")?;
+    #[cfg(not(feature = "ocr"))]
     let text = pdf_extract::extract_text_from_mem(bytes).context("extract pdf text")?;
+
+    if is_scanned_pdf_heuristic(&text) {
+        #[cfg(feature = "ocr")]
+        {
+            tracing::info!("PDF appears to be scanned, attempting OCR fallback: {}", path.display());
+            match perform_ocr(path) {
+                Ok(ocr_text) => {
+                    text = ocr_text;
+                }
+                Err(e) => {
+                    tracing::warn!("OCR fallback failed for PDF {}, returning sparse text: {}", path.display(), e);
+                }
+            }
+        }
+        #[cfg(not(feature = "ocr"))]
+        {
+            tracing::warn!("PDF appears to be scanned but OCR is disabled, returning sparse text: {}", path.display());
+        }
+    }
 
     Ok(Some(ExtractedDocument {
         text,
@@ -112,7 +139,7 @@ fn extract_office(path: &Path, source_kind: SourceKind) -> Result<Option<Extract
 }
 
 #[cfg(feature = "ocr")]
-fn extract_image(path: &Path, source_kind: SourceKind) -> Result<Option<ExtractedDocument>> {
+fn perform_ocr(path: &Path) -> Result<String> {
     let tesseract = tesseract_rs::TesseractAPI::new();
     tesseract
         .init(".", "eng")
@@ -121,12 +148,18 @@ fn extract_image(path: &Path, source_kind: SourceKind) -> Result<Option<Extracte
     let text = tesseract
         .process_pages(
             path.to_str()
-                .ok_or_else(|| anyhow::anyhow!("invalid image path"))?,
+                .ok_or_else(|| anyhow::anyhow!("invalid file path for OCR"))?,
             None,
             0,
         )
         .map_err(|e| anyhow::anyhow!("failed to extract text via OCR: {}", e))?;
 
+    Ok(text)
+}
+
+#[cfg(feature = "ocr")]
+fn extract_image(path: &Path, source_kind: SourceKind) -> Result<Option<ExtractedDocument>> {
+    let text = perform_ocr(path)?;
     Ok(Some(ExtractedDocument { text, source_kind }))
 }
 
@@ -161,5 +194,13 @@ mod tests {
         // We don't need the file to exist because it should hit the image check first
         let result = extract_path(Path::new("test.png")).unwrap();
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_is_scanned_pdf_heuristic() {
+        assert!(is_scanned_pdf_heuristic(""));
+        assert!(is_scanned_pdf_heuristic("   \n \t  "));
+        assert!(is_scanned_pdf_heuristic("1234567890")); // 10 chars
+        assert!(!is_scanned_pdf_heuristic("This is a standard PDF with plenty of alphanumeric characters, clearly exceeding the threshold for the heuristic."));
     }
 }

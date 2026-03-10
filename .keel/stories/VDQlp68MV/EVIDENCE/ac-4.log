@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T20:18:45.834276-07:00
+mode: manual
+---
+extract_pdf logs a warning and returns sparse text if ocr feature is disabled

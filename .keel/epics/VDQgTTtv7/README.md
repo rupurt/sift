@@ -18,8 +18,9 @@ created_at: 2026-03-09T19:56:54
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 1/1 voyages complete, 1/1 stories done
+**Progress:** 2/2 voyages complete, 2/2 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
 | [Implement Base OCR Support](voyages/VDQgokSvk/) | done | 1/1 |
+| [Implement Scanned PDF Fallback](voyages/VDQlaCkJk/) | done | 1/1 |
 <!-- END GENERATED -->

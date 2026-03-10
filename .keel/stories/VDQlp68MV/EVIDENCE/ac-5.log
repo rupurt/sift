@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-09T20:18:45.840080-07:00
+mode: manual
+---
+Heuristic avoids OCR calls for standard PDFs since text length is checked before fallback

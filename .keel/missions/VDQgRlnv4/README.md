@@ -1,9 +1,12 @@
 ---
 id: VDQgRlnv4
 title: Support OCR and Additional Binary Document Formats
-status: active
+status: verified
 created_at: 2026-03-09T19:50:00
 activated_at: 2026-03-09T19:55:00
+updated_at: 2026-03-09T20:20:43
+achieved_at: 2026-03-09T20:20:43
+verified_at: 2026-03-09T20:20:43
 ---
 
 # Support OCR and Additional Binary Document Formats
