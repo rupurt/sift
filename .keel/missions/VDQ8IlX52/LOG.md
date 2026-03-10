@@ -22,3 +22,7 @@ Cleaned up all Clippy warnings and removed unused imports to ensure a high-quali
 ## 2026-03-09T17:56:03
 
 Standardized CI pipeline to include strict linting (Clippy) and formatting (fmt) checks. Applied project-wide formatting and fixed all remaining warnings.
+
+## 2026-03-09T17:59:48
+
+Improved search result quality for the public release by adding default exclusion patterns for metadata (.keel, .git, target) and refining the score confidence thresholds to better represent result relevance.
