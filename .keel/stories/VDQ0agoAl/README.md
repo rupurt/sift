@@ -2,12 +2,14 @@
 id: VDQ0agoAl
 title: Implement Mmap-Accelerated Blob Retrieval
 type: feat
-status: in-progress
+status: done
 created_at: 2026-03-09T17:28:43
-updated_at: 2026-03-09T17:28:43
+updated_at: 2026-03-09T17:09:49
 scope: VDPy8MNer/VDQ0Y5HBn
 index: 1
 started_at: 2026-03-09T17:30:15
+submitted_at: 2026-03-09T17:09:49
+completed_at: 2026-03-09T17:09:49
 ---
 
 # Implement Mmap-Accelerated Blob Retrieval
