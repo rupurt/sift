@@ -47,9 +47,9 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/rupurt/sift/releases/la
 ### Manual Download
 
 Download the latest pre-built binaries and installers for your platform from the [GitHub Releases](https://github.com/rupurt/sift/releases) page. We provide:
-- **Linux:** `.tar.gz`, `.deb`, `.rpm` (standard glibc and static musl versions)
-- **macOS:** `.tar.gz`, `.dmg`
-- **Windows:** `.zip`, `.msi`
+- **Linux:** `.tar.gz` archives plus the cross-platform shell installer
+- **macOS:** `.tar.gz` archives plus the cross-platform shell installer
+- **Windows:** `.zip` archives, `.msi`, and the PowerShell installer
 
 ## How Sift Works
 

@@ -18,16 +18,52 @@ pub fn hash_file(path: &Path) -> Result<String> {
 }
 
 pub fn get_file_heuristics(path: &Path) -> Result<CacheEntry> {
-    use std::os::unix::fs::MetadataExt;
-
     let meta = fs::metadata(path).with_context(|| format!("failed to stat {}", path.display()))?;
-    Ok(CacheEntry {
-        inode: meta.ino(),
-        mtime_secs: meta.mtime(),
-        mtime_nanos: meta.mtime_nsec() as u32,
-        size: meta.size(),
-        blake3_hash: String::new(), // Will be populated if needed
-    })
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+
+        return Ok(CacheEntry {
+            inode: meta.ino(),
+            mtime_secs: meta.mtime(),
+            mtime_nanos: meta.mtime_nsec() as u32,
+            size: meta.size(),
+            blake3_hash: String::new(), // Will be populated if needed
+        });
+    }
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+
+        let last_write_time = meta.last_write_time();
+        return Ok(CacheEntry {
+            // Use creation time as the closest stable file identity available in std on Windows.
+            inode: meta.creation_time(),
+            mtime_secs: (last_write_time / 10_000_000) as i64,
+            mtime_nanos: ((last_write_time % 10_000_000) * 100) as u32,
+            size: meta.file_size(),
+            blake3_hash: String::new(), // Will be populated if needed
+        });
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        let modified = meta
+            .modified()
+            .with_context(|| format!("failed to read mtime for {}", path.display()))?;
+        let since_epoch = modified
+            .duration_since(std::time::UNIX_EPOCH)
+            .with_context(|| format!("mtime predates UNIX_EPOCH for {}", path.display()))?;
+
+        Ok(CacheEntry {
+            inode: 0,
+            mtime_secs: since_epoch.as_secs() as i64,
+            mtime_nanos: since_epoch.subsec_nanos(),
+            size: meta.len(),
+            blake3_hash: String::new(), // Will be populated if needed
+        })
+    }
 }
 
 impl Manifest {

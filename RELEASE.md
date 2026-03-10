@@ -48,7 +48,7 @@ git push origin v0.1.1
 Pushing the tag triggers the [Release GitHub Action](.github/workflows/release.yml). This workflow will:
 - Plan the release using `cargo dist plan`.
 - Build binaries for all supported platforms in parallel.
-- Generate installers (`.deb`, `.rpm`, `.dmg`, `.msi`).
+- Generate supported installers (shell, PowerShell, Homebrew, and `.msi`).
 - Create a GitHub Release and upload all artifacts and checksums.
 
 ### 5. Verify the Release
@@ -63,12 +63,12 @@ Once the GitHub Action completes:
 
 | Platform | Target Triple | Artifacts |
 |----------|---------------|-----------|
-| **Linux (x86_64, glibc)** | `x86_64-unknown-linux-gnu` | `.tar.gz`, `.deb`, `.rpm`, shell script |
-| **Linux (x86_64, static)** | `x86_64-unknown-linux-musl` | `.tar.gz`, `.deb`, `.rpm` |
-| **Linux (ARM64)** | `aarch64-unknown-linux-gnu` | `.tar.gz`, `.deb`, `.rpm` |
-| **macOS (Intel)** | `x86_64-apple-darwin` | `.tar.gz`, `.dmg` |
-| **macOS (Apple Silicon)** | `aarch64-apple-darwin` | `.tar.gz`, `.dmg` |
-| **Windows (x86_64)** | `x86_64-pc-windows-msvc` | `.zip`, `.msi`, powershell script |
+| **Linux (x86_64, glibc)** | `x86_64-unknown-linux-gnu` | `.tar.gz`, shell installer |
+| **Linux (x86_64, static)** | `x86_64-unknown-linux-musl` | `.tar.gz`, shell installer |
+| **Linux (ARM64)** | `aarch64-unknown-linux-gnu` | `.tar.gz`, shell installer |
+| **macOS (Intel)** | `x86_64-apple-darwin` | `.tar.gz`, shell installer, Homebrew formula |
+| **macOS (Apple Silicon)** | `aarch64-apple-darwin` | `.tar.gz`, shell installer, Homebrew formula |
+| **Windows (x86_64)** | `x86_64-pc-windows-msvc` | `.zip`, `.msi`, PowerShell installer |
 
 ---
 

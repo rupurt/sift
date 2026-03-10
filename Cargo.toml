@@ -2,6 +2,18 @@
 name = "sift"
 version = "0.1.0"
 edition = "2024"
+authors = ["Alex Kwiatkowski"]
+description = "Standalone hybrid search CLI for fast document retrieval in agentic coding workflows"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/rupurt/sift"
+homepage = "https://github.com/rupurt/sift"
+
+[package.metadata.wix]
+upgrade-guid = "ADD48BF5-10C3-4F19-ADDC-2662BB2C4AE7"
+path-guid = "C85A99E3-E620-44A5-A651-EBBDC3606722"
+license = false
+eula = false
 
 [dependencies]
 anyhow = "1.0.102"
@@ -43,20 +55,34 @@ tempfile = "3.26.0"
 name = "search_bench"
 harness = false
 
+# The profile that 'cargo dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
+
 # Config for 'cargo dist'
-[package.metadata.dist]
-# The preferred cargo-dist version to use in CI (checked by pipelines)
+[workspace.metadata.dist]
+# The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
 cargo-dist-version = "0.22.1"
 # CI backends to support
 ci = "github"
-# The installers to generate for each release
-installers = ["shell", "powershell", "deb", "rpm", "dmg", "msi", "homebrew"]
-# Target platforms to build apps for (Rust target-triples)
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl", "aarch64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
-# Publish jobs to run in CI
-publish-jobs = []
+# The installers to generate for each app
+installers = ["shell", "powershell", "homebrew", "msi"]
+# Target platforms to build apps for (Rust target-triple syntax)
+targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl", "x86_64-pc-windows-msvc"]
 # Whether to install an updater program
 install-updater = true
+# Path that installers should place binaries in
+install-path = "CARGO_HOME"
 
-[package.metadata.dist.homebrew]
+[workspace.metadata.dist.homebrew]
 tap = "rupurt/homebrew-tap"
+
+[workspace.metadata.dist.github-custom-runners]
+global = "ubuntu-24.04"
+aarch64-apple-darwin = "macos-15"
+aarch64-unknown-linux-gnu = "ubuntu-24.04-arm"
+x86_64-apple-darwin = "macos-15-intel"
+x86_64-pc-windows-msvc = "windows-2022"
+x86_64-unknown-linux-gnu = "ubuntu-24.04"
+x86_64-unknown-linux-musl = "ubuntu-24.04"
