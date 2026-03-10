@@ -27,7 +27,16 @@ There is no external database, no daemon, and no background indexing service.
   dense vector embeddings, enabling search at dot-product speeds.
 - **Inference & Reranking:** Runs locally through Candle with support for 
   both dense embeddings and advanced LLM reranking (e.g., Qwen2.5).
-- **Supported Inputs:** Text, HTML, PDF, and OOXML files (`.docx`, `.xlsx`, `.pptx`).
+- **Supported Inputs:** Text, HTML, PDF, OOXML files (`.docx`, `.xlsx`, `.pptx`), and optionally **Images** (`.png`, `.jpeg`, `.tiff`, `.bmp`) with scanned PDF fallback via the `ocr` feature.
+
+### Optional OCR Support
+By default, `sift` is a pure-Rust binary with zero system dependencies. However, you can enable Optical Character Recognition (OCR) to search through images and image-only scanned PDFs.
+
+This requires the Tesseract C++ library (`libtesseract` and `libleptonica`) to be installed on your system. To enable it, compile from source with the `ocr` feature:
+
+```bash
+cargo install --path . --features ocr
+```
 
 ## Installation
 
