@@ -1,4 +1,4 @@
-use sift::{SearchInput, SearchOptions, Sift};
+use sift::{Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift};
 
 #[test]
 fn embedded_facade_runs_a_basic_bm25_search() {
@@ -15,6 +15,9 @@ fn embedded_facade_runs_a_basic_bm25_search() {
             SearchInput::new(corpus.path(), "canonical").with_options(
                 SearchOptions::default()
                     .with_strategy("bm25")
+                    .with_retrievers(vec![Retriever::Bm25])
+                    .with_fusion(Fusion::Rrf)
+                    .with_reranking(Reranking::None)
                     .with_limit(1)
                     .with_shortlist(1),
             ),

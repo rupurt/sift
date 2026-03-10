@@ -1,0 +1,7 @@
+---
+recorded_at: 2026-03-10T15:50:53.684494634-07:00
+command: cargo check --test library_facade_test
+---
+
+--- stderr ---
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.14s

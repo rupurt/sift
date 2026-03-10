@@ -1,0 +1,7 @@
+---
+recorded_at: 2026-03-10T15:50:53.522823264-07:00
+command: sh -lc '! rg -n "render_search_response|RetrieverPolicy|FusionPolicy|RerankingPolicy" src/lib.rs'
+---
+
+--- stderr ---
+rg: src/lib.rs: IO error for operation on src/lib.rs: No such file or directory (os error 2)

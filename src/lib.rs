@@ -10,7 +10,7 @@ pub mod segment;
 pub mod system;
 pub mod vector;
 
-pub use crate::facade::{SearchInput, SearchOptions, Sift, SiftBuilder};
-pub use crate::search::{
-    FusionPolicy, RerankingPolicy, RetrieverPolicy, ScoreConfidence, SearchHit, SearchResponse,
+pub use crate::facade::{
+    Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift, SiftBuilder,
 };
+pub use crate::search::{ScoreConfidence, SearchHit, SearchResponse};

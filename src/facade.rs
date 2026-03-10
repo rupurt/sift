@@ -13,6 +13,53 @@ use crate::search::{
 };
 use crate::system::Telemetry;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Retriever {
+    Bm25,
+    Phrase,
+    Vector,
+}
+
+impl From<Retriever> for RetrieverPolicy {
+    fn from(value: Retriever) -> Self {
+        match value {
+            Retriever::Bm25 => RetrieverPolicy::Bm25,
+            Retriever::Phrase => RetrieverPolicy::Phrase,
+            Retriever::Vector => RetrieverPolicy::Vector,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Fusion {
+    Rrf,
+}
+
+impl From<Fusion> for FusionPolicy {
+    fn from(value: Fusion) -> Self {
+        match value {
+            Fusion::Rrf => FusionPolicy::Rrf,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reranking {
+    None,
+    PositionAware,
+    Llm,
+}
+
+impl From<Reranking> for RerankingPolicy {
+    fn from(value: Reranking) -> Self {
+        match value {
+            Reranking::None => RerankingPolicy::None,
+            Reranking::PositionAware => RerankingPolicy::PositionAware,
+            Reranking::Llm => RerankingPolicy::Llm,
+        }
+    }
+}
+
 pub struct SiftBuilder {
     config: Config,
     ignore: Option<Ignore>,
@@ -132,9 +179,12 @@ impl Sift {
                 dense_model,
                 rerank_model,
                 verbose: input.options.verbose,
-                retrievers: input.options.retrievers,
-                fusion: input.options.fusion,
-                reranking: input.options.reranking,
+                retrievers: input
+                    .options
+                    .retrievers
+                    .map(|retrievers| retrievers.into_iter().map(Into::into).collect()),
+                fusion: input.options.fusion.map(Into::into),
+                reranking: input.options.reranking.map(Into::into),
                 telemetry: self.telemetry.clone(),
                 cache_dir: input.options.cache_dir.or_else(|| self.cache_dir.clone()),
                 query_cache: Some(self.query_cache.clone()),
@@ -221,9 +271,9 @@ pub struct SearchOptions {
     dense_model: Option<DenseModelSpec>,
     rerank_model: Option<QwenModelSpec>,
     verbose: u8,
-    retrievers: Option<Vec<RetrieverPolicy>>,
-    fusion: Option<FusionPolicy>,
-    reranking: Option<RerankingPolicy>,
+    retrievers: Option<Vec<Retriever>>,
+    fusion: Option<Fusion>,
+    reranking: Option<Reranking>,
     cache_dir: Option<PathBuf>,
 }
 
@@ -258,17 +308,17 @@ impl SearchOptions {
         self
     }
 
-    pub fn with_retrievers(mut self, retrievers: Vec<RetrieverPolicy>) -> Self {
+    pub fn with_retrievers(mut self, retrievers: Vec<Retriever>) -> Self {
         self.retrievers = Some(retrievers);
         self
     }
 
-    pub fn with_fusion(mut self, fusion: FusionPolicy) -> Self {
+    pub fn with_fusion(mut self, fusion: Fusion) -> Self {
         self.fusion = Some(fusion);
         self
     }
 
-    pub fn with_reranking(mut self, reranking: RerankingPolicy) -> Self {
+    pub fn with_reranking(mut self, reranking: Reranking) -> Self {
         self.reranking = Some(reranking);
         self
     }
@@ -284,13 +334,13 @@ fn resolve_plan(strategy: &str, options: &SearchOptions) -> Result<crate::search
     let mut plan = registry.resolve(strategy)?;
 
     if let Some(retrievers) = &options.retrievers {
-        plan.retrievers = retrievers.clone();
+        plan.retrievers = retrievers.iter().copied().map(Into::into).collect();
     }
     if let Some(fusion) = options.fusion {
-        plan.fusion = fusion;
+        plan.fusion = fusion.into();
     }
     if let Some(reranking) = options.reranking {
-        plan.reranking = reranking;
+        plan.reranking = reranking.into();
     }
 
     Ok(plan)

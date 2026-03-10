@@ -25,11 +25,11 @@ started_at: 2026-03-10T15:32:23
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/4 stories complete
+**Progress:** 1/4 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
-| [Introduce Canonical Embedded Search Facade](../../../../stories/VDVSF0yAX/README.md) | feat | backlog |
+| [Introduce Canonical Embedded Search Facade](../../../../stories/VDVSF0yAX/README.md) | feat | done |
 | [Decouple Public API From CLI Concerns](../../../../stories/VDVSF1KAM/README.md) | feat | backlog |
 | [Adopt The Facade In The Executable](../../../../stories/VDVSF1bAN/README.md) | feat | backlog |
 | [Document The Supported Embedded API Boundary](../../../../stories/VDVSF1tAK/README.md) | docs | backlog |
