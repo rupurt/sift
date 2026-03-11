@@ -4,8 +4,8 @@
 
 | ID | Description | Verification |
 |----|-------------|--------------|
-| MG-01 | Prepare the repository for the `0.2.0` release by updating the crate version and any user-facing release documentation that embeds the current version. | board: VDWyMeOGv |
-| MG-02 | Verify that the repository is release-ready for the `v0.2.0` tag using the existing cargo-dist workflow and project quality gates. | board: VDWyMeOGv |
+| MG-01 | Prepare the repository for the `0.2.0` release by updating the crate version and any user-facing release documentation that embeds the current version. | board: VDWyNSW9x |
+| MG-02 | Verify that the repository is release-ready for the `v0.2.0` tag using the existing cargo-dist workflow and project quality gates. | board: VDWyNSW9x |
 
 ## Constraints
 

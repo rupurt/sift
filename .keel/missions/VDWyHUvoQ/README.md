@@ -1,10 +1,12 @@
 ---
 id: VDWyHUvoQ
 title: Release 0.2.0
-status: active
+status: verified
 created_at: 2026-03-10T21:43:59
-updated_at: 2026-03-10T21:44:18
+updated_at: 2026-03-10T21:55:19
 activated_at: 2026-03-10T21:44:18
+achieved_at: 2026-03-10T21:55:12
+verified_at: 2026-03-10T21:55:19
 ---
 
 # Release 0.2.0

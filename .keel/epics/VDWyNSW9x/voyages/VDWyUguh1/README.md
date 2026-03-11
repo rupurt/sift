@@ -1,12 +1,13 @@
 ---
 id: VDWyUguh1
 title: Prepare 0.2.0 Release
-status: in-progress
+status: done
 epic: VDWyNSW9x
 created_at: 2026-03-10T21:44:50
 index: 1
 updated_at: 2026-03-10T21:46:23
 started_at: 2026-03-10T21:46:47
+completed_at: 2026-03-10T21:54:30
 ---
 
 # Prepare 0.2.0 Release
@@ -20,14 +21,16 @@ started_at: 2026-03-10T21:46:47
 |----------|-------------|
 | [SRS.md](SRS.md) | Requirements and verification criteria |
 | [SDD.md](SDD.md) | Architecture and implementation details |
+| [VOYAGE_REPORT.md](VOYAGE_REPORT.md) | Narrative summary of implementation and evidence |
+| [COMPLIANCE_REPORT.md](COMPLIANCE_REPORT.md) | Traceability matrix and verification proof |
 <!-- END DOCUMENTS -->
 
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 stories complete
+**Progress:** 1/1 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
-| [Cut 0.2.0 Release Candidate](../../../../stories/VDWyf24a0/README.md) | feat | backlog |
+| [Cut 0.2.0 Release Candidate](../../../../stories/VDWyf24a0/README.md) | feat | done |
 <!-- END GENERATED -->

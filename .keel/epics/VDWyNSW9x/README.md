@@ -19,8 +19,8 @@ index: 8
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 0/1 stories done
+**Progress:** 1/1 voyages complete, 1/1 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Prepare 0.2.0 Release](voyages/VDWyUguh1/) | in-progress | 0/1 |
+| [Prepare 0.2.0 Release](voyages/VDWyUguh1/) | done | 1/1 |
 <!-- END GENERATED -->
