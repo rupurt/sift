@@ -85,7 +85,24 @@ search *args:
     cargo run --release -- search {{args}}
 
 embed-build:
-    cargo build --manifest-path examples/sift-embed/Cargo.toml
+    @set -eu; \
+    local_target="{{justfile_directory()}}/target"; \
+    manifest="{{justfile_directory()}}/examples/sift-embed/Cargo.toml"; \
+    cargo build --manifest-path "$manifest"; \
+    profile_dir=debug; \
+    source_root="${CARGO_TARGET_DIR:-$local_target}"; \
+    source_bin="$source_root/$profile_dir/sift-embed"; \
+    dest_dir="$local_target/$profile_dir"; \
+    dest_bin="$dest_dir/sift-embed"; \
+    if [ ! -f "$source_bin" ]; then \
+        echo "expected build artifact not found: $source_bin" >&2; \
+        exit 1; \
+    fi; \
+    mkdir -p "$dest_dir"; \
+    if [ "$source_bin" != "$dest_bin" ]; then \
+        cp -f "$source_bin" "$dest_bin"; \
+        echo "copied $source_bin -> $dest_bin"; \
+    fi
 
 embed-search path query:
     cargo run --manifest-path examples/sift-embed/Cargo.toml -- search '{{path}}' '{{query}}'
