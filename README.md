@@ -4,7 +4,7 @@
 [![Planning Board](https://img.shields.io/badge/Keel-Board-blue)](.keel/README.md)
 [![Release Process](https://img.shields.io/badge/Release-Process-green)](RELEASE.md)
 
-`sift` is a standalone Rust CLI for local document retrieval in agentic
+`sift` is a standalone Rust CLI and **Hybrid Information Retrieval (IR) system** for local document retrieval in agentic
 workflows. It searches raw local corpora without a long-running daemon, uses a 
 composable search strategy architecture, and employs a Zig-style heuristic 
 caching system for near-instant repeated queries.
@@ -163,8 +163,17 @@ flowchart TD
   C5 --> D
 
   subgraph Strategy ["Layered Search Strategy"]
-    D --> E[Query Expansion]
-    E --> F{Retrievers}
+    D --> E{Expansion}
+    E -->|None| E1[Direct Query]
+    E -->|HyDE| E2[LLM: Hypothetical Answer]
+    E -->|SPLADE| E3[LLM: Generative Expansion]
+    E -->|Classified| E4[LLM: Intent Classification]
+    
+    E1 --> F{Retrievers}
+    E2 --> F
+    E3 --> F
+    E4 --> F
+    
     F -->|Lexical| F1[BM25]
     F -->|Exact| F2[Phrase]
     F -->|Semantic| F3[Vector - SIMD Dot Product]

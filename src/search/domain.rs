@@ -43,6 +43,7 @@ use crate::search::adapters::qwen::QwenModelSpec;
 pub struct SearchRequest {
     pub strategy: String,
     pub query: String,
+    pub intent: Option<String>,
     pub path: PathBuf,
     pub limit: usize,
     pub shortlist: usize,
@@ -55,6 +56,28 @@ pub struct SearchRequest {
     pub telemetry: Arc<Telemetry>,
     pub cache_dir: Option<PathBuf>,
     pub query_cache: Option<QueryEmbeddingCache>,
+}
+
+impl SearchRequest {
+    pub fn new(strategy: impl Into<String>, query: impl Into<String>, path: PathBuf) -> Self {
+        Self {
+            strategy: strategy.into(),
+            query: query.into(),
+            intent: None,
+            path,
+            limit: 10,
+            shortlist: 10,
+            dense_model: DenseModelSpec::default(),
+            rerank_model: None,
+            verbose: 0,
+            retrievers: None,
+            fusion: None,
+            reranking: None,
+            telemetry: Arc::new(Telemetry::new()),
+            cache_dir: None,
+            query_cache: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -285,6 +308,9 @@ impl SearchPlan {
 pub enum QueryExpansionPolicy {
     None,
     Synonym,
+    Hyde,
+    Splade,
+    Classified,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
@@ -307,6 +333,7 @@ pub enum RerankingPolicy {
     None,
     PositionAware,
     Llm,
+    Jina,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -431,8 +458,15 @@ pub trait Expander: Send + Sync {
 }
 
 pub trait Reranker: Send + Sync {
-    fn rerank(&self, query: &str, candidates: CandidateList, limit: usize)
-    -> Result<CandidateList>;
+    fn rerank(&self, query: &str, candidates: CandidateList, limit: usize) -> Result<CandidateList>;
+    fn as_any(&self) -> &dyn std::any::Any;
+    fn as_generative(&self) -> Option<&dyn GenerativeModel> {
+        None
+    }
+}
+
+pub trait GenerativeModel: Send + Sync {
+    fn generate(&self, prompt: &str, max_tokens: usize) -> Result<String>;
 }
 
 #[cfg(test)]

@@ -53,13 +53,43 @@ data/raw/
 | `limit` | Integer | `10` | The maximum number of results to return. |
 | `shortlist` | Integer | `8` | The number of candidates passed into reranking. |
 
+#### Expansion Pipeline
+Before retrieval, Sift can expand your query to improve recall.
+
+| Policy | Description |
+|--------|-------------|
+| `none` | No expansion (default for simple searches). |
+| `synonym` | Simple rule-based synonym matching. |
+| `hyde` | **Hypothetical Document Embeddings.** Uses a local LLM to generate a "fake" answer and embeds that for semantic retrieval. |
+| `splade` | **Sparse Lexical and Expansion.** Predicts technical terms semantically related to the query. |
+| `classified` | Identifies technical intent (e.g., BUGFIX) and adds category-specific keywords. |
+
 #### Available Strategies
-- **`page-index-hybrid`** (default): Our champion strategy. Combines BM25, Phrase matching, and Vector search, followed by Position-Aware reranking.
-- **`page-index-llm`**: Combines BM25, Phrase matching, and Vector search, followed by a **Qwen-based LLM reranker**.
+- **`page-index-hybrid`** (default): Our champion strategy. Combines BM25, Phrase matching, and Vector search, followed by Position-Aware reranking. Defaults to **SPLADE** expansion.
+- **`page-index-llm`**: Combines BM25, Phrase matching, and Vector search, followed by a **Qwen-based LLM reranker**. Defaults to **HyDE** expansion.
+- **`page-index-jina`**: Uses the specialized **Jina Reranker v3** for high-precision ranking. Defaults to **SPLADE** expansion.
+- **`page-index-splade`**: Uses SPLADE generative expansion for broader keyword recall.
+- **`page-index-classified`**: Uses intent-based classification to expand technical queries.
 - **`page-index`**: Lexical-focused strategy (inspired by qmd). Uses BM25 and Phrase matching with Position-Aware reranking (no vectors).
 - **`bm25`**: Lexical search only. Fast and strictly keyword-based.
 - **`vector`**: Semantic search only. Uses dense embeddings.
 - **`legacy-hybrid`**: Simple BM25 + Vector fusion (no phrase matching or structural bonuses).
+
+#### Search Strategy Matrix
+The table below details exactly how each built-in strategy is configured across the search pipeline.
+
+| Strategy | Expansion | Retrievers | Fusion | Reranking |
+|----------|-----------|------------|--------|-----------|
+| `page-index-hybrid` (default) | `splade` | `bm25, phrase, vector` | `rrf` | `position-aware` |
+| `page-index-llm` | `hyde` | `bm25, phrase, vector` | `rrf` | `llm` |
+| `page-index-jina` | `splade` | `bm25, phrase, vector` | `rrf` | `jina` |
+| `page-index-splade` | `splade` | `bm25, phrase, vector` | `rrf` | `position-aware` |
+| `page-index-classified` | `classified` | `bm25, phrase, vector` | `rrf` | `position-aware` |
+| `page-index` | `none` | `bm25, phrase` | `rrf` | `position-aware` |
+| `bm25` | `none` | `bm25` | `rrf` | `none` |
+| `vector` | `none` | `vector` | `rrf` | `none` |
+| `legacy-hybrid` | `none` | `bm25, vector` | `rrf` | `none` |
+| `page-index-qwen` | `none` | `bm25, phrase, vector` | `rrf` | `llm` |
 
 ---
 
@@ -68,10 +98,11 @@ data/raw/
 You can override the components of any strategy directly from the CLI:
 
 ```bash
-sift search --retrievers bm25,phrase --reranking position-aware "my query"
+sift search --intent "fix the bug" --retrievers bm25,phrase --reranking position-aware "my query"
 ```
 
 ### Override Flags
+- `--intent`: Explicitly provide search intent/context to guide expansion.
 - `--retrievers`: Comma-separated list (`bm25`, `phrase`, `vector`).
 - `--fusion`: Currently only `rrf` is supported.
 - `--reranking`: `none`, `position-aware`, or `llm`.
@@ -132,3 +163,4 @@ Performs a deep semantic pass over the top candidates. It prompts a local LLM to
 | `SIFT_BLOBS_CACHE` | Specific override for the blob store. |
 | `SIFT_MANIFESTS_CACHE` | Specific override for the project manifests. |
 | `SIFT_MODELS_CACHE` | Specific override for downloaded ML models. |
+| `HF_TOKEN` | Hugging Face API token for downloading gated models (e.g., Jina Reranker v3). |

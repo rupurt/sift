@@ -154,6 +154,11 @@ impl Sift {
             .strategy
             .clone()
             .unwrap_or_else(|| self.config.search.strategy.clone());
+        let intent = input
+            .intent
+            .as_ref()
+            .or(input.options.intent.as_ref())
+            .cloned();
         let limit = input.options.limit.unwrap_or(self.config.search.limit);
         let shortlist = input
             .options
@@ -173,6 +178,7 @@ impl Sift {
             &SearchRequest {
                 strategy,
                 query: input.query,
+                intent,
                 path: input.path,
                 limit,
                 shortlist,
@@ -245,6 +251,7 @@ impl Sift {
 pub struct SearchInput {
     path: PathBuf,
     query: String,
+    intent: Option<String>,
     options: SearchOptions,
 }
 
@@ -253,8 +260,14 @@ impl SearchInput {
         Self {
             path: path.as_ref().to_path_buf(),
             query: query.into(),
+            intent: None,
             options: SearchOptions::default(),
         }
+    }
+
+    pub fn with_intent(mut self, intent: impl Into<String>) -> Self {
+        self.intent = Some(intent.into());
+        self
     }
 
     pub fn with_options(mut self, options: SearchOptions) -> Self {
@@ -266,6 +279,7 @@ impl SearchInput {
 #[derive(Debug, Clone, Default)]
 pub struct SearchOptions {
     strategy: Option<String>,
+    intent: Option<String>,
     limit: Option<usize>,
     shortlist: Option<usize>,
     dense_model: Option<DenseModelSpec>,
@@ -280,6 +294,11 @@ pub struct SearchOptions {
 impl SearchOptions {
     pub fn with_strategy(mut self, strategy: impl Into<String>) -> Self {
         self.strategy = Some(strategy.into());
+        self
+    }
+
+    pub fn with_intent(mut self, intent: impl Into<String>) -> Self {
+        self.intent = Some(intent.into());
         self
     }
 

@@ -1,5 +1,4 @@
 use sift::internal::{
-    dense::DenseModelSpec,
     search::{Embedder, LocalFileCorpusRepository, SearchRequest, run_search},
     system::Telemetry,
     vector::dot_product,
@@ -39,22 +38,9 @@ fn test_query_embedding_cache_avoids_redundant_calls() {
     let query_cache = Arc::new(RwLock::new(HashMap::new()));
     let telemetry = Arc::new(Telemetry::new());
 
-    let request = SearchRequest {
-        strategy: "vector".to_string(),
-        query: "performance".to_string(),
-        path: temp_corpus.path().to_path_buf(),
-        limit: 10,
-        shortlist: 10,
-        dense_model: DenseModelSpec::default(),
-        rerank_model: None,
-        verbose: 0,
-        retrievers: None,
-        fusion: None,
-        reranking: None,
-        telemetry: telemetry.clone(),
-        cache_dir: None,
-        query_cache: Some(query_cache.clone()),
-    };
+    let mut request = SearchRequest::new("vector", "performance", temp_corpus.path().to_path_buf());
+    request.telemetry = telemetry.clone();
+    request.query_cache = Some(query_cache.clone());
 
     // First search: should call embedder for query
     let _response1 = run_search(

@@ -5,8 +5,6 @@ mod tests {
 
     use tempfile::tempdir;
 
-    use crate::dense::DenseModelSpec;
-
     use super::super::adapters::render_search_response;
     use super::super::*;
     use std::sync::Arc;
@@ -35,22 +33,9 @@ mod tests {
         }
 
         fn request(&self, strategy: &str, query: &str) -> SearchRequest {
-            SearchRequest {
-                strategy: strategy.to_string(),
-                query: query.to_string(),
-                path: self.corpus.path().to_path_buf(),
-                limit: 10,
-                shortlist: 10,
-                dense_model: DenseModelSpec::default(),
-                rerank_model: None,
-                verbose: 0,
-                retrievers: None,
-                fusion: None,
-                reranking: None,
-                telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
-                cache_dir: Some(self.cache.path().to_path_buf()),
-                query_cache: None,
-            }
+            let mut req = SearchRequest::new(strategy, query, self.corpus.path().to_path_buf());
+            req.cache_dir = Some(self.cache.path().to_path_buf());
+            req
         }
     }
 

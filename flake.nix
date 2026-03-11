@@ -45,12 +45,18 @@
           pkgs.mold
         ];
 
+        cargoToml = (builtins.fromTOML (builtins.readFile ./Cargo.toml));
+        version = cargoToml.package.version;
+
         siftPkg = pkgs.rustPlatform.buildRustPackage {
           pname = "sift";
-          version = "0.1.0";
+          inherit version;
           src = ./.;
           cargoLock = {
             lockFile = ./Cargo.lock;
+            outputHashes = {
+              "candle-core-0.9.2" = "sha256-GeU7yc4vqN0hy3tJAq0LDhwnpO4XDeVVmxaBchKWkWg=";
+            };
           };
           nativeBuildInputs = [ pkgs.pkg-config ];
           buildInputs = [ pkgs.bzip2 pkgs.xz pkgs.zlib ];
@@ -59,10 +65,13 @@
 
         siftStatic = pkgs.pkgsStatic.rustPlatform.buildRustPackage {
           pname = "sift-static";
-          version = "0.1.0";
+          inherit version;
           src = ./.;
           cargoLock = {
             lockFile = ./Cargo.lock;
+            outputHashes = {
+              "candle-core-0.9.2" = "sha256-GeU7yc4vqN0hy3tJAq0LDhwnpO4XDeVVmxaBchKWkWg=";
+            };
           };
           nativeBuildInputs = [ pkgs.pkg-config ];
           buildInputs = [ pkgs.bzip2 pkgs.xz pkgs.zlib ];

@@ -202,14 +202,14 @@ Use this order when interpreting constraints: ADRs, when present, then
 
 ## Project Overview
 
-This repository is `sift` — a standalone hybrid search CLI for fast
+This repository is `sift` — a standalone **Hybrid Information Retrieval (IR) system** for fast
 document retrieval in agentic coding workflows.
 
 Sift is intended to stay lightweight: a single Rust binary with no external
 database requirement, combining BM25 keyword ranking with vector-backed semantic
-search. The product thesis is that retrieval quality and CLI ergonomics should
-be available directly inside the developer workflow rather than delegated to a
-separate service stack.
+search and LLM-based re-ranking to capture user **intent**. The product thesis
+is that retrieval quality and CLI ergonomics should be available directly
+inside the developer workflow rather than delegated to a separate service stack.
 
 The current repository is still in bootstrap mode. Expect the CLI surface,
 indexing model, and planning artifacts to evolve together while the board

@@ -359,7 +359,12 @@ fn ensure_asset(
         "https://huggingface.co/{}/resolve/{}/{}",
         spec.model_id, spec.revision, relative_path
     );
-    let mut response = ureq::get(&url)
+    let mut request = ureq::get(&url);
+    if let Ok(token) = std::env::var("HF_TOKEN") {
+        request = request.header("Authorization", &format!("Bearer {}", token));
+    }
+
+    let mut response = request
         .call()
         .with_context(|| format!("download {label} from {url}"))?;
     let temp_path = path.with_extension("tmp");

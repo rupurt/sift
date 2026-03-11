@@ -8,6 +8,16 @@ Sift is designed using **Domain-Driven Design (DDD)** and **Hexagonal Architectu
 2. **Composable Pipeline:** Search is not a monolithic algorithm. It is an explicit pipeline of `Expansion -> Retrieval -> Fusion -> Reranking`.
 3. **Pluggable Adapters:** BM25, Candle-based dense vectors, and phrase matching are implemented as adapters fulfilling domain traits.
 4. **Pure Rust:** Sift is a pure-Rust application, with no external C++ or database dependencies.
+5. **Hybrid IR System:** `sift` is a Hybrid Information Retrieval (IR) system, bridging the "vocabulary gap" between queries and documents by combining lexical matching, semantic embeddings, and LLM-driven intent analysis.
+
+## Intent-Driven Retrieval
+
+Sift does not just match keywords; it attempts to understand and expand the user's **intent**. Before the retrieval stage begins, the query is passed through an **Expansion Pipeline** that uses a local LLM (Qwen2.5-0.5B) to bridge the "vocabulary gap"—the difference between how a user asks a question and how the code or documentation is written.
+
+- **Explicit Intent:** Users can provide direct context via the `--intent` flag. This bypasses automated inference and guides the search directly.
+- **Hypothetical Document Embeddings (HyDE):** For complex informational queries, Sift generates a hypothetical technical answer and uses its embedding for vector retrieval. This often finds better matches than the query alone.
+- **SPLADE-style Expansion:** Sift predicts additional technical terms that are semantically related to the query (e.g., "auth" expands to "login, session, token") to increase keyword recall.
+- **Intent Classification:** Sift categorizes the query (e.g., BUGFIX vs. NAVIGATION) and adds intent-specific keywords to the retrieval variants.
 
 ## Execution Model
 
@@ -35,6 +45,10 @@ Sift uses the `tracing` crate to provide a detailed view of search execution.
 
 The domain defines the vocabulary of the search process.
 
+- **Expansion Pipeline:**
+  - `HydeStrategy`: Generates a hypothetical technical answer to bridge semantic gaps.
+  - `SpladeStrategy`: Predicts semantically related technical terms for broader recall.
+  - `ClassifiedStrategy`: Categorizes technical intent and adds specific keyword variants.
 - **Models:**
   - `Document`: A parsed file with extracted text, length, and content segments.
   - `Candidate` & `CandidateList`: The scored outputs from retrievers and the fuser.

@@ -66,6 +66,10 @@ struct SearchCommand {
     strategy: Option<String>,
 
     #[arg(long)]
+    /// Explicit intent context to help guide search and ranking.
+    intent: Option<String>,
+
+    #[arg(long)]
     json: bool,
 
     #[arg(long)]
@@ -186,6 +190,9 @@ impl SearchCommand {
 
         if let Some(strategy) = &self.strategy {
             options = options.with_strategy(strategy.clone());
+        }
+        if let Some(intent) = &self.intent {
+            options = options.with_intent(intent.clone());
         }
         if let Some(limit) = self.limit {
             options = options.with_limit(limit);

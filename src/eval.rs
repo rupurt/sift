@@ -308,6 +308,7 @@ pub struct ComparativeEvaluationReport {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StrategyComparison {
     pub strategy: String,
+    pub expansion: String,
     pub quality: QualityMetrics,
     pub latency: LatencyMetrics,
     pub telemetry: Option<crate::search::SearchTelemetry>,
@@ -369,23 +370,17 @@ pub fn run_quality_evaluation(
     let champion_plan = registry.resolve("hybrid")?;
     let champion_strategy_name = champion_plan.name.clone();
 
+    let mut search_req =
+        SearchRequest::new(&request.strategy, String::new(), request.corpus_dir.clone());
+    search_req.limit = request.shortlist;
+    search_req.shortlist = request.shortlist;
+    search_req.dense_model = request.dense_model.clone();
+    search_req.verbose = request.verbose;
+    search_req.telemetry = telemetry_for_load.clone();
+    search_req.query_cache = Some(query_cache.clone());
+
     let env = crate::search::SearchEnvironment::new(
-        &SearchRequest {
-            strategy: request.strategy.clone(),
-            query: String::new(),
-            path: request.corpus_dir.clone(),
-            limit: request.shortlist,
-            shortlist: request.shortlist,
-            dense_model: request.dense_model.clone(),
-            rerank_model: None,
-            verbose: request.verbose,
-            retrievers: None,
-            fusion: None,
-            reranking: None,
-            telemetry: telemetry_for_load.clone(),
-            cache_dir: None,
-            query_cache: Some(query_cache.clone()),
-        },
+        &search_req,
         &corpus,
         &index,
         Some(dense_for_load.clone()),
@@ -406,23 +401,17 @@ pub fn run_quality_evaluation(
         .or_else(|| Some("bm25".to_string()));
     let baseline_metrics = match &baseline_strategy {
         Some(strategy) => {
+            let mut baseline_req =
+                SearchRequest::new(strategy, String::new(), request.corpus_dir.clone());
+            baseline_req.limit = request.shortlist;
+            baseline_req.shortlist = request.shortlist;
+            baseline_req.dense_model = request.dense_model.clone();
+            baseline_req.verbose = request.verbose;
+            baseline_req.telemetry = telemetry_for_load.clone();
+            baseline_req.query_cache = Some(query_cache.clone());
+
             let baseline_env = crate::search::SearchEnvironment::new(
-                &SearchRequest {
-                    strategy: strategy.clone(),
-                    query: String::new(),
-                    path: request.corpus_dir.clone(),
-                    limit: request.shortlist,
-                    shortlist: request.shortlist,
-                    dense_model: request.dense_model.clone(),
-                    rerank_model: None,
-                    verbose: request.verbose,
-                    retrievers: None,
-                    fusion: None,
-                    reranking: None,
-                    telemetry: telemetry_for_load.clone(),
-                    cache_dir: None,
-                    query_cache: Some(query_cache.clone()),
-                },
+                &baseline_req,
                 &corpus,
                 &index,
                 Some(dense_for_load.clone()),
@@ -441,23 +430,20 @@ pub fn run_quality_evaluation(
     };
 
     let champion_metrics = if champion_strategy_name != request.strategy {
+        let mut champion_req = SearchRequest::new(
+            &champion_strategy_name,
+            String::new(),
+            request.corpus_dir.clone(),
+        );
+        champion_req.limit = request.shortlist;
+        champion_req.shortlist = request.shortlist;
+        champion_req.dense_model = request.dense_model.clone();
+        champion_req.verbose = request.verbose;
+        champion_req.telemetry = telemetry_for_load.clone();
+        champion_req.query_cache = Some(query_cache.clone());
+
         let champion_env = crate::search::SearchEnvironment::new(
-            &SearchRequest {
-                strategy: champion_strategy_name.clone(),
-                query: String::new(),
-                path: request.corpus_dir.clone(),
-                limit: request.shortlist,
-                shortlist: request.shortlist,
-                dense_model: request.dense_model.clone(),
-                rerank_model: None,
-                verbose: request.verbose,
-                retrievers: None,
-                fusion: None,
-                reranking: None,
-                telemetry: telemetry_for_load.clone(),
-                cache_dir: None,
-                query_cache: Some(query_cache.clone()),
-            },
+            &champion_req,
             &corpus,
             &index,
             Some(dense_for_load.clone()),
@@ -521,23 +507,16 @@ pub fn run_latency_evaluation(
         bail!("latency evaluation requires at least one query");
     }
 
+    let mut latency_req =
+        SearchRequest::new(&request.strategy, String::new(), request.corpus_dir.clone());
+    latency_req.shortlist = request.shortlist;
+    latency_req.dense_model = request.dense_model.clone();
+    latency_req.verbose = request.verbose;
+    latency_req.telemetry = telemetry_for_load.clone();
+    latency_req.query_cache = Some(query_cache.clone());
+
     let env = crate::search::SearchEnvironment::new(
-        &SearchRequest {
-            strategy: request.strategy.clone(),
-            query: String::new(),
-            path: request.corpus_dir.clone(),
-            limit: 10,
-            shortlist: request.shortlist,
-            dense_model: request.dense_model.clone(),
-            rerank_model: None,
-            verbose: request.verbose,
-            retrievers: None,
-            fusion: None,
-            reranking: None,
-            telemetry: telemetry_for_load.clone(),
-            cache_dir: None,
-            query_cache: Some(query_cache.clone()),
-        },
+        &latency_req,
         &corpus,
         &index,
         Some(dense_for_load.clone()),
@@ -555,7 +534,7 @@ pub fn run_latency_evaluation(
 
     for query_text in queries_vec.iter().take(total_queries) {
         let started = Instant::now();
-        let _ = env.search(query_text, 10, request.shortlist, request.verbose)?;
+        let _ = env.search(query_text, None, 10, request.shortlist, request.verbose)?;
         timings.push(started.elapsed().as_secs_f64() * 1000.0)
     }
 
@@ -626,23 +605,16 @@ pub fn run_comparative_evaluation(
             total_strategies,
             name
         );
+        let mut comp_req = SearchRequest::new(name, String::new(), request.corpus_dir.clone());
+        comp_req.limit = request.shortlist;
+        comp_req.shortlist = request.shortlist;
+        comp_req.dense_model = request.dense_model.clone();
+        comp_req.verbose = request.verbose;
+        comp_req.telemetry = telemetry_for_load.clone();
+        comp_req.query_cache = Some(query_cache.clone());
+
         let env = crate::search::SearchEnvironment::new(
-            &SearchRequest {
-                strategy: name.clone(),
-                query: String::new(),
-                path: request.corpus_dir.clone(),
-                limit: request.shortlist,
-                shortlist: request.shortlist,
-                dense_model: request.dense_model.clone(),
-                rerank_model: None,
-                verbose: request.verbose,
-                retrievers: None,
-                fusion: None,
-                reranking: None,
-                telemetry: telemetry_for_load.clone(),
-                cache_dir: None,
-                query_cache: Some(query_cache.clone()),
-            },
+            &comp_req,
             &corpus,
             &index,
             Some(dense_for_load.clone()),
@@ -674,7 +646,7 @@ pub fn run_comparative_evaluation(
 
         for query_text in queries_vec.iter().take(total_queries) {
             let started = Instant::now();
-            let _ = env.search(query_text, 10, request.shortlist, request.verbose)?;
+            let _ = env.search(query_text, None, 10, request.shortlist, request.verbose)?;
             timings.push(started.elapsed().as_secs_f64() * 1000.0);
         }
         timings.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
@@ -692,6 +664,7 @@ pub fn run_comparative_evaluation(
 
         results.push(StrategyComparison {
             strategy: name.clone(),
+            expansion: format!("{:?}", env.plan.query_expansion),
             quality,
             latency,
             telemetry: Some(telemetry),
@@ -718,18 +691,18 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
     writeln!(out, "\x1b[1mComparative Search Strategy Evaluation\x1b[0m").unwrap();
     writeln!(
         out,
-        "──────────────────────────────────────────────────────────────────────────────────────────────"
+        "──────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
     )
     .unwrap();
     writeln!(
         out,
-        "{:<20} {:>10} {:>10} {:>10} {:>12} {:>15}",
-        "Strategy", "nDCG@10", "MRR@10", "Recall@10", "p50 (ms)", "Cache Hits"
+        "{:<25} {:<12} {:>10} {:>10} {:>10} {:>12} {:>15}",
+        "Strategy", "Expansion", "nDCG@10", "MRR@10", "Recall@10", "p50 (ms)", "Cache Hits"
     )
     .unwrap();
     writeln!(
         out,
-        "──────────────────────────────────────────────────────────────────────────────────────────────"
+        "──────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
     )
     .unwrap();
 
@@ -766,8 +739,9 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
 
         writeln!(
             out,
-            "{}{:<20}\x1b[0m {}{:>10.4}\x1b[0m {}{:>10.4}\x1b[0m {}{:>10.4}\x1b[0m {}{:>12.2}\x1b[0m {:>15}  {}",
+            "{}{:<25}\x1b[0m {:<12} {}{:>10.4}\x1b[0m {}{:>10.4}\x1b[0m {}{:>10.4}\x1b[0m {}{:>12.2}\x1b[0m {:>15}  {}",
             ndcg_c, res.strategy, // Use nDCG color for strategy name
+            res.expansion,
             ndcg_c, res.quality.ndcg_at_10,
             mrr_c, res.quality.mrr_at_10,
             recall_c, res.quality.recall_at_10,
@@ -779,7 +753,7 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
     }
     writeln!(
         out,
-        "──────────────────────────────────────────────────────────────────────────────────────────────"
+        "──────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
     )
     .unwrap();
 
@@ -931,7 +905,7 @@ fn evaluate_quality(
             .get(*query_id)
             .with_context(|| format!("missing query text for qrels query-id '{query_id}'"))?;
 
-        let response = env.search(query_text, 10, shortlist, verbose)?;
+        let response = env.search(query_text, None, 10, shortlist, verbose)?;
 
         let ranked_ids: Vec<String> = response
             .results

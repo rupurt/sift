@@ -44,3 +44,6 @@ The core search logic must remain pure.
 Implementation does not end at a clean compile.
 - Every functional change must be verified against a test, a benchmark, or an empirical CLI proof.
 - If a change degrades the benchmark quality against the BM25 baseline or the champion preset, the change must be justified with evidence.
+
+## 9. Intent-Driven Hybrid IR
+`sift` is built as a modern Hybrid Information Retrieval (IR) system that captures user **intent**, not just keyword matches. We use LLM-based re-ranking and multi-stage pipelines to bridge the vocabulary gap between a user's question and the technical implementation in the source code.

@@ -73,6 +73,13 @@ For large datasets like SciFact, you can limit the number of queries evaluated t
 just eval all --dataset scifact --query-limit 5
 ```
 
+### 5. Intent-Driven Evaluation
+Sift allows you to compare different query expansion strategies to see which one best captures user intent for a given dataset.
+
+- **`page-index-splade`**: Measures the quality of generative expansion terms.
+- **`page-index-classified`**: Measures the quality of intent-based classification.
+- **`page-index-llm`**: Measures the quality of full HyDE expansion combined with LLM reranking.
+
 ---
 
 ## Performance Profiling
