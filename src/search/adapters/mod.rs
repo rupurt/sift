@@ -280,6 +280,168 @@ impl Expander for SynonymExpander {
     }
 }
 
+pub struct LlmExpander {
+    pub llm: std::sync::Arc<std::sync::Mutex<Option<std::sync::Arc<dyn GenerativeModel>>>>,
+    pub strategy: Box<dyn GenerativeExpansionStrategy>,
+}
+
+impl LlmExpander {
+    pub fn new(strategy: Box<dyn GenerativeExpansionStrategy>) -> Self {
+        Self {
+            llm: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            strategy,
+        }
+    }
+
+    pub fn with_llm(self, llm: std::sync::Arc<dyn GenerativeModel>) -> Self {
+        *self.llm.lock().unwrap() = Some(llm);
+        self
+    }
+}
+
+impl Expander for LlmExpander {
+    fn expand(&self, query: &str) -> Vec<QueryVariant> {
+        let llm = self.llm.lock().unwrap();
+        if let Some(qwen) = llm.as_ref() {
+            let prompt = self.strategy.prompt(query);
+            tracing::info!(
+                "{}: generating expansion for '{}'...",
+                self.strategy.name(),
+                query
+            );
+            match qwen.generate(&prompt, self.strategy.max_tokens()) {
+                Ok(generated) => {
+                    tracing::info!(
+                        "{} generated: '{}'",
+                        self.strategy.name(),
+                        generated.replace('\n', " ")
+                    );
+                    return self.strategy.process_output(query, &generated);
+                }
+                Err(e) => {
+                    tracing::error!("{} generation failed: {}", self.strategy.name(), e);
+                }
+            }
+        }
+
+        tracing::info!("{}: using fallback for '{}'", self.strategy.name(), query);
+        if self.strategy.name() == "HyDE" {
+            vec![
+                QueryVariant {
+                    text: query.to_string(),
+                    weight: 1.0,
+                },
+                QueryVariant {
+                    text: format!("{} hypothetical content", query),
+                    weight: 0.8,
+                },
+            ]
+        } else {
+            vec![QueryVariant {
+                text: query.to_string(),
+                weight: 1.0,
+            }]
+        }
+    }
+}
+
+pub trait GenerativeExpansionStrategy: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn prompt(&self, query: &str) -> String;
+    fn process_output(&self, query: &str, output: &str) -> Vec<QueryVariant>;
+    fn max_tokens(&self) -> usize {
+        48
+    }
+}
+
+pub struct HydeStrategy;
+impl GenerativeExpansionStrategy for HydeStrategy {
+    fn name(&self) -> &'static str {
+        "HyDE"
+    }
+    fn max_tokens(&self) -> usize {
+        128
+    }
+    fn prompt(&self, query: &str) -> String {
+        format!(
+            "<|im_start|>system\nYou are a technical assistant. For the given query, generate a concise, hypothetical technical document snippet that would satisfy the user's intent. Focus on code structures, API names, and implementation logic.<|im_end|>\n<|im_start|>user\nQuery: {}\n<|im_end|>\n<|im_start|>assistant\n",
+            query
+        )
+    }
+    fn process_output(&self, query: &str, output: &str) -> Vec<QueryVariant> {
+        vec![
+            QueryVariant {
+                text: query.to_string(),
+                weight: 1.0,
+            },
+            QueryVariant {
+                text: output.to_string(),
+                weight: 0.8,
+            },
+        ]
+    }
+}
+
+pub struct SpladeStrategy;
+impl GenerativeExpansionStrategy for SpladeStrategy {
+    fn name(&self) -> &'static str {
+        "SPLADE"
+    }
+    fn prompt(&self, query: &str) -> String {
+        format!(
+            "<|im_start|>system\nYou are a technical search expert. For the given query, provide 5-8 technical terms that are semantically related but NOT necessarily present in the query. Return ONLY the keywords separated by commas.<|im_end|>\n<|im_start|>user\nQuery: {}\n<|im_end|>\n<|im_start|>assistant\n",
+            query
+        )
+    }
+    fn process_output(&self, query: &str, output: &str) -> Vec<QueryVariant> {
+        let mut variants = vec![QueryVariant {
+            text: query.to_string(),
+            weight: 1.0,
+        }];
+        for term in output.split(',') {
+            let term = term.trim();
+            if !term.is_empty() {
+                variants.push(QueryVariant {
+                    text: term.to_string(),
+                    weight: 0.4,
+                });
+            }
+        }
+        variants
+    }
+}
+
+pub struct ClassifiedStrategy;
+impl GenerativeExpansionStrategy for ClassifiedStrategy {
+    fn name(&self) -> &'static str {
+        "CLASSIFIED"
+    }
+    fn prompt(&self, query: &str) -> String {
+        format!(
+            "<|im_start|>system\nYou are a technical classifier. Identify the technical intent of the query (e.g., NAVIGATION, LOGIC, DOCS, BUGFIX, TEST). Return the classification and 3 highly specific keywords for that intent. Format: CATEGORY: keyword1, keyword2, keyword3<|im_end|>\n<|im_start|>user\nQuery: {}\n<|im_end|>\n<|im_start|>assistant\n",
+            query
+        )
+    }
+    fn process_output(&self, query: &str, output: &str) -> Vec<QueryVariant> {
+        let mut variants = vec![QueryVariant {
+            text: query.to_string(),
+            weight: 1.0,
+        }];
+        if let Some((_category, keywords)) = output.split_once(':') {
+            for term in keywords.split(',') {
+                let term = term.trim();
+                if !term.is_empty() {
+                    variants.push(QueryVariant {
+                        text: term.to_string(),
+                        weight: 0.6,
+                    });
+                }
+            }
+        }
+        variants
+    }
+}
+
 pub struct NoReranker;
 
 impl Reranker for NoReranker {
@@ -290,6 +452,10 @@ impl Reranker for NoReranker {
         _limit: usize,
     ) -> Result<CandidateList> {
         Ok(candidates)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
@@ -351,6 +517,10 @@ impl Reranker for PositionAwareReranker {
             results: candidates.results.into_iter().take(limit).collect(),
         })
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 pub struct MockLlmReranker;
@@ -378,6 +548,10 @@ impl Reranker for MockLlmReranker {
         Ok(CandidateList {
             results: candidates.results.into_iter().take(limit).collect(),
         })
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
@@ -433,7 +607,20 @@ mod tests {
     }
 }
 
+pub struct RerankerAsGenerative(pub std::sync::Arc<dyn Reranker>);
+
+impl GenerativeModel for RerankerAsGenerative {
+    fn generate(&self, prompt: &str, max_tokens: usize) -> Result<String> {
+        if let Some(generative) = self.0.as_generative() {
+            generative.generate(prompt, max_tokens)
+        } else {
+            anyhow::bail!("Reranker does not support generation")
+        }
+    }
+}
 pub mod cli;
+pub mod jina;
+pub mod llm_utils;
 pub mod qwen;
 #[allow(unused_imports)]
 pub use cli::*;

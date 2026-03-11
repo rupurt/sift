@@ -458,7 +458,8 @@ pub trait Expander: Send + Sync {
 }
 
 pub trait Reranker: Send + Sync {
-    fn rerank(&self, query: &str, candidates: CandidateList, limit: usize) -> Result<CandidateList>;
+    fn rerank(&self, query: &str, candidates: CandidateList, limit: usize)
+    -> Result<CandidateList>;
     fn as_any(&self) -> &dyn std::any::Any;
     fn as_generative(&self) -> Option<&dyn GenerativeModel> {
         None

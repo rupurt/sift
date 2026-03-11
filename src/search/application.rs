@@ -2,6 +2,7 @@ use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use super::adapters::jina::{JinaModelSpec, JinaReranker};
 use super::adapters::qwen::{QwenModelSpec, QwenReranker};
 use super::adapters::*;
 use super::domain::*;
@@ -14,14 +15,29 @@ impl SearchServiceBuilder {
         plan: &SearchPlan,
         embedder: Option<Arc<dyn Embedder>>,
         query_cache: Option<QueryEmbeddingCache>,
-        llm_reranker: Option<Box<dyn Reranker>>,
+        llm_reranker: Option<Arc<dyn Reranker>>,
     ) -> SearchService {
         let mut service = SearchService::new();
 
-        // Register mandatory components
         service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
         service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
         service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
+
+        let mut hyde = LlmExpander::new(Box::new(HydeStrategy));
+        let mut splade = LlmExpander::new(Box::new(SpladeStrategy));
+        let mut classified = LlmExpander::new(Box::new(ClassifiedStrategy));
+
+        if let Some(r) = &llm_reranker {
+            let generative = Arc::new(RerankerAsGenerative(r.clone())) as Arc<dyn GenerativeModel>;
+            hyde = hyde.with_llm(generative.clone());
+            splade = splade.with_llm(generative.clone());
+            classified = classified.with_llm(generative);
+        }
+
+        service.register_expander(QueryExpansionPolicy::Hyde, Box::new(hyde));
+        service.register_expander(QueryExpansionPolicy::Splade, Box::new(splade));
+        service.register_expander(QueryExpansionPolicy::Classified, Box::new(classified));
+
         service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
         service.register_reranker(
             RerankingPolicy::PositionAware,
@@ -29,9 +45,14 @@ impl SearchServiceBuilder {
         );
 
         if let Some(r) = llm_reranker {
-            service.register_reranker(RerankingPolicy::Llm, r);
+            if plan.reranking == RerankingPolicy::Jina {
+                service.register_reranker_arc(RerankingPolicy::Jina, r);
+            } else {
+                service.register_reranker_arc(RerankingPolicy::Llm, r);
+            }
         } else {
             service.register_reranker(RerankingPolicy::Llm, Box::new(MockLlmReranker));
+            service.register_reranker(RerankingPolicy::Jina, Box::new(MockLlmReranker));
         }
 
         // Register retrievers based on plan
@@ -62,7 +83,7 @@ pub struct SearchService {
     retrievers: HashMap<RetrieverPolicy, Box<dyn Retriever>>,
     fusers: HashMap<FusionPolicy, Box<dyn Fuser>>,
     expanders: HashMap<QueryExpansionPolicy, Box<dyn Expander>>,
-    rerankers: HashMap<RerankingPolicy, Box<dyn Reranker>>,
+    rerankers: HashMap<RerankingPolicy, Arc<dyn Reranker>>,
 }
 
 pub struct StrategyPresetRegistry {
@@ -134,7 +155,7 @@ impl StrategyPresetRegistry {
             "page-index-hybrid",
             SearchPlan {
                 name: "page-index-hybrid".to_string(),
-                query_expansion: QueryExpansionPolicy::None,
+                query_expansion: QueryExpansionPolicy::Splade,
                 retrievers: vec![
                     RetrieverPolicy::Bm25,
                     RetrieverPolicy::Phrase,
@@ -150,7 +171,7 @@ impl StrategyPresetRegistry {
             "page-index-llm",
             SearchPlan {
                 name: "page-index-llm".to_string(),
-                query_expansion: QueryExpansionPolicy::None,
+                query_expansion: QueryExpansionPolicy::Hyde,
                 retrievers: vec![
                     RetrieverPolicy::Bm25,
                     RetrieverPolicy::Phrase,
@@ -174,6 +195,54 @@ impl StrategyPresetRegistry {
                 ],
                 fusion: FusionPolicy::Rrf,
                 reranking: RerankingPolicy::Llm,
+            },
+        );
+
+        // page-index-splade (generative expansion focus)
+        registry.register(
+            "page-index-splade",
+            SearchPlan {
+                name: "page-index-splade".to_string(),
+                query_expansion: QueryExpansionPolicy::Splade,
+                retrievers: vec![
+                    RetrieverPolicy::Bm25,
+                    RetrieverPolicy::Phrase,
+                    RetrieverPolicy::Vector,
+                ],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::PositionAware,
+            },
+        );
+
+        // page-index-classified (classification-driven expansion)
+        registry.register(
+            "page-index-classified",
+            SearchPlan {
+                name: "page-index-classified".to_string(),
+                query_expansion: QueryExpansionPolicy::Classified,
+                retrievers: vec![
+                    RetrieverPolicy::Bm25,
+                    RetrieverPolicy::Phrase,
+                    RetrieverPolicy::Vector,
+                ],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::PositionAware,
+            },
+        );
+
+        // page-index-jina (Jina Reranker v3)
+        registry.register(
+            "page-index-jina",
+            SearchPlan {
+                name: "page-index-jina".to_string(),
+                query_expansion: QueryExpansionPolicy::Splade,
+                retrievers: vec![
+                    RetrieverPolicy::Bm25,
+                    RetrieverPolicy::Phrase,
+                    RetrieverPolicy::Vector,
+                ],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::Jina,
             },
         );
 
@@ -233,6 +302,10 @@ impl SearchService {
     }
 
     pub fn register_reranker(&mut self, policy: RerankingPolicy, reranker: Box<dyn Reranker>) {
+        self.rerankers.insert(policy, Arc::from(reranker));
+    }
+
+    pub fn register_reranker_arc(&mut self, policy: RerankingPolicy, reranker: Arc<dyn Reranker>) {
         self.rerankers.insert(policy, reranker);
     }
 
@@ -241,6 +314,7 @@ impl SearchService {
         &self,
         plan: &SearchPlan,
         query: &str,
+        intent: Option<&str>,
         corpus: &PreparedCorpus,
         limit: usize,
         shortlist: usize,
@@ -250,15 +324,37 @@ impl SearchService {
         let start = std::time::Instant::now();
         tracing::info!("executing strategy: {} for query: '{}'", plan.name, query);
 
+        if let Some(intent_text) = intent {
+            tracing::info!("using provided intent: '{}'", intent_text);
+        }
+
         let retrieval_limit = std::cmp::max(limit, shortlist);
 
         // 1. Query Expansion
         let expand_start = std::time::Instant::now();
+
+        let effective_policy = if intent.is_some() {
+            QueryExpansionPolicy::None
+        } else if plan.reranking == RerankingPolicy::Llm {
+            QueryExpansionPolicy::Hyde
+        } else {
+            QueryExpansionPolicy::Splade
+        };
+
         let expander = self
             .expanders
-            .get(&plan.query_expansion)
-            .ok_or_else(|| anyhow!("expander not found for policy: {:?}", plan.query_expansion))?;
-        let query_variants = expander.expand(query);
+            .get(&effective_policy)
+            .or_else(|| self.expanders.get(&plan.query_expansion))
+            .ok_or_else(|| anyhow!("expander not found for policy: {:?}", effective_policy))?;
+
+        let query_variants = if let Some(intent_text) = intent {
+            vec![QueryVariant {
+                text: format!("{} {}", query, intent_text),
+                weight: 1.0,
+            }]
+        } else {
+            expander.expand(query)
+        };
         tracing::info!(
             "expanded query into {} variants in {:.2?}",
             query_variants.len(),
@@ -395,6 +491,7 @@ impl<'a> SearchEnvironment<'a> {
     pub fn search(
         &self,
         query: &str,
+        intent: Option<&str>,
         limit: usize,
         shortlist: usize,
         verbose: u8,
@@ -402,6 +499,7 @@ impl<'a> SearchEnvironment<'a> {
         let candidates = self.service.execute(
             &self.plan,
             query,
+            intent,
             &self.prepared,
             limit,
             shortlist,
@@ -477,15 +575,32 @@ pub fn run_search(
         corpus_start.elapsed()
     );
 
-    let llm_reranker = if plan.reranking == RerankingPolicy::Llm {
+    let mut llm_reranker = if plan.reranking == RerankingPolicy::Llm {
         if let Some(spec) = &request.rerank_model {
-            Some(Box::new(QwenReranker::load(spec.clone())?) as Box<dyn Reranker>)
+            Some(Arc::new(QwenReranker::load(spec.clone())?) as Arc<dyn Reranker>)
         } else {
-            Some(Box::new(QwenReranker::load(QwenModelSpec::default())?) as Box<dyn Reranker>)
+            Some(Arc::new(QwenReranker::load(QwenModelSpec::default())?) as Arc<dyn Reranker>)
         }
+    } else if plan.reranking == RerankingPolicy::Jina {
+        Some(Arc::new(JinaReranker::load(JinaModelSpec::default())?) as Arc<dyn Reranker>)
     } else {
         None
     };
+
+    // If we need generative expansion but don't have a reranker (or it's not generative),
+    // load the default Instruct model.
+    let expansion_needs_llm = matches!(
+        plan.query_expansion,
+        QueryExpansionPolicy::Hyde
+            | QueryExpansionPolicy::Splade
+            | QueryExpansionPolicy::Classified
+    );
+
+    if llm_reranker.is_none() && expansion_needs_llm {
+        tracing::info!("loading Instruct model for query expansion...");
+        llm_reranker =
+            Some(Arc::new(QwenReranker::load(QwenModelSpec::default())?) as Arc<dyn Reranker>);
+    }
 
     let service =
         SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone(), llm_reranker);
@@ -501,6 +616,7 @@ pub fn run_search(
     let candidates = service.execute(
         &plan,
         &request.query,
+        request.intent.as_deref(),
         &prepared,
         request.limit,
         request.shortlist,
@@ -655,6 +771,10 @@ mod tests {
                 results: candidates.results.into_iter().take(limit).collect(),
             })
         }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
     }
 
     #[test]
@@ -681,13 +801,93 @@ mod tests {
         };
         let telemetry = crate::system::Telemetry::new();
         let results = service
-            .execute(&plan, "search", &corpus, 10, 10, 0, &telemetry)
+            .execute(&plan, "search", None, &corpus, 10, 10, 0, &telemetry)
             .unwrap();
 
         // "search" expansion with SynonymExpander gives "search" and "retrieval"
         // MockRetriever returns them as candidates
         assert!(results.results.iter().any(|c| c.id == "search"));
         assert!(results.results.iter().any(|c| c.id == "retrieval"));
+    }
+
+    #[test]
+    fn search_service_uses_explicit_intent_for_expansion() {
+        let mut service = SearchService::new();
+        service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
+        service.register_retriever(Box::new(MockRetriever {
+            policy: RetrieverPolicy::Bm25,
+        }));
+        service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
+        service.register_reranker(RerankingPolicy::None, Box::new(NoReranker));
+
+        let plan = SearchPlan {
+            name: "test".to_string(),
+            query_expansion: QueryExpansionPolicy::None,
+            retrievers: vec![RetrieverPolicy::Bm25],
+            fusion: FusionPolicy::Rrf,
+            reranking: RerankingPolicy::None,
+        };
+
+        let corpus = PreparedCorpus {
+            documents: &[],
+            bm25_index: None,
+        };
+        let telemetry = crate::system::Telemetry::new();
+        let results = service
+            .execute(
+                &plan,
+                "query",
+                Some("with intent"),
+                &corpus,
+                10,
+                10,
+                0,
+                &telemetry,
+            )
+            .unwrap();
+
+        // Should expand to "query with intent"
+        assert_eq!(results.results.len(), 1);
+        assert_eq!(results.results[0].id, "query with intent");
+    }
+
+    #[test]
+    fn search_service_uses_hyde_when_llm_reranker_present_and_no_intent() {
+        let mut service = SearchService::new();
+        service.register_expander(
+            QueryExpansionPolicy::Hyde,
+            Box::new(LlmExpander::new(Box::new(HydeStrategy))),
+        );
+        service.register_retriever(Box::new(MockRetriever {
+            policy: RetrieverPolicy::Bm25,
+        }));
+        service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
+        service.register_reranker(RerankingPolicy::Llm, Box::new(NoReranker));
+
+        let plan = SearchPlan {
+            name: "test".to_string(),
+            query_expansion: QueryExpansionPolicy::None, // Should be overridden by LLM reranker check
+            retrievers: vec![RetrieverPolicy::Bm25],
+            fusion: FusionPolicy::Rrf,
+            reranking: RerankingPolicy::Llm,
+        };
+
+        let corpus = PreparedCorpus {
+            documents: &[],
+            bm25_index: None,
+        };
+        let telemetry = crate::system::Telemetry::new();
+        let results = service
+            .execute(&plan, "query", None, &corpus, 10, 10, 0, &telemetry)
+            .unwrap();
+
+        // HydeStrategy (Mock fallback) adds "hypothetical content implementation logic"
+        assert!(
+            results
+                .results
+                .iter()
+                .any(|c| c.id.contains("hypothetical content"))
+        );
     }
 
     #[test]
@@ -717,7 +917,7 @@ mod tests {
         };
         let telemetry = crate::system::Telemetry::new();
         let results = service
-            .execute(&plan, "query", &corpus, 10, 10, 0, &telemetry)
+            .execute(&plan, "query", None, &corpus, 10, 10, 0, &telemetry)
             .unwrap();
 
         // Both retrievers should return "query"
@@ -770,7 +970,7 @@ mod tests {
         };
         let telemetry = crate::system::Telemetry::new();
         let results = service
-            .execute(&plan, "query", &corpus, 5, 3, 0, &telemetry)
+            .execute(&plan, "query", None, &corpus, 5, 3, 0, &telemetry)
             .unwrap();
 
         let observed_sizes = observed_sizes.lock().unwrap();
@@ -809,7 +1009,7 @@ mod tests {
         };
         let telemetry = crate::system::Telemetry::new();
         let results = service
-            .execute(&plan, "query", &corpus, 3, 6, 0, &telemetry)
+            .execute(&plan, "query", None, &corpus, 3, 6, 0, &telemetry)
             .unwrap();
 
         let observed_sizes = observed_sizes.lock().unwrap();

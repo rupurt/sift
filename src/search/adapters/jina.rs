@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
-use candle_core::{DType, Device, Tensor};
+use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::qwen3::{Config as QwenConfig, Model as QwenModel};
 use tokenizers::Tokenizer;
@@ -11,39 +11,62 @@ use super::llm_utils::{QwenConfigPartial, ensure_hf_asset, qwen_generate};
 use crate::cache::cache_dir;
 use crate::search::domain::{CandidateList, GenerativeModel, Reranker};
 
-pub const DEFAULT_QWEN_MODEL_ID: &str = "Qwen/Qwen2.5-0.5B-Instruct";
-pub const DEFAULT_QWEN_REVISION: &str = "main";
-pub const DEFAULT_QWEN_MAX_LENGTH: usize = 512;
+pub const DEFAULT_JINA_MODEL_ID: &str = "jinaai/jina-reranker-v3";
+pub const DEFAULT_JINA_REVISION: &str = "main";
+pub const DEFAULT_JINA_MAX_LENGTH: usize = 512;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct QwenModelSpec {
+pub struct JinaModelSpec {
     pub model_id: String,
     pub revision: String,
     pub max_length: usize,
 }
 
-impl Default for QwenModelSpec {
+impl Default for JinaModelSpec {
     fn default() -> Self {
         Self {
-            model_id: DEFAULT_QWEN_MODEL_ID.to_string(),
-            revision: DEFAULT_QWEN_REVISION.to_string(),
-            max_length: DEFAULT_QWEN_MAX_LENGTH,
+            model_id: DEFAULT_JINA_MODEL_ID.to_string(),
+            revision: DEFAULT_JINA_REVISION.to_string(),
+            max_length: DEFAULT_JINA_MAX_LENGTH,
         }
     }
 }
 
-pub struct QwenReranker {
+pub struct Projector {
+    linear1: candle_nn::Linear,
+    linear2: candle_nn::Linear,
+}
+
+impl Projector {
+    pub fn new(vb: VarBuilder) -> Result<Self> {
+        let linear1 = candle_nn::linear_no_bias(1024, 512, vb.pp("0"))?;
+        let linear2 = candle_nn::linear_no_bias(512, 512, vb.pp("2"))?;
+        Ok(Self { linear1, linear2 })
+    }
+
+    pub fn forward(&self, x: &Tensor) -> Result<Tensor> {
+        let x = self.linear1.forward(x)?;
+        let x = x.relu()?;
+        let x = self.linear2.forward(&x)?;
+        // Normalize for cosine similarity
+        let norm = x.sqr()?.sum_keepdim(1)?.sqrt()?;
+        Ok(x.broadcast_div(&norm)?)
+    }
+}
+
+pub struct JinaReranker {
     pub model_id: String,
     pub revision: String,
     pub max_length: usize,
     tokenizer: Tokenizer,
     config: QwenConfig,
     vb: VarBuilder<'static>,
+    projector: Projector,
     device: Device,
 }
 
-impl QwenReranker {
-    pub fn load(spec: QwenModelSpec) -> Result<Self> {
+impl JinaReranker {
+    pub fn load(spec: JinaModelSpec) -> Result<Self> {
         let cache_root = cache_dir("models")?;
         let root = cache_root
             .join(Path::new(&spec.model_id))
@@ -82,6 +105,7 @@ impl QwenReranker {
                 &device,
             )?
         };
+        let projector = Projector::new(vb.pp("projector"))?;
 
         Ok(Self {
             model_id: spec.model_id,
@@ -90,15 +114,16 @@ impl QwenReranker {
             tokenizer,
             config,
             vb,
+            projector,
             device,
         })
     }
 
-    pub fn score_pair(&self, query: &str, filename: &str, document: &str) -> Result<f64> {
-        let prompt = format!(
-            "<|im_start|>system\nYou are a technical search expert. Evaluate if the document snippet provides the logic, implementation, or test case for the user's query.\n\nFocus on matching the logical intent, not just common words like 'test' or 'config'.<|im_end|>\n<|im_start|>user\nQuery: {}\nFile: {}\nSnippet: {}\nIs this document a strong match for the query logic? Answer with only 'Yes' or 'No'.<|im_end|>\n<|im_start|>assistant\n",
-            query, filename, document
-        );
+    pub fn score_pair(&self, query: &str, document: &str) -> Result<f64> {
+        let q_token = "<|rerank_token|>";
+        let d_token = "<|embed_token|>";
+
+        let prompt = format!("{} {} {} {}", query, q_token, document, d_token);
 
         let encoding = self
             .tokenizer
@@ -108,45 +133,45 @@ impl QwenReranker {
         let tokens = encoding.get_ids();
         let tokens_tensor = Tensor::new(tokens, &self.device)?.unsqueeze(0)?;
 
+        let q_id = self
+            .tokenizer
+            .token_to_id(q_token)
+            .ok_or_else(|| anyhow!("missing q_token in vocab"))?;
+        let d_id = self
+            .tokenizer
+            .token_to_id(d_token)
+            .ok_or_else(|| anyhow!("missing d_token in vocab"))?;
+
+        let q_pos = tokens
+            .iter()
+            .position(|&id| id == q_id)
+            .ok_or_else(|| anyhow!("missing query token in sequence"))?;
+        let d_pos = tokens
+            .iter()
+            .position(|&id| id == d_id)
+            .ok_or_else(|| anyhow!("missing doc token in sequence"))?;
+
+        // Recreate the Model structure to ensure a fresh KV cache.
+        // This is fast as weights are already in memory via VarBuilder.
         let mut model = QwenModel::new(&self.config, self.vb.clone())?;
 
         let hidden_states = model.forward(&tokens_tensor, 0)?;
-        let last_hidden = hidden_states.narrow(1, tokens.len() - 1, 1)?;
 
-        let lm_head = if self.config.tie_word_embeddings {
-            candle_nn::Linear::new(
-                self.vb
-                    .pp("model.embed_tokens")
-                    .get((self.config.vocab_size, self.config.hidden_size), "weight")?,
-                None,
-            )
-        } else {
-            candle_nn::linear_no_bias(
-                self.config.hidden_size,
-                self.config.vocab_size,
-                self.vb.pp("lm_head"),
-            )?
-        };
+        // hidden_states: [batch, seq_len, hidden_size]
+        let q_hidden = hidden_states.narrow(1, q_pos, 1)?.squeeze(1)?;
+        let d_hidden = hidden_states.narrow(1, d_pos, 1)?.squeeze(1)?;
 
-        let logits = last_hidden.apply(&lm_head)?;
+        let q_emb = self.projector.forward(&q_hidden)?;
+        let d_emb = self.projector.forward(&d_hidden)?;
 
-        let last_logit = logits.get(0)?.get(0)?;
-        let probs = candle_nn::ops::softmax(&last_logit, 0)?;
-        let probs_vec = probs.to_vec1::<f32>()?;
-
-        let yes_id = self.tokenizer.token_to_id("Yes").unwrap_or(5510) as usize;
-        let no_id = self.tokenizer.token_to_id("No").unwrap_or(3465) as usize;
-
-        let yes_prob = probs_vec.get(yes_id).cloned().unwrap_or(0.0) as f64;
-        let no_prob = probs_vec.get(no_id).cloned().unwrap_or(0.0) as f64;
-
-        let score = yes_prob / (yes_prob + no_prob + 1e-6);
+        // Dot product of normalized embeddings = cosine similarity
+        let score = (q_emb * d_emb)?.sum_all()?.to_scalar::<f32>()? as f64;
 
         Ok(score)
     }
 }
 
-impl GenerativeModel for QwenReranker {
+impl GenerativeModel for JinaReranker {
     fn generate(&self, prompt: &str, max_tokens: usize) -> Result<String> {
         qwen_generate(
             prompt,
@@ -159,7 +184,7 @@ impl GenerativeModel for QwenReranker {
     }
 }
 
-impl Reranker for QwenReranker {
+impl Reranker for JinaReranker {
     fn rerank(
         &self,
         query: &str,
@@ -171,7 +196,7 @@ impl Reranker for QwenReranker {
         }
 
         tracing::info!(
-            "reranking {} candidates with Qwen2.5-0.5B...",
+            "reranking {} candidates with Jina Reranker v3...",
             candidates.results.len()
         );
         let start = std::time::Instant::now();
@@ -179,8 +204,7 @@ impl Reranker for QwenReranker {
         for candidate in &mut candidates.results {
             let snippet = candidate.snippet.as_deref().unwrap_or("");
             if !snippet.is_empty() {
-                candidate.score =
-                    self.score_pair(query, &candidate.path.display().to_string(), snippet)?;
+                candidate.score = self.score_pair(query, snippet)?;
             }
         }
 
@@ -204,5 +228,18 @@ impl Reranker for QwenReranker {
 
     fn as_generative(&self) -> Option<&dyn GenerativeModel> {
         Some(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore] // Requires model download and HF_TOKEN
+    fn test_jina_load() {
+        let spec = JinaModelSpec::default();
+        let res = JinaReranker::load(spec);
+        assert!(res.is_ok(), "Failed to load Jina model: {:?}", res.err());
     }
 }
