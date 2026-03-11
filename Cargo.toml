@@ -1,6 +1,6 @@
 [package]
 name = "sift"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Alex Kwiatkowski"]
 description = "Standalone hybrid search CLI for fast document retrieval in agentic coding workflows"
@@ -66,6 +66,8 @@ lto = "thin"
 cargo-dist-version = "0.22.1"
 # CI backends to support
 ci = "github"
+# Keep the generated release workflow intentionally customized for SHA stamping.
+allow-dirty = ["ci"]
 # The installers to generate for each app
 installers = ["shell", "powershell", "homebrew", "msi"]
 # Target platforms to build apps for (Rust target-triple syntax)

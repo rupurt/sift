@@ -66,7 +66,7 @@
 
 | Voyage | Status |
 |--------|--------|
-| [Prepare 0.2.0 Release](epics/VDWyNSW9x/voyages/VDWyUguh1/) | planned |
+| [Prepare 0.2.0 Release](epics/VDWyNSW9x/voyages/VDWyUguh1/) | in-progress |
 
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 

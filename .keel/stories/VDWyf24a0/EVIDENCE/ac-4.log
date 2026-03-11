@@ -1,0 +1,49 @@
+---
+recorded_at: 2026-03-10T21:51:20.885753234-07:00
+command: nix develop -c sh -lc 'cd /home/alex/workspace/rupurt/sift && cargo dist plan --tag v0.2.0'
+---
+announcing v0.2.0
+  sift 0.2.0
+    source.tar.gz
+      [checksum] source.tar.gz.sha256
+    sift-installer.sh
+    sift-installer.ps1
+    sift.rb
+    sift-aarch64-apple-darwin-update
+    sift-aarch64-apple-darwin.tar.xz
+      [bin] sift
+      [misc] LICENSE, README.md
+      [checksum] sift-aarch64-apple-darwin.tar.xz.sha256
+    sift-aarch64-unknown-linux-gnu-update
+    sift-aarch64-unknown-linux-gnu.tar.xz
+      [bin] sift
+      [misc] LICENSE, README.md
+      [checksum] sift-aarch64-unknown-linux-gnu.tar.xz.sha256
+    sift-x86_64-apple-darwin-update
+    sift-x86_64-apple-darwin.tar.xz
+      [bin] sift
+      [misc] LICENSE, README.md
+      [checksum] sift-x86_64-apple-darwin.tar.xz.sha256
+    sift-x86_64-pc-windows-msvc-update
+    sift-x86_64-pc-windows-msvc.zip
+      [bin] sift.exe
+      [misc] LICENSE, README.md
+      [checksum] sift-x86_64-pc-windows-msvc.zip.sha256
+    sift-x86_64-pc-windows-msvc.msi
+      [bin] sift.exe
+      [checksum] sift-x86_64-pc-windows-msvc.msi.sha256
+    sift-x86_64-unknown-linux-gnu-update
+    sift-x86_64-unknown-linux-gnu.tar.xz
+      [bin] sift
+      [misc] LICENSE, README.md
+      [checksum] sift-x86_64-unknown-linux-gnu.tar.xz.sha256
+    sift-x86_64-unknown-linux-musl-update
+    sift-x86_64-unknown-linux-musl.tar.xz
+      [bin] sift
+      [misc] LICENSE, README.md
+      [checksum] sift-x86_64-unknown-linux-musl.tar.xz.sha256
+
+--- stderr ---
+path '/home/alex/workspace/rupurt/sift/.keel' does not contain a 'flake.nix', searching up
+ WARN found old manifest for the tag Some("v0.1.0"), ignoring it
+ WARN found old manifest for the tag Some("v0.1.0"), ignoring it

@@ -1,11 +1,12 @@
 ---
 id: VDWyUguh1
 title: Prepare 0.2.0 Release
-status: planned
+status: in-progress
 epic: VDWyNSW9x
 created_at: 2026-03-10T21:44:50
 index: 1
 updated_at: 2026-03-10T21:46:23
+started_at: 2026-03-10T21:46:47
 ---
 
 # Prepare 0.2.0 Release

@@ -1,0 +1,17 @@
+---
+recorded_at: 2026-03-10T21:51:37.711603950-07:00
+command: sh -lc 'cd /home/alex/workspace/rupurt/sift && git diff --name-only --cached | rg "^(Cargo.toml|Cargo.lock|RELEASE.md|examples/sift-embed/Cargo.toml|examples/sift-embed/Cargo.lock|\.keel/)"'
+---
+.keel/README.md
+.keel/epics/VDWyNSW9x/README.md
+.keel/epics/VDWyNSW9x/voyages/VDWyUguh1/README.md
+.keel/stories/VDWyf24a0/EVIDENCE/ac-1.log
+.keel/stories/VDWyf24a0/EVIDENCE/ac-2.log
+.keel/stories/VDWyf24a0/EVIDENCE/ac-3.log
+.keel/stories/VDWyf24a0/EVIDENCE/ac-4.log
+.keel/stories/VDWyf24a0/README.md
+Cargo.lock
+Cargo.toml
+RELEASE.md
+examples/sift-embed/Cargo.lock
+examples/sift-embed/Cargo.toml

@@ -1,0 +1,8 @@
+---
+recorded_at: 2026-03-10T21:50:32.080026124-07:00
+command: sh -lc 'cd /home/alex/workspace/rupurt/sift && rg -n "0\.2\.0" RELEASE.md && ! rg -n "0\.1\.[0-9]+" RELEASE.md'
+---
+27:version = "0.2.0" # Update this
+35:git commit -m "chore: bump version to 0.2.0"
+43:git tag v0.2.0
+44:git push origin v0.2.0

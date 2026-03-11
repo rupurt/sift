@@ -1,0 +1,11 @@
+---
+recorded_at: 2026-03-10T21:50:25.100000469-07:00
+command: nix develop -c sh -lc 'cd /home/alex/workspace/rupurt/sift && rg -n "^version = \"0\.2\.0\"$" Cargo.toml && cargo run -- --version | rg "^sift 0\.2\.0-dev \(([0-9a-f]{7}|unknown)\)$"'
+---
+3:version = "0.2.0"
+sift 0.2.0-dev (b9d7984)
+
+--- stderr ---
+path '/home/alex/workspace/rupurt/sift/.keel' does not contain a 'flake.nix', searching up
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.14s
+     Running `/home/alex/.cache/cargo-target/sift/debug/sift --version`

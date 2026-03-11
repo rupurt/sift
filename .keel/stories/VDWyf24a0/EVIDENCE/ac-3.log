@@ -1,0 +1,61 @@
+---
+recorded_at: 2026-03-10T21:50:43.700042698-07:00
+command: nix develop -c just check
+---
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+--- stderr ---
+path '/home/alex/workspace/rupurt/sift/.keel' does not contain a 'flake.nix', searching up
+cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.19s
+cargo nextest run
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
+────────────
+ Nextest run ID cf6ac77a-5141-411a-af1d-f48ec153007f with nextest profile: default
+    Starting 36 tests across 4 binaries
+        PASS [   0.008s] ( 1/36) sift::bin/sift versioning::tests::falls_back_to_unknown_when_sha_is_missing
+        PASS [   0.009s] ( 2/36) sift::bin/sift versioning::tests::normalizes_sha_to_seven_characters
+        PASS [   0.008s] ( 3/36) sift::bin/sift versioning::tests::renders_release_version_without_dev_suffix
+        PASS [   0.010s] ( 4/36) sift::bin/sift versioning::tests::renders_dev_version_with_short_sha
+        PASS [   0.010s] ( 5/36) sift::bin/sift versioning::tests::detects_release_profiles_and_overrides
+        PASS [   0.011s] ( 6/36) sift::performance_test test_dot_product_consistency
+        PASS [   0.012s] ( 7/36) sift::performance_test test_query_embedding_cache_avoids_redundant_calls
+        PASS [   0.013s] ( 8/36) sift::library_facade_test embedded_facade_runs_a_basic_bm25_search
+        PASS [   0.020s] ( 9/36) sift search::application::tests::search_service_reranks_shortlist_if_larger_than_limit
+        PASS [   0.022s] (10/36) sift search::application::tests::search_service_shortlist_only_limits_rerank_input
+        PASS [   0.023s] (11/36) sift search::application::tests::strategy_preset_registry_resolves_named_presets_and_hybrid_alias
+        PASS [   0.023s] (12/36) sift dense::model::local_asset_plan_is_file_based_and_complete
+        PASS [   0.024s] (13/36) sift search::application::tests::search_service_fuses_results_from_multiple_retrievers
+        PASS [   0.024s] (14/36) sift dense::model::overrides_preserve_default_max_length_when_unspecified
+        PASS [   0.029s] (15/36) sift dense::model::overrides_allow_explicit_max_length
+        PASS [   0.031s] (16/36) sift search::adapters::tests::rrf_fuser_preserves_provenance
+        PASS [   0.031s] (17/36) sift search::application::tests::search_service_orchestrates_multiple_variants_and_retrievers
+        PASS [   0.032s] (18/36) sift segment::tests::merges_standalone_heading_blocks_into_section_segments
+        PASS [   0.033s] (19/36) sift hybrid::rrf::fuses_independent_bm25_and_vector_rankings
+        PASS [   0.033s] (20/36) sift vector::tests::vector_retrieval::aggregation::uses_the_planned_diminishing_returns_rule
+        PASS [   0.033s] (21/36) sift segment::tests::produces_stable_segment_identifiers
+        PASS [   0.033s] (22/36) sift search::domain::tests::cached_embedder_avoids_redundant_calls
+        PASS [   0.034s] (23/36) sift vector::tests::vector_retrieval::full_corpus::scores_the_full_active_segment_corpus
+        PASS [   0.034s] (24/36) sift search::legacy::tests::search::bm25_ranks_recursive_utf8_files
+        PASS [   0.034s] (25/36) sift search::legacy::tests::rich_document::extractor_boundary::routes_text_and_html_documents_through_shared_extractor
+        PASS [   0.035s] (26/36) sift search::legacy::tests::rich_document::html::html_files_are_searchable_without_preprocessing
+        PASS [   0.036s] (27/36) sift search::legacy::tests::cli::json_output_contains_result_fields
+        PASS [   0.036s] (28/36) sift search::legacy::tests::rich_document::skip_handling::invalid_binary_files_are_skipped_deterministically
+        PASS [   0.036s] (29/36) sift search::legacy::tests::fs::filtering_skips_invalid_utf8_without_crashing
+        PASS [   0.037s] (30/36) sift search::legacy::tests::hybrid::best_segment_snippet::prefers_best_segment_snippet_over_document_truncation
+        PASS [   0.037s] (31/36) sift search::legacy::tests::rich_document::determinism::mixed_format_search_results_are_deterministic
+        PASS [   0.037s] (32/36) sift search::legacy::tests::rich_document::segments::structure_aware_segments_are_source_aware
+        PASS [   0.039s] (33/36) sift search::legacy::tests::rich_document::segments::segment_text_preservation_keeps_section_local_text
+        PASS [   0.039s] (34/36) sift search::legacy::tests::rich_document::segments::segment_identity_is_stable_for_supported_documents
+        PASS [   0.040s] (35/36) sift search::legacy::tests::rich_document::office::office_documents_are_searchable_without_external_conversion
+        PASS [   0.044s] (36/36) sift search::legacy::tests::rich_document::pdf::pdf_files_are_searchable_without_external_conversion
+────────────
+     Summary [   0.045s] 36 tests run: 36 passed, 0 skipped
+cargo test --doc
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.15s
+   Doc-tests sift
