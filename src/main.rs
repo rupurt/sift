@@ -22,13 +22,18 @@ use sift::internal::{
 use sift::{Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
+#[cfg(test)]
+mod versioning;
+
 const SCIFACT_BASE_URL: &str = "https://huggingface.co/datasets/BeIR/scifact/resolve/main";
 const SCIFACT_QRELS_BASE_URL: &str =
     "https://huggingface.co/datasets/BeIR/scifact-qrels/resolve/main";
+const CLI_VERSION: &str = env!("SIFT_CLI_VERSION");
 
 #[derive(Parser)]
 #[command(name = "sift")]
 #[command(about = "Indexless hybrid search for local retrieval workflows", long_about = None)]
+#[command(version = CLI_VERSION)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,

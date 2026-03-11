@@ -1,0 +1,13 @@
+---
+recorded_at: 2026-03-10T20:54:58.047496447-07:00
+command: sh -lc 'cd /home/alex/workspace/rupurt/sift && rg -n "SIFT_GIT_SHA|github\.sha" .github/workflows/release.yml && rg -n "Release and dist-profile builds report|unknown|github\.sha" RELEASE.md'
+---
+113:      SIFT_GIT_SHA: ${{ github.sha }}
+168:      SIFT_GIT_SHA: ${{ github.sha }}
+264:          RELEASE_COMMIT: "${{ github.sha }}"
+51:- Inject `github.sha` into release builds so `sift --version` reports the exact release commit.
+67:| **Linux (x86_64, glibc)** | `x86_64-unknown-linux-gnu` | `.tar.gz`, shell installer |
+68:| **Linux (x86_64, static)** | `x86_64-unknown-linux-musl` | `.tar.gz`, shell installer |
+69:| **Linux (ARM64)** | `aarch64-unknown-linux-gnu` | `.tar.gz`, shell installer |
+90:- Release and dist-profile builds report `sift <semver> (<sha>)`.
+91:- If git metadata is unavailable during build, the SHA falls back to `unknown`.

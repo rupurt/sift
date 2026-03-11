@@ -110,6 +110,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BUILD_MANIFEST_NAME: target/distrib/${{ join(matrix.targets, '-') }}-dist-manifest.json
+      SIFT_GIT_SHA: ${{ github.sha }}
     steps:
       - name: enable windows longpaths
         run: |
@@ -164,6 +165,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       BUILD_MANIFEST_NAME: target/distrib/global-dist-manifest.json
+      SIFT_GIT_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:

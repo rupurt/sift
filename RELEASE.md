@@ -48,6 +48,7 @@ git push origin v0.1.1
 Pushing the tag triggers the [Release GitHub Action](.github/workflows/release.yml). This workflow will:
 - Plan the release using `cargo dist plan`.
 - Build binaries for all supported platforms in parallel.
+- Inject `github.sha` into release builds so `sift --version` reports the exact release commit.
 - Generate supported installers (shell, PowerShell, Homebrew, and `.msi`).
 - Create a GitHub Release and upload all artifacts and checksums.
 
@@ -83,6 +84,11 @@ cargo dist plan
 # Build artifacts locally (outputs to target/dist)
 cargo dist build
 ```
+
+Version metadata contract:
+- Normal local and test builds report `sift <semver>-dev (<sha>)`.
+- Release and dist-profile builds report `sift <semver> (<sha>)`.
+- If git metadata is unavailable during build, the SHA falls back to `unknown`.
 
 ### Building a Static Binary Locally
 
