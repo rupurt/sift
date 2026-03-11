@@ -35,6 +35,7 @@
           rust
           pkgs.just
           pkgs.cargo-nextest
+          pkgs.bzip2
           pkgs.xz
           pkgs.zlib
           keelPkg
@@ -42,7 +43,6 @@
 
         linuxInputs = pkgs.lib.optionals isLinux [
           pkgs.mold
-          pkgs.musl
         ];
 
         siftPkg = pkgs.rustPlatform.buildRustPackage {
@@ -53,7 +53,7 @@
             lockFile = ./Cargo.lock;
           };
           nativeBuildInputs = [ pkgs.pkg-config ];
-          buildInputs = [ pkgs.xz pkgs.zlib ];
+          buildInputs = [ pkgs.bzip2 pkgs.xz pkgs.zlib ];
           doCheck = false;
         };
 
@@ -65,7 +65,7 @@
             lockFile = ./Cargo.lock;
           };
           nativeBuildInputs = [ pkgs.pkg-config ];
-          buildInputs = [ pkgs.xz pkgs.zlib ];
+          buildInputs = [ pkgs.bzip2 pkgs.xz pkgs.zlib ];
           doCheck = false;
         };
       in {

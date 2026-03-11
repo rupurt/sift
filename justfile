@@ -87,8 +87,11 @@ search *args:
 embed-build:
     cargo build --manifest-path examples/sift-embed/Cargo.toml
 
-embed-search *args:
-    cargo run --manifest-path examples/sift-embed/Cargo.toml -- search {{args}}
+embed-search path query:
+    cargo run --manifest-path examples/sift-embed/Cargo.toml -- search '{{path}}' '{{query}}'
+
+embed-search-here query:
+    cargo run --manifest-path examples/sift-embed/Cargo.toml -- search '{{query}}'
 
 config:
     cargo run --release -- config
