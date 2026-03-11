@@ -62,6 +62,12 @@
 |--------|--------|
 | [Version Output Metadata](epics/VDWjylxX2/voyages/VDWk0yH65/) | done |
 
+### [Release 0.2.0 Cut](epics/VDWyNSW9x/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Prepare 0.2.0 Release](epics/VDWyNSW9x/voyages/VDWyUguh1/) | planned |
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |
