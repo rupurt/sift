@@ -14,13 +14,13 @@ while local builds fall back to git discovery and ultimately `unknown`.
 
 ## Context & Boundaries
 
-In scope:
+### In Scope
 - Build-time metadata generation for `sift`
 - Clap version output wiring
 - GitHub Actions release-job environment wiring
 - Release documentation updates
 
-Out of scope:
+### Out of Scope
 - Runtime git inspection or new version subcommands
 - Stamping auxiliary example binaries
 - Changing semver/tagging policy

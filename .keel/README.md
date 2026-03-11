@@ -56,11 +56,11 @@
 |--------|--------|
 | [Example Consumer CLI](epics/VDVkH5a6M/voyages/VDVkORseE/) | done |
 
-### [Stamped Version Metadata](epics/VDWjylxX2/) (active)
+### [Stamped Version Metadata](epics/VDWjylxX2/) (done)
 
 | Voyage | Status |
 |--------|--------|
-| [Version Output Metadata](epics/VDWjylxX2/voyages/VDWk0yH65/) | in-progress |
+| [Version Output Metadata](epics/VDWjylxX2/voyages/VDWk0yH65/) | done |
 
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 

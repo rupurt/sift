@@ -19,8 +19,8 @@ index: 7
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 0/1 stories done
+**Progress:** 1/1 voyages complete, 1/1 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Version Output Metadata](voyages/VDWk0yH65/) | in-progress | 0/1 |
+| [Version Output Metadata](voyages/VDWk0yH65/) | done | 1/1 |
 <!-- END GENERATED -->
