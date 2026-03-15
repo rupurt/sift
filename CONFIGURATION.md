@@ -78,6 +78,9 @@ Before retrieval, Sift can expand your query to improve recall.
 #### Search Strategy Matrix
 The table below details exactly how each built-in strategy is configured across the search pipeline.
 
+#### Search Strategy Matrix
+The table below details exactly how each built-in strategy is configured across the search pipeline. These presets are interpreted by the `EngineFactory` to construct a modular `SearchEngine` instance.
+
 | Strategy | Expansion | Retrievers | Fusion | Reranking |
 |----------|-----------|------------|--------|-----------|
 | `page-index-hybrid` (default) | `splade` | `bm25, phrase, vector` | `rrf` | `position-aware` |
@@ -90,6 +93,17 @@ The table below details exactly how each built-in strategy is configured across 
 | `vector` | `none` | `vector` | `rrf` | `none` |
 | `legacy-hybrid` | `none` | `bm25, vector` | `rrf` | `none` |
 | `page-index-qwen` | `none` | `bm25, phrase, vector` | `rrf` | `llm` |
+
+---
+
+## Library Engine Configuration
+
+When embedding `sift` as a library, consumers can bypass the standard `sift.toml` and construct engines directly using the `EngineFactory` or by providing custom implementations of the `SearchIR`, `SearchExecution`, and `SearchStorage` traits.
+
+```rust
+let engine = EngineFactory::default()
+    .build("hybrid", storage, Some(embedder), Some(cache), Some(reranker))?;
+```
 
 ---
 

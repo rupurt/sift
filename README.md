@@ -231,9 +231,10 @@ Trace the pipeline and timings at different levels:
 
 ## Configuration & Customization
 
-- **[CONFIGURATION.md](CONFIGURATION.md):** Guide to `sift.toml`, available strategies, and environment variables.
+- **[USER_GUIDE.md](USER_GUIDE.md):** The comprehensive guide to getting started and mastering Sift.
+- **[CONFIGURATION.md](CONFIGURATION.md):** Technical guide to `sift.toml`, available strategies, and environment variables.
 - **[EVALUATION.md](EVALUATION.md):** How to manage datasets and run quality/latency evaluations.
-- **[ARCHITECTURE.md](ARCHITECTURE.md):** Deep dive into the hexagonal design and asset pipeline.
+- **[ARCHITECTURE.md](ARCHITECTURE.md):** Deep dive into the hexagonal modular engine and asset pipeline.
 
 ## License
 

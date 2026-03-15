@@ -59,9 +59,17 @@ The domain defines the vocabulary of the search process.
   - `Fuser`: Takes multiple `CandidateList`s (e.g., from BM25 and Vector) and merges them into a single ranked list.
   - `Reranker`: Takes the fused list and applies a final pass to finalize the order.
 
-### 2. The Application Service (`src/search/application.rs`)
+### 2. The Modular Engine (`src/search/engine.rs`)
 
-The `SearchService` is the orchestrator. It holds registries of the concrete adapters and executes a `SearchPlan` by passing data through the ports.
+Sift has evolved from a hardcoded search pipeline into a modular **Graph IR and Execution Engine**. The search logic is decoupled into four foundational traits, allowing for pluggable components and universal retrieval.
+
+- **SearchEngine (The Orchestrator):** The top-level interface that binds IR, Execution, and Storage. It provides a unified `.search()` entry point.
+- **SearchIR (The Graph Compiler):** Translates a user query and options into a formal Intermediate Representation (IR) of the search plan. This allows for optimization passes and dynamic graph generation.
+- **SearchExecution (The Runtime):** Orchestrates the traversal of the IR graph. Standard execution follows the `Expansion -> Retrieval -> Fusion -> Rerank` sequence.
+- **SearchStorage (The Persistence Layer):** Abstracts the document corpus and indices. This allows Sift to be decoupled from the local filesystem, enabling retrieval from S3, databases, or remote APIs.
+
+#### GenericEngine & Factory
+The `GenericEngine<IR, Exec, Storage>` is the concrete implementation used by the CLI. The `EngineFactory` streamlines the creation of these engines, handling the registration of standard retrievers, fusers, and LLM-backed expanders.
 
 ### 3. The Adapters (`src/search/adapters/`)
 
