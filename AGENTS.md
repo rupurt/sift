@@ -7,14 +7,14 @@ Shared guidance for AI agents working with this repository.
 1. Enter the development shell with `nix develop`.
 2. If the board is not initialized yet, run `keel init` in the repo root.
 3. Regenerate board summaries after structural changes with `keel generate`.
-4. Validate board health before finalizing work with `keel doctor`.
+4. Validate board health before finalizing work with `keel doctor --scene`.
 
 ## Upgrade Workflow (Keel)
 
 To upgrade `keel` to the latest version from the upstream repository:
 
 1. Run `nix flake update keel` to update the lock file.
-2. Verify the upgrade by running `keel --version` or `keel flow` inside the development shell.
+2. Verify the upgrade by running `keel doctor --scene` inside the development shell.
 3. Commit the `flake.lock` changes.
 
 ## Mission Workflow (Autonomous Operation)
@@ -47,7 +47,7 @@ broad product or feature goal.
 
 ## Execution Workflow (Implementer)
 
-1. **Pull Context**: Read current board health and identify bottlenecks with `keel flow`.
+1. **Pull Context**: Read current board health and identify bottlenecks with `keel flow --scene`.
 2. **Claim Work**: Pull the highest-priority implementation item with `keel next --agent`.
    - If no story is ready and the mission goals are still incomplete, switch
      to research or planning work immediately instead of stopping.
@@ -115,7 +115,7 @@ cleanup step.
 
 ## Planning Workflow (Architect)
 
-1. **Identify Gaps**: Use `keel flow` or `keel status` to find epics needing tactical decomposition.
+1. **Identify Gaps**: Use `keel flow --scene` or `keel status` to find epics needing tactical decomposition.
    - If execution is starved but mission goals are incomplete, create the
      next planning unit instead of waiting for more instructions.
 2. **Scaffold Planning Unit**:
@@ -172,7 +172,7 @@ cleanup step.
 
 Apply these checks to every change before finalizing work:
 
-1. **Doctor Check**: `keel doctor` must pass with zero warnings or errors.
+1. **Doctor Check**: `keel doctor --scene` must pass with zero warnings or errors.
 2. **Project Verification**: Run the repo-specific formatting, linting, and test commands that exist. If automation is not available yet, state exactly what was and was not verified.
 3. **Board Regeneration**: Run `keel generate` after structural board changes so summaries stay current.
 4. **Atomic Commits**: Commit once per logical unit of work using [Conventional Commits](https://www.conventionalcommits.org/).
