@@ -9,6 +9,14 @@ Shared guidance for AI agents working with this repository.
 3. Regenerate board summaries after structural changes with `keel generate`.
 4. Validate board health before finalizing work with `keel doctor`.
 
+## Upgrade Workflow (Keel)
+
+To upgrade `keel` to the latest version from the upstream repository:
+
+1. Run `nix flake update keel` to update the lock file.
+2. Verify the upgrade by running `keel --version` or `keel flow` inside the development shell.
+3. Commit the `flake.lock` changes.
+
 ## Mission Workflow (Autonomous Operation)
 
 Missions are the top-level steering loop for long-running, autonomous objectives.

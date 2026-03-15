@@ -32,4 +32,4 @@ result-*
 
 # Local evaluation caches
 /.cache/
-/.keel/.cache/
+/.keel/cache/
