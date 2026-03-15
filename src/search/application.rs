@@ -55,16 +55,10 @@ impl SearchServiceBuilder {
             service.register_reranker(RerankingPolicy::Jina, Box::new(MockLlmReranker));
         }
 
-        // Register retrievers based on plan
-        if plan.retrievers.contains(&RetrieverPolicy::Bm25) {
-            service.register_retriever(Box::new(Bm25Retriever));
-        }
-        if plan.retrievers.contains(&RetrieverPolicy::Phrase) {
-            service.register_retriever(Box::new(PhraseRetriever));
-        }
-        if plan.retrievers.contains(&RetrieverPolicy::Vector)
-            && let Some(e) = embedder
-        {
+        // Register retrievers
+        service.register_retriever(Box::new(Bm25Retriever));
+        service.register_retriever(Box::new(PhraseRetriever));
+        if let Some(e) = embedder {
             let final_embedder = if let Some(cache) = query_cache {
                 Arc::new(CachedEmbedder { inner: e, cache }) as Arc<dyn Embedder>
             } else {
@@ -653,7 +647,7 @@ pub fn run_search(
     })
 }
 
-fn resolve_snippet_from_candidate(
+pub fn resolve_snippet_from_candidate(
     corpus: &LoadedCorpus,
     candidate: &Candidate,
     query: &str,

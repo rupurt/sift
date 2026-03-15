@@ -1,3 +1,13 @@
+pub mod cli;
+pub mod jina;
+pub mod llm_utils;
+pub mod qwen;
+
+pub use self::cli::*;
+pub use self::jina::*;
+pub use self::llm_utils::*;
+pub use self::qwen::*;
+
 use super::domain::*;
 use anyhow::Result;
 
@@ -618,9 +628,3 @@ impl GenerativeModel for RerankerAsGenerative {
         }
     }
 }
-pub mod cli;
-pub mod jina;
-pub mod llm_utils;
-pub mod qwen;
-#[allow(unused_imports)]
-pub use cli::*;
