@@ -34,8 +34,8 @@ latency benchmark commands that emit reproducible evidence.
 
 #### Verified Evidence
 - [ac-1.log](../../../../stories/1vzJfc000/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/1vzJfc000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzJfc000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzJfc000/EVIDENCE/ac-3.log)
 
 ### Implement Raw File BM25 Search CLI
 - **ID:** 1vzJfp000
@@ -61,8 +61,8 @@ JSON output without any persisted search index.
 
 #### Verified Evidence
 - [ac-1.log](../../../../stories/1vzJfp000/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/1vzJfp000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzJfp000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzJfp000/EVIDENCE/ac-3.log)
 
 ### Add Candle Dense Reranking And Hybrid Fusion
 - **ID:** 1vzJfv000
@@ -95,9 +95,9 @@ evaluation corpus.
 
 
 #### Verified Evidence
-- [ac-4.log](../../../../stories/1vzJfv000/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/1vzJfv000/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/1vzJfv000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzJfv000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzJfv000/EVIDENCE/ac-3.log)
+- [ac-4.log](../../../../stories/1vzJfv000/EVIDENCE/ac-4.log)
 
 

@@ -24,10 +24,10 @@ Reduce redundant neural network inference by caching query embeddings at the ses
 - [x] [SRS-01/AC-04] Search results are identical with and without the cache enabled <!-- verify: manual, SRS-01:start:end, proof: ac-4.log -->
 
 #### Verified Evidence
-- [ac-4.log](../../../../stories/VDPyDiXga/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/VDPyDiXga/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDPyDiXga/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDPyDiXga/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDPyDiXga/EVIDENCE/ac-3.log)
+- [ac-4.log](../../../../stories/VDPyDiXga/EVIDENCE/ac-4.log)
 
 ### SIMD-Optimized Dot-Product Calculation
 - **ID:** VDPyDiqht
@@ -43,10 +43,10 @@ Improve vector retrieval throughput by optimizing the core `dot_product` calcula
 - [x] [SRS-03/AC-04] Results remain numerically consistent with the scalar implementation within floating-point precision <!-- verify: manual, SRS-03:start:end, proof: ac-4.log -->
 
 #### Verified Evidence
-- [ac-4.log](../../../../stories/VDPyDiqht/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/VDPyDiqht/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDPyDiqht/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDPyDiqht/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDPyDiqht/EVIDENCE/ac-3.log)
+- [ac-4.log](../../../../stories/VDPyDiqht/EVIDENCE/ac-4.log)
 
 ### Reduce Search Pipeline Memory Allocations
 - **ID:** VDPyDj6iA
@@ -62,9 +62,9 @@ Minimize the overhead of search execution by reducing memory allocations in the 
 - [x] [SRS-02/AC-04] Total memory footprint remains stable across multiple searches in a session <!-- verify: manual, SRS-02:start:end, proof: ac-4.log -->
 
 #### Verified Evidence
-- [ac-4.log](../../../../stories/VDPyDj6iA/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/VDPyDj6iA/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDPyDj6iA/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDPyDj6iA/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDPyDj6iA/EVIDENCE/ac-3.log)
+- [ac-4.log](../../../../stories/VDPyDj6iA/EVIDENCE/ac-4.log)
 
 

@@ -24,7 +24,7 @@ Configure the release pipeline to produce a fully static Linux executable using 
 
 #### Verified Evidence
 - [ac-1.log](../../../../stories/VDQAq22Tq/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDQAq22Tq/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDQAq22Tq/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDQAq22Tq/EVIDENCE/ac-3.log)
 
 

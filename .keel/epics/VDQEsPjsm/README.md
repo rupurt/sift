@@ -1,6 +1,7 @@
 ---
 id: VDQEsPjsm
 title: Qwen LLM Reranking Architecture
+mission: VDQEoulWx
 created_at: 2026-03-09T18:06:00
 index: 5
 ---

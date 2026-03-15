@@ -25,3 +25,11 @@
 | SRS-01 | `cargo-dist` must generate a static Linux binary using the `musl` target. | FR-01 | SCOPE-01 | manual: Inspect artifacts |
 | SRS-02 | `RELEASE.md` must mention the availability of static Linux binaries. | FR-02 | SCOPE-03 | manual: Read RELEASE.md |
 <!-- END FUNCTIONAL_REQUIREMENTS -->
+
+### Non-Functional Requirements
+
+<!-- BEGIN NON_FUNCTIONAL_REQUIREMENTS -->
+| ID | Requirement | Source | Scope | Verification |
+|----|-------------|--------|-------|--------------|
+| SRS-06 | Multi-platform build artifacts must remain portable across target-compatible OS versions. | NFR-01 | SCOPE-01 | manual: Verify on target platforms |
+<!-- END NON_FUNCTIONAL_REQUIREMENTS -->

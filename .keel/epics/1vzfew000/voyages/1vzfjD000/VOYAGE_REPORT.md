@@ -21,8 +21,8 @@
 
 #### Verified Evidence
 - [ac-1.log](../../../../stories/1vzfji000/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/1vzfji000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzfji000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzfji000/EVIDENCE/ac-3.log)
 
 ### Implement Blob Store And Manifest Logic
 - **ID:** 1vzfjv000
@@ -35,10 +35,10 @@
 - [x] [SRS-05/AC-01] Use file locking via `fs2` during manifest writing. <!-- verify: manual, SRS-05:start:end, proof: ac-4.log -->
 
 #### Verified Evidence
-- [ac-4.log](../../../../stories/1vzfjv000/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/1vzfjv000/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/1vzfjv000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzfjv000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzfjv000/EVIDENCE/ac-3.log)
+- [ac-4.log](../../../../stories/1vzfjv000/EVIDENCE/ac-4.log)
 
 ### Wire Cache Into Prepared Corpus
 - **ID:** 1vzfkD000
@@ -51,7 +51,7 @@
 
 #### Verified Evidence
 - [ac-1.log](../../../../stories/1vzfkD000/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/1vzfkD000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzfkD000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzfkD000/EVIDENCE/ac-3.log)
 
 

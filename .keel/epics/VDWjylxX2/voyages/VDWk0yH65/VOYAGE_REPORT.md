@@ -26,9 +26,9 @@ contract for stamping the authoritative commit SHA.
 - [x] [SRS-04/AC-04] Shared version-formatting logic is covered by automated tests for release, dev, and `unknown` fallback cases. <!-- verify: cargo test versioning::, SRS-04:start:end, proof: ac-4.log-->
 
 #### Verified Evidence
-- [ac-4.log](../../../../stories/VDWk6czfb/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/VDWk6czfb/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDWk6czfb/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDWk6czfb/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDWk6czfb/EVIDENCE/ac-3.log)
+- [ac-4.log](../../../../stories/VDWk6czfb/EVIDENCE/ac-4.log)
 
 

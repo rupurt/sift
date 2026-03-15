@@ -1,6 +1,7 @@
 ---
 id: 1vzXLN000
 title: Composable Search Strategy Architecture
+mission: VDPxuxum3
 created_at: 2026-03-09T02:57:41
 ---
 

@@ -22,10 +22,12 @@ recovery or layout loss can degrade both lexical and dense retrieval.
 
 ## Success Criteria
 
-How will we know if this research was valuable?
+The research is considered successful if it achieves the following outcomes:
 
-- [x] Identify a plausible Rust-native extraction path for HTML, PDF, and Office formats that keeps sift as a single local binary with no daemon or external database.
-- [x] Recommend an implementation sequence, explicit format boundaries, and known limitations that can be turned directly into the next epic, voyage, and stories.
+- **Library Evaluation:** Evaluate `lopdf`, `selectng`, and `undoc` against the Rust-only, single-binary constraints and identify the best first implementation path.
+- **Unified Extraction Boundary:** Propose a single `SourceKind` and extraction trait that covers PDF, HTML, and OOXML without leaking format-specific details into the core search logic.
+- **Performance Baseline:** Establish an expected extraction latency for typical (1-10MB) document blobs to ensure search startup remains "local-fast".
+- **Implementation Strategy:** Provide a clear sequence of epics and stories that can be executed to add support for these formats in the next release cycle.
 
 ## Open Questions
 

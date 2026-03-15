@@ -75,7 +75,7 @@ another Rust project should actually depend on and call the library.
 
 #### Verified Evidence
 - [ac-1.log](../../../../stories/VDVSF1tAK/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDVSF1tAK/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDVSF1tAK/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDVSF1tAK/EVIDENCE/ac-3.log)
 
 

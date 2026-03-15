@@ -78,10 +78,10 @@ tradeoffs explicit.
 - [x] [SRS-11/AC-01] Latency reporting makes any shortfall against the 200 ms target explicit for the true-hybrid path. <!-- verify: sh -lc 'cd "$(git rev-parse --show-toplevel)" && cargo test bench::latency && cargo run -- bench latency --engine hybrid --corpus tests/fixtures/rich-docs --queries tests/fixtures/rich-docs/test-queries.tsv', SRS-11:start:end, proof: ac-5.log -->
 
 #### Verified Evidence
-- [ac-4.log](../../../../stories/1vzSwK000/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/1vzSwK000/EVIDENCE/ac-1.log)
-- [ac-5.log](../../../../stories/1vzSwK000/EVIDENCE/ac-5.log)
-- [ac-3.log](../../../../stories/1vzSwK000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzSwK000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzSwK000/EVIDENCE/ac-3.log)
+- [ac-4.log](../../../../stories/1vzSwK000/EVIDENCE/ac-4.log)
+- [ac-5.log](../../../../stories/1vzSwK000/EVIDENCE/ac-5.log)
 
 

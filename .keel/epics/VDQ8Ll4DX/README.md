@@ -1,6 +1,7 @@
 ---
 id: VDQ8Ll4DX
 title: Automated Cross-Platform Release Pipeline
+mission: VDQ8IlX52
 created_at: 2026-03-09T17:40:04
 index: 4
 ---

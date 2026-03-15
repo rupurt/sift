@@ -1,6 +1,7 @@
 ---
 id: VDVkH5a6M
 title: Runnable Embedded Example Consumer
+mission: VDVkDRlhw
 created_at: 2026-03-10T16:42:05
 index: 6
 ---

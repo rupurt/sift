@@ -27,10 +27,10 @@ the existing local and tag-based release paths remain healthy.
 - [x] [SRS-05/AC-05] The release cut remains limited to version-preparation artifacts and does not add unrelated product changes. <!-- verify: sh -lc 'cd "$(git rev-parse --show-toplevel)" && git show --name-only --pretty=format: HEAD | rg -v "^$" | tee /tmp/sift-release-files.log | awk "/^(Cargo.toml|Cargo.lock|RELEASE.md|examples\\/sift-embed\\/Cargo.toml|examples\\/sift-embed\\/Cargo.lock|\\.keel\\/)/ { next } { bad = 1 } END { exit bad }"', SRS-05:start:end, proof: ac-5.log-->
 
 #### Verified Evidence
-- [ac-4.log](../../../../stories/VDWyf24a0/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/VDWyf24a0/EVIDENCE/ac-1.log)
-- [ac-5.log](../../../../stories/VDWyf24a0/EVIDENCE/ac-5.log)
-- [ac-3.log](../../../../stories/VDWyf24a0/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDWyf24a0/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDWyf24a0/EVIDENCE/ac-3.log)
+- [ac-4.log](../../../../stories/VDWyf24a0/EVIDENCE/ac-4.log)
+- [ac-5.log](../../../../stories/VDWyf24a0/EVIDENCE/ac-5.log)
 
 

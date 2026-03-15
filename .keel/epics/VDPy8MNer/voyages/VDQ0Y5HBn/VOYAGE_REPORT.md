@@ -24,9 +24,9 @@ Use memory-mapped I/O for retrieving documents from the global blob store to imp
 - [x] [SRS-01/AC-04] `sift search -vv` works correctly and shows expected results with mmap enabled <!-- verify: command, SRS-01:start:end, proof: ac-4.log -->
 
 #### Verified Evidence
-- [ac-4.log](../../../../stories/VDQ0agoAl/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/VDQ0agoAl/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDQ0agoAl/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDQ0agoAl/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDQ0agoAl/EVIDENCE/ac-3.log)
+- [ac-4.log](../../../../stories/VDQ0agoAl/EVIDENCE/ac-4.log)
 
 

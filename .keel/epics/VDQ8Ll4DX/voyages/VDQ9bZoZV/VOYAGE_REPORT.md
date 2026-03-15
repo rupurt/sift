@@ -24,7 +24,7 @@ Add Homebrew formula generation to the `cargo-dist` release pipeline to allow us
 
 #### Verified Evidence
 - [ac-1.log](../../../../stories/VDQ9YwPaS/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDQ9YwPaS/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDQ9YwPaS/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDQ9YwPaS/EVIDENCE/ac-3.log)
 
 

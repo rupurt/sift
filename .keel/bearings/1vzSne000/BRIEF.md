@@ -30,16 +30,12 @@ The architecture question is therefore two-fold:
 
 ## Success Criteria
 
-How will we know if this research was valuable?
+The research is considered successful if it achieves the following outcomes:
 
-- [x] Determine whether sift should replace rerank-only `hybrid` behavior with
-  true BM25 plus vector retrieval.
-- [x] Recommend a document representation strategy that is effective for whole
-  documents and structured rich formats.
-- [x] Compare the current Candle path, `fastembed-rs`, and deferred alternatives
-  against the repository constraints.
-- [x] Produce a concrete epic/voyage recommendation that can be executed without
-  reopening the architecture question.
+- **Hybrid Strategy Validation:** Formally determine if a "true hybrid" (BM25 + Vector) approach out-performs the "rerank-only" baseline for local document search.
+- **Section-Aware Representation:** Propose a concrete document-to-segment mapping that allows for high-fidelity vector retrieval on long, structured documents (PDF/HTML).
+- **Runtime Path Recommendation:** Select between the current Candle implementation and `fastembed-rs` based on binary size, performance, and dependency constraints.
+- **Implementation Roadmap:** Deliver a scoped epic and voyage plan that translates these findings into the next implementation cycle.
 
 ## Open Questions
 

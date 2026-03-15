@@ -24,10 +24,10 @@ Add the necessary metadata to `Cargo.toml` to configure `cargo-dist` for multi-p
 - [x] [SRS-04/AC-04] DMG installer for macOS is configured <!-- verify: manual, SRS-04:start:end, proof: ac-4.log -->
 
 #### Verified Evidence
-- [ac-4.log](../../../../stories/VDQ8UwFfq/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/VDQ8UwFfq/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDQ8UwFfq/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDQ8UwFfq/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDQ8UwFfq/EVIDENCE/ac-3.log)
+- [ac-4.log](../../../../stories/VDQ8UwFfq/EVIDENCE/ac-4.log)
 
 ### Create Github Action For Releases
 - **ID:** VDQ8UwXh7
@@ -43,9 +43,9 @@ Generate and configure the `.github/workflows/release.yml` file to automate the 
 - [x] [SRS-05/AC-04] Workflow uses `dist` to create and upload artifacts <!-- verify: manual, SRS-05:start:end, proof: ac-4.log -->
 
 #### Verified Evidence
-- [ac-4.log](../../../../stories/VDQ8UwXh7/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/VDQ8UwXh7/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/VDQ8UwXh7/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/VDQ8UwXh7/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/VDQ8UwXh7/EVIDENCE/ac-3.log)
+- [ac-4.log](../../../../stories/VDQ8UwXh7/EVIDENCE/ac-4.log)
 
 

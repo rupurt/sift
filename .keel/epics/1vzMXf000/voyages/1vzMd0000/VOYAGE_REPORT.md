@@ -34,8 +34,8 @@ CLI.
 
 #### Verified Evidence
 - [ac-1.log](../../../../stories/1vzMe4000/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/1vzMe4000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzMe4000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzMe4000/EVIDENCE/ac-3.log)
 
 ### Add Text-Bearing PDF Extraction
 - **ID:** 1vzMeH000
@@ -85,7 +85,7 @@ close the voyage with deterministic mixed-format verification artifacts.
 
 #### Verified Evidence
 - [ac-1.log](../../../../stories/1vzMeL000/EVIDENCE/ac-1.log)
-- [ac-3.log](../../../../stories/1vzMeL000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzMeL000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzMeL000/EVIDENCE/ac-3.log)
 
 

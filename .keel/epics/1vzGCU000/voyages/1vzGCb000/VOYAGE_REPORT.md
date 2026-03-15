@@ -27,10 +27,10 @@ by `zvec v0.2.0`.
 - [x] [SRS-05/AC-01] The compatibility pin is limited to the required native build components, and the shell does not carry an unused alternate compiler toolchain. <!-- verify: manual, SRS-05:start:end, proof: ac-5.log -->
 
 #### Verified Evidence
-- [ac-4.log](../../../../stories/1vzGCp000/EVIDENCE/ac-4.log)
 - [ac-1.log](../../../../stories/1vzGCp000/EVIDENCE/ac-1.log)
-- [ac-5.log](../../../../stories/1vzGCp000/EVIDENCE/ac-5.log)
-- [ac-3.log](../../../../stories/1vzGCp000/EVIDENCE/ac-3.log)
 - [ac-2.log](../../../../stories/1vzGCp000/EVIDENCE/ac-2.log)
+- [ac-3.log](../../../../stories/1vzGCp000/EVIDENCE/ac-3.log)
+- [ac-4.log](../../../../stories/1vzGCp000/EVIDENCE/ac-4.log)
+- [ac-5.log](../../../../stories/1vzGCp000/EVIDENCE/ac-5.log)
 
 
