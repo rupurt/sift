@@ -366,7 +366,9 @@ pub trait GenerativeExpansionStrategy: Send + Sync {
     }
 }
 
-pub struct HydeStrategy;
+pub struct HydeStrategy {
+    pub custom_prompt: Option<String>,
+}
 impl GenerativeExpansionStrategy for HydeStrategy {
     fn name(&self) -> &'static str {
         "HyDE"
@@ -375,9 +377,12 @@ impl GenerativeExpansionStrategy for HydeStrategy {
         128
     }
     fn prompt(&self, query: &str) -> String {
+        let system_prompt = self.custom_prompt.as_deref().unwrap_or(
+            "You are a technical assistant. For the given query, generate a concise, hypothetical technical document snippet that would satisfy the user's intent. Focus on code structures, API names, and implementation logic."
+        );
         format!(
-            "<|im_start|>system\nYou are a technical assistant. For the given query, generate a concise, hypothetical technical document snippet that would satisfy the user's intent. Focus on code structures, API names, and implementation logic.<|im_end|>\n<|im_start|>user\nQuery: {}\n<|im_end|>\n<|im_start|>assistant\n",
-            query
+            "<|im_start|>system\n{}<|im_end|>\n<|im_start|>user\nQuery: {}\n<|im_end|>\n<|im_start|>assistant\n",
+            system_prompt, query
         )
     }
     fn process_output(&self, query: &str, output: &str) -> Vec<QueryVariant> {
@@ -394,15 +399,20 @@ impl GenerativeExpansionStrategy for HydeStrategy {
     }
 }
 
-pub struct SpladeStrategy;
+pub struct SpladeStrategy {
+    pub custom_prompt: Option<String>,
+}
 impl GenerativeExpansionStrategy for SpladeStrategy {
     fn name(&self) -> &'static str {
         "SPLADE"
     }
     fn prompt(&self, query: &str) -> String {
+        let system_prompt = self.custom_prompt.as_deref().unwrap_or(
+            "You are a technical search expert. For the given query, provide 5-8 technical terms that are semantically related but NOT necessarily present in the query. Return ONLY the keywords separated by commas."
+        );
         format!(
-            "<|im_start|>system\nYou are a technical search expert. For the given query, provide 5-8 technical terms that are semantically related but NOT necessarily present in the query. Return ONLY the keywords separated by commas.<|im_end|>\n<|im_start|>user\nQuery: {}\n<|im_end|>\n<|im_start|>assistant\n",
-            query
+            "<|im_start|>system\n{}<|im_end|>\n<|im_start|>user\nQuery: {}\n<|im_end|>\n<|im_start|>assistant\n",
+            system_prompt, query
         )
     }
     fn process_output(&self, query: &str, output: &str) -> Vec<QueryVariant> {
@@ -423,15 +433,20 @@ impl GenerativeExpansionStrategy for SpladeStrategy {
     }
 }
 
-pub struct ClassifiedStrategy;
+pub struct ClassifiedStrategy {
+    pub custom_prompt: Option<String>,
+}
 impl GenerativeExpansionStrategy for ClassifiedStrategy {
     fn name(&self) -> &'static str {
         "CLASSIFIED"
     }
     fn prompt(&self, query: &str) -> String {
+        let system_prompt = self.custom_prompt.as_deref().unwrap_or(
+            "You are a technical classifier. Identify the technical intent of the query (e.g., NAVIGATION, LOGIC, DOCS, BUGFIX, TEST). Return the classification and 3 highly specific keywords for that intent. Format: CATEGORY: keyword1, keyword2, keyword3"
+        );
         format!(
-            "<|im_start|>system\nYou are a technical classifier. Identify the technical intent of the query (e.g., NAVIGATION, LOGIC, DOCS, BUGFIX, TEST). Return the classification and 3 highly specific keywords for that intent. Format: CATEGORY: keyword1, keyword2, keyword3<|im_end|>\n<|im_start|>user\nQuery: {}\n<|im_end|>\n<|im_start|>assistant\n",
-            query
+            "<|im_start|>system\n{}<|im_end|>\n<|im_start|>user\nQuery: {}\n<|im_end|>\n<|im_start|>assistant\n",
+            system_prompt, query
         )
     }
     fn process_output(&self, query: &str, output: &str) -> Vec<QueryVariant> {

@@ -17,6 +17,7 @@ impl SearchServiceBuilder {
         embedder: Option<Arc<dyn Embedder>>,
         query_cache: Option<QueryEmbeddingCache>,
         llm_reranker: Option<Arc<dyn Reranker>>,
+        prompts: Option<&crate::config::PromptsConfig>,
     ) -> SearchService {
         let mut service = SearchService::new();
 
@@ -24,9 +25,9 @@ impl SearchServiceBuilder {
         service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
         service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
 
-        let mut hyde = LlmExpander::new(Box::new(HydeStrategy));
-        let mut splade = LlmExpander::new(Box::new(SpladeStrategy));
-        let mut classified = LlmExpander::new(Box::new(ClassifiedStrategy));
+        let mut hyde = LlmExpander::new(Box::new(HydeStrategy { custom_prompt: prompts.and_then(|p| p.hyde.clone()) }));
+        let mut splade = LlmExpander::new(Box::new(SpladeStrategy { custom_prompt: prompts.and_then(|p| p.splade.clone()) }));
+        let mut classified = LlmExpander::new(Box::new(ClassifiedStrategy { custom_prompt: prompts.and_then(|p| p.classified.clone()) }));
 
         if let Some(r) = &llm_reranker {
             let generative = Arc::new(RerankerAsGenerative(r.clone())) as Arc<dyn GenerativeModel>;
@@ -488,7 +489,7 @@ impl<'a> SearchEnvironment<'a> {
         }
 
         let service =
-            SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone(), None);
+            SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone(), None, request.prompts.as_ref());
 
         Ok(Self {
             service,
@@ -623,7 +624,7 @@ pub fn run_search(
     }
 
     let service =
-        SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone(), llm_reranker);
+        SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone(), llm_reranker, request.prompts.as_ref());
 
     let index_start = std::time::Instant::now();
     let index = Bm25Index::build(&corpus.documents);
@@ -876,7 +877,7 @@ mod tests {
         let mut service = SearchService::new();
         service.register_expander(
             QueryExpansionPolicy::Hyde,
-            Box::new(LlmExpander::new(Box::new(HydeStrategy))),
+            Box::new(LlmExpander::new(Box::new(HydeStrategy { custom_prompt: None }))),
         );
         service.register_retriever(Box::new(MockRetriever {
             policy: RetrieverPolicy::Bm25,

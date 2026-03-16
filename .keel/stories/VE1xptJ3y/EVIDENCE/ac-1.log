@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-16T05:14:58.289421712-07:00
+mode: manual
+---
+SearchServiceBuilder and run_search pass prompts config properly
