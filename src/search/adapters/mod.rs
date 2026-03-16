@@ -565,6 +565,18 @@ impl Reranker for MockLlmReranker {
     }
 }
 
+pub struct RerankerAsGenerative(pub std::sync::Arc<dyn Reranker>);
+
+impl GenerativeModel for RerankerAsGenerative {
+    fn generate(&self, prompt: &str, max_tokens: usize) -> Result<String> {
+        if let Some(generative) = self.0.as_generative() {
+            generative.generate(prompt, max_tokens)
+        } else {
+            anyhow::bail!("Reranker does not support generation")
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -614,17 +626,5 @@ mod tests {
                 .iter()
                 .any(|c| c.retriever == RetrieverPolicy::Vector)
         );
-    }
-}
-
-pub struct RerankerAsGenerative(pub std::sync::Arc<dyn Reranker>);
-
-impl GenerativeModel for RerankerAsGenerative {
-    fn generate(&self, prompt: &str, max_tokens: usize) -> Result<String> {
-        if let Some(generative) = self.0.as_generative() {
-            generative.generate(prompt, max_tokens)
-        } else {
-            anyhow::bail!("Reranker does not support generation")
-        }
     }
 }
