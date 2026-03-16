@@ -22,7 +22,7 @@ SciFact is our primary dataset for local retrieval testing.
 ```bash
 # Downloads and prepares the SciFact dataset automatically
 # Files will be placed in your user cache directory
-just dataset prepare
+just sift dataset prepare
 ```
 
 ### 2. Manual Dataset Commands
@@ -30,17 +30,17 @@ You can also run the download and materialization steps manually:
 
 ```bash
 # Download
-just dataset download scifact
+just sift dataset download scifact
 
 # Materialize (JSONL -> individual .txt files)
-just dataset materialize scifact
+just sift dataset materialize scifact
 ```
 
 ---
 
 ## Running Evaluations
 
-The `eval` subcommand (and the `just eval` module) is used to measure search performance.
+The `eval` subcommand is used to measure search performance.
 
 ### 1. Comparative Evaluation (`eval all`)
 Runs all available strategies (BM25, Vector, Hybrid, etc.) and compares their metrics.
@@ -48,21 +48,21 @@ Runs all available strategies (BM25, Vector, Hybrid, etc.) and compares their me
 **Note:** Comparative evaluations are significantly accelerated by the **Query Embedding Cache**. Once a query is embedded for the first strategy, all subsequent strategies will reuse that embedding, reducing total runtime by hundreds of milliseconds per query.
 
 ```bash
-just eval all --dataset scifact
+just sift eval all --dataset scifact
 ```
 
 ### 2. Champion Evaluation (`eval hybrid`)
 Runs a comprehensive quality and latency report for the current champion strategy (`page-index-hybrid`) against the `bm25` baseline.
 
 ```bash
-just eval hybrid --dataset scifact
+just sift eval hybrid --dataset scifact
 ```
 
 ### 3. Baseline Evaluation (`eval baseline`)
 Runs a report for the standard `bm25` strategy.
 
 ```bash
-just eval baseline --dataset scifact
+just sift eval baseline --dataset scifact
 ```
 
 ### 4. Running a Subset (`--query-limit`)
@@ -70,7 +70,7 @@ For large datasets like SciFact, you can limit the number of queries evaluated t
 
 ```bash
 # Evaluate only the first 5 queries
-just eval all --dataset scifact --query-limit 5
+just sift eval all --dataset scifact --query-limit 5
 ```
 
 ### 5. Intent-Driven Evaluation
@@ -82,13 +82,35 @@ Sift allows you to compare different query expansion strategies to see which one
 
 ---
 
+## Prompt Optimization
+
+The `optimize` subcommand is used to auto-tune the system prompts used for generative expansion. It uses an LLM to iteratively mutate prompts and measures their impact on **Signal Gain** using the evaluation harness.
+
+### How it Works
+1.  **Baseline:** It runs a baseline evaluation of a strategy (e.g., `page-index-splade`) to establish current performance.
+2.  **Mutation:** It prompts an LLM to generate a more effective variation of the system prompt.
+3.  **Evaluation:** It re-runs the evaluation using the new prompt.
+4.  **Selection:** If the new prompt improves Signal Gain, it is kept; otherwise, it is discarded.
+5.  **Persistence:** The final optimized prompts are saved to your local `sift.toml`.
+
+### Running the Optimizer
+
+```bash
+# Optimize all generative prompts (3 iterations each)
+just sift optimize --dataset scifact --iterations 3
+```
+
+**Note:** Optimization is an expensive operation as it requires multiple LLM calls and multiple evaluation passes. It is recommended to use a `--query-limit` during initial testing.
+
+---
+
 ## Performance Profiling
 
 ### Micro-benchmarks (`criterion`)
 We use `criterion` for high-precision measurement of hot-path functions like tokenization and scoring.
 
 ```bash
-just eval-micro
+just sift-bench
 ```
 
 ### Flamegraphs
@@ -96,7 +118,7 @@ Identify CPU bottlenecks and visualize where time is being spent in the search p
 
 ```bash
 # Requires cargo-flamegraph installed
-just eval-flamegraph all --dataset scifact
+just sift-flamegraph all --dataset scifact
 ```
 
 ---

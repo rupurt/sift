@@ -1,6 +1,4 @@
 mod keel '.justfiles/keel.just'
-mod eval '.justfiles/eval.just'
-mod dataset '.justfiles/dataset.just'
 
 default:
     @echo "Root recipes:"
@@ -8,12 +6,6 @@ default:
     @echo
     @echo "Keel module:"
     @just --list keel
-    @echo
-    @echo "Eval module:"
-    @just --list eval
-    @echo
-    @echo "Dataset module:"
-    @just --list dataset
 
 fmt:
     cargo fmt
@@ -81,8 +73,8 @@ build-static:
         exit 1; \
     fi
 
-search *args:
-    cargo run --release -- search {{args}}
+sift *args:
+    cargo run --release -- {{args}}
 
 embed-build:
     @set -eu; \
@@ -104,17 +96,14 @@ embed-build:
         echo "copied $source_bin -> $dest_bin"; \
     fi
 
-embed-search path query:
+embed-sift path query:
     cargo run --manifest-path examples/sift-embed/Cargo.toml -- search '{{path}}' '{{query}}'
 
-embed-search-here query:
+embed-sift-here query:
     cargo run --manifest-path examples/sift-embed/Cargo.toml -- search '{{query}}'
 
-config:
-    cargo run --release -- config
-
-eval-flamegraph *args:
+sift-flamegraph *args:
     cargo flamegraph -- eval {{args}}
 
-eval-micro:
+sift-bench:
     cargo bench
