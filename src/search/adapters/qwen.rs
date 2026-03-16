@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::{Result, anyhow};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
-use candle_transformers::models::qwen3::{Config as QwenConfig, Model as QwenModel};
+use candle_transformers::models::qwen2::{Config as QwenConfig, Model as QwenModel};
 use tokenizers::Tokenizer;
 
 use super::llm_utils::{QwenConfigPartial, ensure_hf_asset, qwen_generate};
@@ -110,7 +110,7 @@ impl QwenReranker {
 
         let mut model = QwenModel::new(&self.config, self.vb.clone())?;
 
-        let hidden_states = model.forward(&tokens_tensor, 0)?;
+        let hidden_states = model.forward(&tokens_tensor, 0, None)?;
         let last_hidden = hidden_states.narrow(1, tokens.len() - 1, 1)?;
 
         let lm_head = if self.config.tie_word_embeddings {

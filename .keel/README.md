@@ -72,7 +72,7 @@
 
 | Voyage | Status |
 |--------|--------|
-| [Configurable Prompts](epics/VE1xUOaxK/voyages/VE1xdk4hF/) | planned |
+| [Configurable Prompts](epics/VE1xUOaxK/voyages/VE1xdk4hF/) | in-progress |
 
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 

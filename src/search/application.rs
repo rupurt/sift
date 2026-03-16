@@ -12,6 +12,46 @@ use crate::config::Ignore;
 pub struct SearchServiceBuilder;
 
 impl SearchServiceBuilder {
+    pub fn load_llm_reranker(
+        plan: &SearchPlan,
+        request: &SearchRequest,
+    ) -> Result<Option<Arc<dyn Reranker>>> {
+        let mut llm_reranker = if plan.reranking == RerankingPolicy::Llm {
+            if let Some(spec) = &request.rerank_model {
+                Some(Arc::new(QwenReranker::load(spec.clone())?) as Arc<dyn Reranker>)
+            } else {
+                Some(Arc::new(QwenReranker::load(QwenModelSpec::default())?) as Arc<dyn Reranker>)
+            }
+        } else if plan.reranking == RerankingPolicy::Jina {
+            Some(Arc::new(JinaReranker::load(JinaModelSpec::default())?) as Arc<dyn Reranker>)
+        } else if plan.reranking == RerankingPolicy::Gemma {
+            if let Some(spec) = &request.gemma_model {
+                Some(Arc::new(GemmaReranker::load(spec.clone())?) as Arc<dyn Reranker>)
+            } else {
+                Some(Arc::new(GemmaReranker::load(GemmaModelSpec::default())?) as Arc<dyn Reranker>)
+            }
+        } else {
+            None
+        };
+
+        // If we need generative expansion but don't have a reranker (or it's not generative),
+        // load the default Instruct model.
+        let expansion_needs_llm = matches!(
+            plan.query_expansion,
+            QueryExpansionPolicy::Hyde
+                | QueryExpansionPolicy::Splade
+                | QueryExpansionPolicy::Classified
+        );
+
+        if llm_reranker.is_none() && expansion_needs_llm {
+            tracing::info!("loading Instruct model for query expansion...");
+            llm_reranker =
+                Some(Arc::new(QwenReranker::load(QwenModelSpec::default())?) as Arc<dyn Reranker>);
+        }
+
+        Ok(llm_reranker)
+    }
+
     pub fn build(
         plan: &SearchPlan,
         embedder: Option<Arc<dyn Embedder>>,
@@ -473,6 +513,7 @@ impl<'a> SearchEnvironment<'a> {
         corpus: &'a LoadedCorpus,
         index: &'a Bm25Index,
         embedder: Option<Arc<dyn Embedder>>,
+        llm_reranker: Option<Arc<dyn Reranker>>,
     ) -> Result<Self> {
         let registry = StrategyPresetRegistry::default_registry();
         let mut plan = registry.resolve(&request.strategy)?;
@@ -489,7 +530,7 @@ impl<'a> SearchEnvironment<'a> {
         }
 
         let service =
-            SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone(), None, request.prompts.as_ref());
+            SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone(), llm_reranker, request.prompts.as_ref());
 
         Ok(Self {
             service,
@@ -590,38 +631,7 @@ pub fn run_search(
         corpus_start.elapsed()
     );
 
-    let mut llm_reranker = if plan.reranking == RerankingPolicy::Llm {
-        if let Some(spec) = &request.rerank_model {
-            Some(Arc::new(QwenReranker::load(spec.clone())?) as Arc<dyn Reranker>)
-        } else {
-            Some(Arc::new(QwenReranker::load(QwenModelSpec::default())?) as Arc<dyn Reranker>)
-        }
-    } else if plan.reranking == RerankingPolicy::Jina {
-        Some(Arc::new(JinaReranker::load(JinaModelSpec::default())?) as Arc<dyn Reranker>)
-    } else if plan.reranking == RerankingPolicy::Gemma {
-        if let Some(spec) = &request.gemma_model {
-            Some(Arc::new(GemmaReranker::load(spec.clone())?) as Arc<dyn Reranker>)
-        } else {
-            Some(Arc::new(GemmaReranker::load(GemmaModelSpec::default())?) as Arc<dyn Reranker>)
-        }
-    } else {
-        None
-    };
-
-    // If we need generative expansion but don't have a reranker (or it's not generative),
-    // load the default Instruct model.
-    let expansion_needs_llm = matches!(
-        plan.query_expansion,
-        QueryExpansionPolicy::Hyde
-            | QueryExpansionPolicy::Splade
-            | QueryExpansionPolicy::Classified
-    );
-
-    if llm_reranker.is_none() && expansion_needs_llm {
-        tracing::info!("loading Instruct model for query expansion...");
-        llm_reranker =
-            Some(Arc::new(QwenReranker::load(QwenModelSpec::default())?) as Arc<dyn Reranker>);
-    }
+    let llm_reranker = SearchServiceBuilder::load_llm_reranker(&plan, request)?;
 
     let service =
         SearchServiceBuilder::build(&plan, embedder, request.query_cache.clone(), llm_reranker, request.prompts.as_ref());

@@ -335,6 +335,7 @@ pub struct QualityEvaluationRequest {
     pub dense_model: DenseModelSpec,
     pub verbose: u8,
     pub query_limit: Option<usize>,
+    pub prompts: Option<crate::config::PromptsConfig>,
 }
 
 #[derive(Debug, Clone)]
@@ -387,12 +388,17 @@ pub fn run_quality_evaluation(
     search_req.verbose = request.verbose;
     search_req.telemetry = telemetry_for_load.clone();
     search_req.query_cache = Some(query_cache.clone());
+    search_req.prompts = request.prompts.clone();
+
+    let env_plan = registry.resolve(&request.strategy)?;
+    let env_llm = crate::search::SearchServiceBuilder::load_llm_reranker(&env_plan, &search_req)?;
 
     let env = crate::search::SearchEnvironment::new(
         &search_req,
         &corpus,
         &index,
         Some(dense_for_load.clone()),
+        env_llm,
     )?;
 
     let (metrics, _telemetry) = evaluate_quality(
@@ -418,12 +424,17 @@ pub fn run_quality_evaluation(
             baseline_req.verbose = request.verbose;
             baseline_req.telemetry = telemetry_for_load.clone();
             baseline_req.query_cache = Some(query_cache.clone());
+            baseline_req.prompts = request.prompts.clone();
+
+            let baseline_plan = registry.resolve(strategy)?;
+            let baseline_llm = crate::search::SearchServiceBuilder::load_llm_reranker(&baseline_plan, &baseline_req)?;
 
             let baseline_env = crate::search::SearchEnvironment::new(
                 &baseline_req,
                 &corpus,
                 &index,
                 Some(dense_for_load.clone()),
+                baseline_llm,
             )?;
             let (m, _) = evaluate_quality(
                 &queries,
@@ -450,12 +461,16 @@ pub fn run_quality_evaluation(
         champion_req.verbose = request.verbose;
         champion_req.telemetry = telemetry_for_load.clone();
         champion_req.query_cache = Some(query_cache.clone());
+        champion_req.prompts = request.prompts.clone();
+
+        let champion_llm = crate::search::SearchServiceBuilder::load_llm_reranker(&champion_plan, &champion_req)?;
 
         let champion_env = crate::search::SearchEnvironment::new(
             &champion_req,
             &corpus,
             &index,
             Some(dense_for_load.clone()),
+            champion_llm,
         )?;
         let (m, _) = evaluate_quality(
             &queries,
@@ -534,11 +549,16 @@ pub fn run_latency_evaluation(
     latency_req.telemetry = telemetry_for_load.clone();
     latency_req.query_cache = Some(query_cache.clone());
 
+    let registry = crate::search::StrategyPresetRegistry::default_registry();
+    let latency_plan = registry.resolve(&request.strategy)?;
+    let latency_llm = crate::search::SearchServiceBuilder::load_llm_reranker(&latency_plan, &latency_req)?;
+
     let env = crate::search::SearchEnvironment::new(
         &latency_req,
         &corpus,
         &index,
         Some(dense_for_load.clone()),
+        latency_llm,
     )?;
 
     let mut timings = Vec::with_capacity(queries.len());
@@ -632,11 +652,15 @@ pub fn run_comparative_evaluation(
         comp_req.telemetry = telemetry_for_load.clone();
         comp_req.query_cache = Some(query_cache.clone());
 
+        let comp_plan = registry.resolve(name)?;
+        let comp_llm = crate::search::SearchServiceBuilder::load_llm_reranker(&comp_plan, &comp_req)?;
+
         let env = crate::search::SearchEnvironment::new(
             &comp_req,
             &corpus,
             &index,
             Some(dense_for_load.clone()),
+            comp_llm,
         )?;
 
         // Quality

@@ -17,6 +17,7 @@ use sift::internal::{
         adapters::qwen::{DEFAULT_QWEN_MODEL_ID, DEFAULT_QWEN_REVISION, QwenModelSpec},
         render_search_response, OutputFormat,
     },
+    optimize::{run_optimization, OptimizeRequest},
     system::Telemetry,
 };
 use sift::{Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift};
@@ -50,6 +51,23 @@ enum Commands {
     Eval {
         #[command(subcommand)]
         command: EvalCommands,
+    },
+    /// Auto-tune prompts to maximize Signal Gain
+    Optimize {
+        #[arg(long)]
+        dataset: Option<Dataset>,
+        #[arg(long)]
+        corpus: Option<PathBuf>,
+        #[arg(long)]
+        queries: Option<PathBuf>,
+        #[arg(long)]
+        qrels: Option<PathBuf>,
+        #[arg(long, default_value_t = 3)]
+        iterations: usize,
+        #[arg(short, long, action = clap::ArgAction::Count)]
+        verbose: u8,
+        #[arg(long)]
+        query_limit: Option<usize>,
     },
     /// Show the applied configuration
     Config,
@@ -409,6 +427,7 @@ fn main() -> Result<()> {
             EvalCommands::Quality { verbose, .. } => *verbose,
             EvalCommands::Latency { verbose, .. } => *verbose,
         },
+        Commands::Optimize { verbose, .. } => *verbose,
         Commands::Search(search) => search.verbose,
         Commands::Config => 0,
     };
@@ -522,6 +541,7 @@ fn main() -> Result<()> {
                         ),
                         verbose,
                         query_limit,
+                        prompts: Some(config.prompts.clone()),
                     },
                     Some(&ignore),
                 )?;
@@ -569,6 +589,7 @@ fn main() -> Result<()> {
                         ),
                         verbose,
                         query_limit,
+                        prompts: Some(config.prompts.clone()),
                     },
                     Some(&ignore),
                 )?;
@@ -612,6 +633,32 @@ fn main() -> Result<()> {
                 )?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
             }
+        },
+        Commands::Optimize {
+            dataset,
+            corpus,
+            queries,
+            qrels,
+            iterations,
+            verbose,
+            query_limit,
+        } => {
+            let (corpus, qrels, queries) = resolve_eval_paths(dataset, corpus, qrels, queries)?;
+            let req = OptimizeRequest {
+                corpus_dir: corpus,
+                queries_path: queries.ok_or_else(|| {
+                    anyhow::anyhow!("queries file must be provided for optimization")
+                })?,
+                qrels_path: qrels.ok_or_else(|| {
+                    anyhow::anyhow!("qrels file must be provided for optimization")
+                })?,
+                shortlist: config.search.shortlist,
+                iterations,
+                command: command_line,
+                verbose,
+                query_limit,
+            };
+            run_optimization(&req, Some(&ignore), &config)?;
         },
         Commands::Config => {
             let toml_string = toml::to_string_pretty(&config)?;

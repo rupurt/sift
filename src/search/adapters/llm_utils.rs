@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::{Result, anyhow, bail};
 use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
-use candle_transformers::models::qwen3::{Config as QwenConfig, Model as QwenModel};
+use candle_transformers::models::qwen2::{Config as QwenConfig, Model as QwenModel};
 use serde::Deserialize;
 use tokenizers::Tokenizer;
 
@@ -91,14 +91,10 @@ impl QwenConfigPartial {
             max_position_embeddings: self.max_position_embeddings,
             rms_norm_eps: self.rms_norm_eps,
             rope_theta: self.rope_theta,
-            use_sliding_window: self.sliding_window.is_some(),
-            sliding_window: Some(self.sliding_window.unwrap_or(self.max_position_embeddings)),
+            use_sliding_window: false,
+            sliding_window: self.sliding_window.unwrap_or(self.max_position_embeddings),
             max_window_layers: self.num_hidden_layers,
             tie_word_embeddings: true,
-            attention_bias: false,
-            head_dim: self
-                .head_dim
-                .unwrap_or(self.hidden_size / self.num_attention_heads),
         })
     }
 }
@@ -169,7 +165,7 @@ pub fn qwen_generate(
             Tensor::new(&[last_token], device)?.unsqueeze(0)?
         };
 
-        let hidden_states = model.forward(&tokens_tensor, tokens.len() - context_size)?;
+        let hidden_states = model.forward(&tokens_tensor, tokens.len() - context_size, None)?;
         let last_hidden = hidden_states.narrow(1, tokens_tensor.dim(1)? - 1, 1)?;
         let logits = last_hidden.apply(&lm_head)?;
         let last_logit = logits.get(0)?.get(0)?;

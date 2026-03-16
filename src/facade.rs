@@ -191,6 +191,7 @@ impl Sift {
                 dense_model,
                 rerank_model,
                 gemma_model,
+                prompts: Some(self.config.prompts.clone()),
                 verbose: input.options.verbose,
                 retrievers: input
                     .options

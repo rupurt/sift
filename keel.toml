@@ -4,3 +4,9 @@ board_dir = ".keel"
 mode = "constrained"
 
 [scoring.modes]
+
+[workflow]
+open_for_work = true
+working_hours_start = 0
+working_hours_end = 24
+working_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]

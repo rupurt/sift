@@ -17,6 +17,7 @@ mod eval;
 mod extract;
 mod facade;
 mod hybrid;
+mod optimize;
 mod search;
 mod segment;
 mod system;
@@ -51,6 +52,10 @@ pub mod internal {
 
     pub mod hybrid {
         pub use crate::hybrid::*;
+    }
+
+    pub mod optimize {
+        pub use crate::optimize::*;
     }
 
     pub mod search {
