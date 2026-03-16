@@ -6,6 +6,7 @@ use anyhow::Result;
 
 use crate::config::{Config, Ignore};
 use crate::dense::DenseModelSpec;
+use crate::search::adapters::gemma::GemmaModelSpec;
 use crate::search::adapters::qwen::QwenModelSpec;
 use crate::search::{
     Embedder, FusionPolicy, LocalFileCorpusRepository, QueryEmbeddingCache, RerankingPolicy,
@@ -48,6 +49,8 @@ pub enum Reranking {
     None,
     PositionAware,
     Llm,
+    Jina,
+    Gemma,
 }
 
 impl From<Reranking> for RerankingPolicy {
@@ -56,6 +59,8 @@ impl From<Reranking> for RerankingPolicy {
             Reranking::None => RerankingPolicy::None,
             Reranking::PositionAware => RerankingPolicy::PositionAware,
             Reranking::Llm => RerankingPolicy::Llm,
+            Reranking::Jina => RerankingPolicy::Jina,
+            Reranking::Gemma => RerankingPolicy::Gemma,
         }
     }
 }
@@ -172,6 +177,7 @@ impl Sift {
             )
         });
         let rerank_model = self.resolve_rerank_model(&strategy, &input.options);
+        let gemma_model = self.resolve_gemma_model(&strategy, &input.options);
         let embedder = self.resolve_embedder(&strategy, &input.options, &dense_model)?;
 
         run_search(
@@ -184,6 +190,7 @@ impl Sift {
                 shortlist,
                 dense_model,
                 rerank_model,
+                gemma_model,
                 verbose: input.options.verbose,
                 retrievers: input
                     .options
@@ -245,6 +252,25 @@ impl Sift {
 
         None
     }
+
+    fn resolve_gemma_model(
+        &self,
+        strategy: &str,
+        options: &SearchOptions,
+    ) -> Option<GemmaModelSpec> {
+        let plan = match resolve_plan(strategy, options) {
+            Ok(plan) => plan,
+            Err(_) => return options.gemma_model.clone(),
+        };
+
+        if options.gemma_model.is_some() || plan.reranking == RerankingPolicy::Gemma {
+            return options.gemma_model.clone().or_else(|| {
+                Some(GemmaModelSpec::default())
+            });
+        }
+
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -284,6 +310,7 @@ pub struct SearchOptions {
     shortlist: Option<usize>,
     dense_model: Option<DenseModelSpec>,
     rerank_model: Option<QwenModelSpec>,
+    gemma_model: Option<GemmaModelSpec>,
     verbose: u8,
     retrievers: Option<Vec<Retriever>>,
     fusion: Option<Fusion>,
@@ -319,6 +346,11 @@ impl SearchOptions {
 
     pub fn with_rerank_model(mut self, rerank_model: QwenModelSpec) -> Self {
         self.rerank_model = Some(rerank_model);
+        self
+    }
+
+    pub fn with_gemma_model(mut self, gemma_model: GemmaModelSpec) -> Self {
+        self.gemma_model = Some(gemma_model);
         self
     }
 

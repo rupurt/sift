@@ -24,6 +24,57 @@ pub struct QwenConfigPartial {
     pub head_dim: Option<usize>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct Gemma3ConfigPartial {
+    pub vocab_size: usize,
+    pub hidden_size: usize,
+    pub intermediate_size: usize,
+    pub num_hidden_layers: usize,
+    pub num_attention_heads: usize,
+    pub num_key_value_heads: usize,
+    pub head_dim: usize,
+    pub rms_norm_eps: f64,
+    pub rope_theta: f64,
+    pub max_position_embeddings: usize,
+    pub attention_bias: bool,
+    pub attn_logit_softcapping: Option<f64>,
+    pub final_logit_softcapping: Option<f64>,
+    pub hidden_activation: Option<String>,
+    pub query_pre_attn_scalar: Option<usize>,
+    pub rope_local_base_freq: f64,
+    pub sliding_window: Option<usize>,
+    pub sliding_window_pattern: Option<usize>,
+}
+
+impl Gemma3ConfigPartial {
+    pub fn into_config(self) -> Result<candle_transformers::models::gemma3::Config> {
+        Ok(candle_transformers::models::gemma3::Config {
+            vocab_size: self.vocab_size,
+            hidden_size: self.hidden_size,
+            intermediate_size: self.intermediate_size,
+            num_hidden_layers: self.num_hidden_layers,
+            num_attention_heads: self.num_attention_heads,
+            num_key_value_heads: self.num_key_value_heads,
+            head_dim: self.head_dim,
+            rms_norm_eps: self.rms_norm_eps,
+            rope_theta: self.rope_theta,
+            max_position_embeddings: self.max_position_embeddings,
+            attention_bias: self.attention_bias,
+            attn_logit_softcapping: self.attn_logit_softcapping,
+            final_logit_softcapping: self.final_logit_softcapping,
+            hidden_activation: match self.hidden_activation.as_deref().unwrap_or("silu") {
+                "silu" => candle_nn::Activation::Silu,
+                "gelu" => candle_nn::Activation::Gelu,
+                _ => bail!("unsupported activation: {:?}", self.hidden_activation),
+            },
+            query_pre_attn_scalar: self.query_pre_attn_scalar.unwrap_or(0),
+            rope_local_base_freq: self.rope_local_base_freq,
+            sliding_window: self.sliding_window.unwrap_or(0),
+            sliding_window_pattern: self.sliding_window_pattern.unwrap_or(0),
+        })
+    }
+}
+
 impl QwenConfigPartial {
     pub fn into_config(self) -> Result<QwenConfig> {
         Ok(QwenConfig {

@@ -59,6 +59,10 @@ pub mod internal {
         pub mod adapters {
             pub use crate::search::adapters::*;
 
+            pub mod gemma {
+                pub use crate::search::adapters::gemma::*;
+            }
+
             pub mod qwen {
                 pub use crate::search::adapters::qwen::*;
             }

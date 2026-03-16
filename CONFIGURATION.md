@@ -68,15 +68,13 @@ Before retrieval, Sift can expand your query to improve recall.
 - **`page-index-hybrid`** (default): Our champion strategy. Combines BM25, Phrase matching, and Vector search, followed by Position-Aware reranking. Defaults to **SPLADE** expansion.
 - **`page-index-llm`**: Combines BM25, Phrase matching, and Vector search, followed by a **Qwen-based LLM reranker**. Defaults to **HyDE** expansion.
 - **`page-index-jina`**: Uses the specialized **Jina Reranker v3** for high-precision ranking. Defaults to **SPLADE** expansion.
+- **`page-index-gemma`**: Uses the **Gemma 3** family of models for deep semantic reranking.
 - **`page-index-splade`**: Uses SPLADE generative expansion for broader keyword recall.
 - **`page-index-classified`**: Uses intent-based classification to expand technical queries.
 - **`page-index`**: Lexical-focused strategy (inspired by qmd). Uses BM25 and Phrase matching with Position-Aware reranking (no vectors).
 - **`bm25`**: Lexical search only. Fast and strictly keyword-based.
 - **`vector`**: Semantic search only. Uses dense embeddings.
 - **`legacy-hybrid`**: Simple BM25 + Vector fusion (no phrase matching or structural bonuses).
-
-#### Search Strategy Matrix
-The table below details exactly how each built-in strategy is configured across the search pipeline.
 
 #### Search Strategy Matrix
 The table below details exactly how each built-in strategy is configured across the search pipeline. These presets are interpreted by the `EngineFactory` to construct a modular `SearchEngine` instance.
@@ -86,6 +84,7 @@ The table below details exactly how each built-in strategy is configured across 
 | `page-index-hybrid` (default) | `splade` | `bm25, phrase, vector` | `rrf` | `position-aware` |
 | `page-index-llm` | `hyde` | `bm25, phrase, vector` | `rrf` | `llm` |
 | `page-index-jina` | `splade` | `bm25, phrase, vector` | `rrf` | `jina` |
+| `page-index-gemma` | `splade` | `bm25, phrase, vector` | `rrf` | `gemma` |
 | `page-index-splade` | `splade` | `bm25, phrase, vector` | `rrf` | `position-aware` |
 | `page-index-classified` | `classified` | `bm25, phrase, vector` | `rrf` | `position-aware` |
 | `page-index` | `none` | `bm25, phrase` | `rrf` | `position-aware` |
@@ -112,17 +111,19 @@ let engine = EngineFactory::default()
 You can override the components of any strategy directly from the CLI:
 
 ```bash
-sift search --intent "fix the bug" --retrievers bm25,phrase --reranking position-aware "my query"
+sift search --intent "fix the bug" --retrievers bm25,phrase --reranking gemma "my query"
 ```
 
 ### Override Flags
 - `--intent`: Explicitly provide search intent/context to guide expansion.
 - `--retrievers`: Comma-separated list (`bm25`, `phrase`, `vector`).
 - `--fusion`: Currently only `rrf` is supported.
-- `--reranking`: `none`, `position-aware`, or `llm`.
+- `--reranking`: `none`, `position-aware`, `llm`, `jina`, or `gemma`.
 - `--shortlist`: Number of fused candidates passed to reranking.
 - `--model-id`: Override the embedding model ID.
-- `--rerank-model-id`: Override the LLM rerank model ID.
+- `--rerank-model-id`: Override the LLM rerank model ID (Qwen).
+- `--gemma-model-id`: Override the Gemma model ID.
+- `--gemma-revision`: Override the Gemma model revision.
 
 `shortlist` controls how many fused candidates are scored by the reranker. It does **not** cap the final output size.
 Higher values can improve reranking quality but increase CPU latency for `page-index-llm`; lower values are usually faster and better for interactive use.
@@ -166,6 +167,9 @@ Applies "soft bonuses" to prioritizing structural matches:
 
 ### LLM Reranking (Qwen)
 Performs a deep semantic pass over the top candidates. It prompts a local LLM to evaluate the relevance of each document to the query, providing the highest accuracy but with more computational overhead.
+
+### Gemma Reranking
+Uses the **Gemma 3** family of models for semantic reranking. Similar to the Qwen-based reranker, it performs deep evaluation of document relevance but leverages the latest Gemma architectures for improved reasoning.
 
 ---
 

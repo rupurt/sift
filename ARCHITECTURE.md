@@ -60,3 +60,25 @@ Stores binary serialized assets, including extracted text, term frequencies, and
 - **Mapped I/O:** Uses `mmap` for reading document blobs to minimize system call overhead.
 - **Query Embedding Cache:** Session-level cache eliminates redundant inference for identical queries.
 - **Structured Telemetry:** Uses the `tracing` crate for waterfall visualization of phase latency.
+
+## Adapters (`src/search/adapters/`)
+
+Adapters implement the core search traits, enabling pluggable behavior across the pipeline:
+
+### 1. Expansion (`Expander`)
+- **LlmExpander:** Uses local LLMs for generative expansion (HyDE, SPLADE, Classified).
+- **SynonymExpander:** Rule-based synonym matching.
+
+### 2. Retrieval (`Retriever`)
+- **Bm25Retriever:** Lexical scoring using the BM25 algorithm.
+- **PhraseRetriever:** High-precision exact phrase matching.
+- **SegmentVectorRetriever:** Semantic scoring via dense vector embeddings.
+
+### 3. Fusion (`Fuser`)
+- **RrfFuser:** Combines multiple candidate lists using Reciprocal Rank Fusion (RRF).
+
+### 4. Reranking (`Reranker`)
+- **PositionAwareReranker:** Applies structural bonuses (filename, heading matches).
+- **QwenReranker:** Deep semantic reranking using the Qwen 2.5 family of models.
+- **GemmaReranker:** Deep semantic reranking using the Gemma 3 family of models.
+- **JinaReranker:** Integration with Jina Reranker v3 for high-precision cross-encoding.

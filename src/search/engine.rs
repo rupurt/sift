@@ -115,12 +115,15 @@ impl EngineFactory {
         if let Some(r) = llm_reranker {
             if plan.reranking == RerankingPolicy::Jina {
                 service.register_reranker_arc(RerankingPolicy::Jina, r);
+            } else if plan.reranking == RerankingPolicy::Gemma {
+                service.register_reranker_arc(RerankingPolicy::Gemma, r);
             } else {
                 service.register_reranker_arc(RerankingPolicy::Llm, r);
             }
         } else {
             service.register_reranker(RerankingPolicy::Llm, Box::new(MockLlmReranker));
             service.register_reranker(RerankingPolicy::Jina, Box::new(MockLlmReranker));
+            service.register_reranker(RerankingPolicy::Gemma, Box::new(MockLlmReranker));
         }
 
         service.register_retriever(Box::new(Bm25Retriever));

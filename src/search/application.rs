@@ -2,6 +2,7 @@ use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use super::adapters::gemma::{GemmaModelSpec, GemmaReranker};
 use super::adapters::jina::{JinaModelSpec, JinaReranker};
 use super::adapters::qwen::{QwenModelSpec, QwenReranker};
 use super::adapters::*;
@@ -47,12 +48,15 @@ impl SearchServiceBuilder {
         if let Some(r) = llm_reranker {
             if plan.reranking == RerankingPolicy::Jina {
                 service.register_reranker_arc(RerankingPolicy::Jina, r);
+            } else if plan.reranking == RerankingPolicy::Gemma {
+                service.register_reranker_arc(RerankingPolicy::Gemma, r);
             } else {
                 service.register_reranker_arc(RerankingPolicy::Llm, r);
             }
         } else {
             service.register_reranker(RerankingPolicy::Llm, Box::new(MockLlmReranker));
             service.register_reranker(RerankingPolicy::Jina, Box::new(MockLlmReranker));
+            service.register_reranker(RerankingPolicy::Gemma, Box::new(MockLlmReranker));
         }
 
         // Register retrievers
@@ -237,6 +241,22 @@ impl StrategyPresetRegistry {
                 ],
                 fusion: FusionPolicy::Rrf,
                 reranking: RerankingPolicy::Jina,
+            },
+        );
+
+        // page-index-gemma (Gemma 3)
+        registry.register(
+            "page-index-gemma",
+            SearchPlan {
+                name: "page-index-gemma".to_string(),
+                query_expansion: QueryExpansionPolicy::Splade,
+                retrievers: vec![
+                    RetrieverPolicy::Bm25,
+                    RetrieverPolicy::Phrase,
+                    RetrieverPolicy::Vector,
+                ],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::Gemma,
             },
         );
 
@@ -577,6 +597,12 @@ pub fn run_search(
         }
     } else if plan.reranking == RerankingPolicy::Jina {
         Some(Arc::new(JinaReranker::load(JinaModelSpec::default())?) as Arc<dyn Reranker>)
+    } else if plan.reranking == RerankingPolicy::Gemma {
+        if let Some(spec) = &request.gemma_model {
+            Some(Arc::new(GemmaReranker::load(spec.clone())?) as Arc<dyn Reranker>)
+        } else {
+            Some(Arc::new(GemmaReranker::load(GemmaModelSpec::default())?) as Arc<dyn Reranker>)
+        }
     } else {
         None
     };

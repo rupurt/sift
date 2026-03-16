@@ -8,19 +8,19 @@ use sift::internal::{
     config::{Config, Ignore},
     dense::DenseModelSpec,
     eval::{
-        LatencyEvaluationRequest, QualityEvaluationRequest, download_scifact_dataset,
-        materialize_scifact_dir, render_comparative_report, run_comparative_evaluation,
-        run_latency_evaluation, run_quality_evaluation,
+        download_scifact_dataset, materialize_scifact_dir, render_comparative_report,
+        run_comparative_evaluation, run_latency_evaluation, run_quality_evaluation,
+        LatencyEvaluationRequest, QualityEvaluationRequest,
     },
     search::{
-        OutputFormat,
+        adapters::gemma::{DEFAULT_GEMMA_MODEL_ID, DEFAULT_GEMMA_REVISION, GemmaModelSpec},
         adapters::qwen::{DEFAULT_QWEN_MODEL_ID, DEFAULT_QWEN_REVISION, QwenModelSpec},
-        render_search_response,
+        render_search_response, OutputFormat,
     },
     system::Telemetry,
 };
 use sift::{Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift};
-use tracing_subscriber::{EnvFilter, fmt, prelude::*};
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
 #[cfg(test)]
 mod versioning;
@@ -94,6 +94,12 @@ struct SearchCommand {
     rerank_revision: Option<String>,
 
     #[arg(long)]
+    gemma_model_id: Option<String>,
+
+    #[arg(long)]
+    gemma_revision: Option<String>,
+
+    #[arg(long)]
     max_length: Option<usize>,
 
     #[arg(short, long, action = clap::ArgAction::Count)]
@@ -155,6 +161,10 @@ enum SearchReranking {
     PositionAware,
     #[value(name = "llm")]
     Llm,
+    #[value(name = "jina")]
+    Jina,
+    #[value(name = "gemma")]
+    Gemma,
 }
 
 impl From<SearchReranking> for Reranking {
@@ -163,6 +173,8 @@ impl From<SearchReranking> for Reranking {
             SearchReranking::None => Reranking::None,
             SearchReranking::PositionAware => Reranking::PositionAware,
             SearchReranking::Llm => Reranking::Llm,
+            SearchReranking::Jina => Reranking::Jina,
+            SearchReranking::Gemma => Reranking::Gemma,
         }
     }
 }
@@ -205,6 +217,9 @@ impl SearchCommand {
         }
         if let Some(rerank_model) = self.resolve_rerank_model(config) {
             options = options.with_rerank_model(rerank_model);
+        }
+        if let Some(gemma_model) = self.resolve_gemma_model(config) {
+            options = options.with_gemma_model(gemma_model);
         }
         if let Some(retrievers) = &self.retrievers {
             options = options.with_retrievers(retrievers.iter().copied().map(Into::into).collect());
@@ -252,6 +267,24 @@ impl SearchCommand {
                 .or(Some(config.rerank.model_revision.clone()))
                 .unwrap_or_else(|| DEFAULT_QWEN_REVISION.to_string()),
             max_length: config.rerank.max_length,
+        })
+    }
+
+    fn resolve_gemma_model(&self, _config: &Config) -> Option<GemmaModelSpec> {
+        if self.gemma_model_id.is_none() && self.gemma_revision.is_none() {
+            return None;
+        }
+
+        Some(GemmaModelSpec {
+            model_id: self
+                .gemma_model_id
+                .clone()
+                .unwrap_or_else(|| DEFAULT_GEMMA_MODEL_ID.to_string()),
+            revision: self
+                .gemma_revision
+                .clone()
+                .unwrap_or_else(|| DEFAULT_GEMMA_REVISION.to_string()),
+            max_length: 512,
         })
     }
 }

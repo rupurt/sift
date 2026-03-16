@@ -38,6 +38,7 @@ use std::sync::{Arc, RwLock};
 pub type QueryEmbeddingCache = Arc<RwLock<HashMap<String, Vec<f32>>>>;
 
 use crate::search::adapters::qwen::QwenModelSpec;
+use crate::search::adapters::gemma::GemmaModelSpec;
 
 #[derive(Debug, Clone)]
 pub struct SearchRequest {
@@ -49,6 +50,7 @@ pub struct SearchRequest {
     pub shortlist: usize,
     pub dense_model: DenseModelSpec,
     pub rerank_model: Option<QwenModelSpec>,
+    pub gemma_model: Option<GemmaModelSpec>,
     pub verbose: u8,
     pub retrievers: Option<Vec<RetrieverPolicy>>,
     pub fusion: Option<FusionPolicy>,
@@ -69,6 +71,7 @@ impl SearchRequest {
             shortlist: 10,
             dense_model: DenseModelSpec::default(),
             rerank_model: None,
+            gemma_model: None,
             verbose: 0,
             retrievers: None,
             fusion: None,
@@ -334,6 +337,7 @@ pub enum RerankingPolicy {
     PositionAware,
     Llm,
     Jina,
+    Gemma,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

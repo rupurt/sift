@@ -1,9 +1,11 @@
 pub mod cli;
+pub mod gemma;
 pub mod jina;
 pub mod llm_utils;
 pub mod qwen;
 
 pub use self::cli::*;
+pub use self::gemma::*;
 pub use self::jina::*;
 pub use self::llm_utils::*;
 pub use self::qwen::*;
