@@ -13,6 +13,8 @@ pub struct Config {
     pub embedding: EmbeddingConfig,
     #[serde(default)]
     pub rerank: RerankConfig,
+    #[serde(default)]
+    pub gemma: GemmaConfig,
 }
 
 pub struct Ignore {
@@ -92,6 +94,16 @@ pub struct RerankConfig {
     pub max_length: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GemmaConfig {
+    #[serde(default = "default_gemma_model_id")]
+    pub model_id: String,
+    #[serde(default = "default_gemma_model_revision")]
+    pub model_revision: String,
+    #[serde(default = "default_gemma_max_length")]
+    pub max_length: usize,
+}
+
 fn default_strategy() -> String {
     "hybrid".to_string()
 }
@@ -121,6 +133,16 @@ fn default_rerank_max_length() -> usize {
     crate::search::adapters::qwen::DEFAULT_QWEN_MAX_LENGTH
 }
 
+fn default_gemma_model_id() -> String {
+    crate::search::adapters::gemma::DEFAULT_GEMMA_MODEL_ID.to_string()
+}
+fn default_gemma_model_revision() -> String {
+    crate::search::adapters::gemma::DEFAULT_GEMMA_REVISION.to_string()
+}
+fn default_gemma_max_length() -> usize {
+    crate::search::adapters::gemma::DEFAULT_GEMMA_MAX_LENGTH
+}
+
 impl Default for SearchConfig {
     fn default() -> Self {
         Self {
@@ -147,6 +169,16 @@ impl Default for RerankConfig {
             model_id: default_rerank_model_id(),
             model_revision: default_rerank_model_revision(),
             max_length: default_rerank_max_length(),
+        }
+    }
+}
+
+impl Default for GemmaConfig {
+    fn default() -> Self {
+        Self {
+            model_id: default_gemma_model_id(),
+            model_revision: default_gemma_model_revision(),
+            max_length: default_gemma_max_length(),
         }
     }
 }
@@ -260,6 +292,18 @@ impl Config {
             }
         }
 
+        if let Some(gemma) = partial.gemma {
+            if let Some(model_id) = gemma.model_id {
+                self.gemma.model_id = model_id;
+            }
+            if let Some(model_revision) = gemma.model_revision {
+                self.gemma.model_revision = model_revision;
+            }
+            if let Some(max_length) = gemma.max_length {
+                self.gemma.max_length = max_length;
+            }
+        }
+
         Ok(())
     }
 }
@@ -270,6 +314,7 @@ struct PartialConfig {
     embedding: Option<PartialModelConfig>,
     model: Option<PartialModelConfig>, // Legacy
     rerank: Option<PartialModelConfig>,
+    gemma: Option<PartialModelConfig>,
 }
 
 #[derive(Debug, Deserialize)]

@@ -13,7 +13,7 @@ use sift::internal::{
         LatencyEvaluationRequest, QualityEvaluationRequest,
     },
     search::{
-        adapters::gemma::{DEFAULT_GEMMA_MODEL_ID, DEFAULT_GEMMA_REVISION, GemmaModelSpec},
+        adapters::gemma::GemmaModelSpec,
         adapters::qwen::{DEFAULT_QWEN_MODEL_ID, DEFAULT_QWEN_REVISION, QwenModelSpec},
         render_search_response, OutputFormat,
     },
@@ -92,12 +92,6 @@ struct SearchCommand {
 
     #[arg(long)]
     rerank_revision: Option<String>,
-
-    #[arg(long)]
-    gemma_model_id: Option<String>,
-
-    #[arg(long)]
-    gemma_revision: Option<String>,
 
     #[arg(long)]
     max_length: Option<usize>,
@@ -218,9 +212,7 @@ impl SearchCommand {
         if let Some(rerank_model) = self.resolve_rerank_model(config) {
             options = options.with_rerank_model(rerank_model);
         }
-        if let Some(gemma_model) = self.resolve_gemma_model(config) {
-            options = options.with_gemma_model(gemma_model);
-        }
+        options = options.with_gemma_model(self.resolve_gemma_model(config));
         if let Some(retrievers) = &self.retrievers {
             options = options.with_retrievers(retrievers.iter().copied().map(Into::into).collect());
         }
@@ -270,22 +262,12 @@ impl SearchCommand {
         })
     }
 
-    fn resolve_gemma_model(&self, _config: &Config) -> Option<GemmaModelSpec> {
-        if self.gemma_model_id.is_none() && self.gemma_revision.is_none() {
-            return None;
+    fn resolve_gemma_model(&self, config: &Config) -> GemmaModelSpec {
+        GemmaModelSpec {
+            model_id: config.gemma.model_id.clone(),
+            revision: config.gemma.model_revision.clone(),
+            max_length: config.gemma.max_length,
         }
-
-        Some(GemmaModelSpec {
-            model_id: self
-                .gemma_model_id
-                .clone()
-                .unwrap_or_else(|| DEFAULT_GEMMA_MODEL_ID.to_string()),
-            revision: self
-                .gemma_revision
-                .clone()
-                .unwrap_or_else(|| DEFAULT_GEMMA_REVISION.to_string()),
-            max_length: 512,
-        })
     }
 }
 

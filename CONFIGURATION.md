@@ -85,7 +85,7 @@ The table below details exactly how each built-in strategy is configured across 
 | `page-index-llm` | `hyde` | `bm25, phrase, vector` | `rrf` | `llm` |
 | `page-index-jina` | `splade` | `bm25, phrase, vector` | `rrf` | `jina` |
 | `page-index-gemma` | `splade` | `bm25, phrase, vector` | `rrf` | `gemma` |
-| `page-index-splade` | `splade` | `bm25, phrase, vector` | `rrf` | `position-aware` |
+| `page-index-splade` | `splade" | `bm25, phrase, vector` | `rrf` | `position-aware` |
 | `page-index-classified` | `classified` | `bm25, phrase, vector` | `rrf` | `position-aware` |
 | `page-index` | `none` | `bm25, phrase` | `rrf` | `position-aware` |
 | `bm25` | `none` | `bm25` | `rrf` | `none` |
@@ -122,8 +122,6 @@ sift search --intent "fix the bug" --retrievers bm25,phrase --reranking gemma "m
 - `--shortlist`: Number of fused candidates passed to reranking.
 - `--model-id`: Override the embedding model ID.
 - `--rerank-model-id`: Override the LLM rerank model ID (Qwen).
-- `--gemma-model-id`: Override the Gemma model ID.
-- `--gemma-revision`: Override the Gemma model revision.
 
 `shortlist` controls how many fused candidates are scored by the reranker. It does **not** cap the final output size.
 Higher values can improve reranking quality but increase CPU latency for `page-index-llm`; lower values are usually faster and better for interactive use.
@@ -148,12 +146,24 @@ These settings control the local machine learning model used for semantic vector
 
 ### `[rerank]` Section
 
-These settings control the local LLM model used for semantic reranking.
+These settings control the local LLM model used for semantic reranking (Qwen).
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `model_id` | String | `"Qwen/Qwen2.5-0.5B-Instruct"` | HuggingFace model ID for the reranker. |
 | `model_revision` | String | `"main"` | The specific git revision/branch of the rerank model. |
+| `max_length` | Integer | `512` | Maximum sequence length (tokens) for reranking. |
+
+---
+
+### `[gemma]` Section
+
+These settings control the local Gemma 3 model used for semantic reranking.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `model_id` | String | `"google/gemma-3-1b-it"` | HuggingFace model ID for the gemma reranker. |
+| `model_revision` | String | `"main"` | The specific git revision/branch of the gemma model. |
 | `max_length` | Integer | `512` | Maximum sequence length (tokens) for reranking. |
 
 ---

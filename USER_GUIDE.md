@@ -68,7 +68,13 @@ You can manually override components of any search:
 sift search --retrievers bm25 --limit 5 "query"
 ```
 
-## Configuration
+To use a specific reranking model families via CLI:
+```bash
+sift search --reranking gemma "query"
+sift search --reranking llm "query"
+```
+
+To customize specific model IDs, update your `sift.toml`.
 
 Sift is "zero-config" by default, but you can customize its behavior using a `sift.toml` file.
 
