@@ -9,47 +9,45 @@ id: 1vzMXf000
 | Factor | Score | Rationale |
 |--------|-------|-----------|
 | Impact | 5 | Format coverage is the next major recall bottleneck now that text-only hybrid retrieval works end to end. [SRC-01] |
-| Confidence | 4 | The ecosystem has viable Rust-native libraries for HTML, text-bearing PDFs, and OOXML Office extraction. [SRC-01, SRC-03, SRC-05] |
+| Confidence | 4 | The ecosystem has viable Rust-native libraries for HTML, text-bearing PDFs, and OOXML Office extraction. [SRC-01] [SRC-03] [SRC-05] |
 | Effort | 4 | The work spans extractor abstraction, fixtures, format-specific normalization, and benchmark updates. [SRC-04] |
-| Risk | 3 | Main risks are extraction quality and dependency fit, not fundamental feasibility. [SRC-02, SRC-05] |
+| Risk | 3 | Main risks are extraction quality and dependency fit, not fundamental feasibility. [SRC-02] [SRC-05] |
 
-*Scores range from 1-5:*
-- 1 = Very Low
-- 2 = Low
-- 3 = Medium
-- 4 = High
-- 5 = Very High
+*Scores range from 1-5 (1=Very Low, 5=Very High)*
 
 ## Analysis
 
-### Opportunity Cost
+### Overview
+Format coverage is the next major recall bottleneck now that text-only hybrid retrieval works end to end.
 
-Pursuing rich document support delays deeper ranking work such as chunking, query-time caching, and more aggressive hybrid fusion tuning. That tradeoff is acceptable because unsupported formats are a larger practical recall gap than another small ranking iteration on text-only corpora [SRC-01, SRC-03].
+## Opportunity Cost
 
-### Findings
+Pursuing rich document support delays deeper ranking work such as chunking, query-time caching, and more aggressive hybrid fusion tuning. That tradeoff is acceptable because unsupported formats are a larger practical recall gap than another small ranking iteration on text-only corpora [SRC-01] [SRC-03]
 
-- Pure-Rust extraction libraries exist for all three target format families: PDF, HTML, and OOXML [SRC-01, SRC-03, SRC-05].
-- `html5ever` provides a robust parser foundation if lighter-weight `html2text` proves insufficient [SRC-04].
-- `pdf_oxide` offers a broader PDF processing stack as an alternative to `pdf-extract` [SRC-02].
+## Findings
 
-### Dependencies
+- Pure-Rust extraction libraries exist for all three target format families: PDF, HTML, and OOXML [SRC-01] [SRC-03] [SRC-05]
+- `html5ever` provides a robust parser foundation if lighter-weight `html2text` proves insufficient [SRC-04]
+- `pdf_oxide` offers a broader PDF processing stack as an alternative to `pdf-extract` [SRC-02]
+
+## Dependencies
 
 The following need to hold:
 
-- The chosen extraction crates must stay compatible with Linux and macOS in a pure-Rust, in-process path [SRC-01, SRC-03, SRC-05].
-- Sift needs a narrow extractor interface so new formats do not fork the search or benchmark codepaths [SRC-04].
-- The next stories must include local fixtures and evidence for extraction correctness, not just happy-path parsing [SRC-01, SRC-02].
+- The chosen extraction crates must stay compatible with Linux and macOS in a pure-Rust, in-process path [SRC-01] [SRC-03] [SRC-05]
+- Sift needs a narrow extractor interface so new formats do not fork the search or benchmark codepaths [SRC-04]
+- The next stories must include local fixtures and evidence for extraction correctness, not just happy-path parsing [SRC-01] [SRC-02]
 
-### Alternatives Considered
+## Alternatives Considered
 
-- **Text-Only:** Stay text-only for longer. Rejected because the user objective explicitly continues into richer formats [SRC-03].
-- **External Converters:** Shell out to system converters such as LibreOffice, Pandoc, or PDF toolkits. Rejected because this weakens the single-binary/local-runtime contract [SRC-01].
-- **Hand-Roll Extractors:** Hand-roll every extractor from ZIP/XML/PDF primitives. Rejected because it increases implementation cost without evidence that the existing Rust libraries are inadequate [SRC-05].
+- **Text-Only:** Stay text-only for longer. Rejected because the user objective explicitly continues into richer formats [SRC-03]
+- **External Converters:** Shell out to system converters such as LibreOffice, Pandoc, or PDF toolkits. Rejected because this weakens the single-binary/local-runtime contract [SRC-01]
+- **Hand-Roll Extractors:** Hand-roll every extractor from ZIP/XML/PDF primitives. Rejected because it increases implementation cost without evidence that the existing Rust libraries are inadequate [SRC-05]
 
 ## Recommendation
 
-[x] Proceed → convert to epic [SRC-01, SRC-03, SRC-05]
-[ ] Park → revisit later
-[ ] Decline → document learnings
+- [x] Proceed → convert to epic [SRC-01] [SRC-03] [SRC-05]
+- [ ] Park → revisit later
+- [ ] Decline → document learnings
 
-Proceed with a new epic focused on rich document ingestion. Recommended sequence: HTML (`html2text`), then PDF (`pdf-extract`), then OOXML (`undoc`) [SRC-01, SRC-03, SRC-05].
+Proceed with a new epic focused on rich document ingestion. Recommended sequence: HTML (`html2text`), then PDF (`pdf-extract`), then OOXML (`undoc`) [SRC-01] [SRC-03] [SRC-05]
