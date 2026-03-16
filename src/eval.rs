@@ -273,9 +273,17 @@ pub struct QualityMetrics {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ReactorMetrics {
+    pub shortlist_compression: f64,
+    pub signal_gain: f64,
+    pub emission_fidelity: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct QualityEvaluationReport {
     pub metadata: EvaluationMetadata,
     pub metrics: QualityMetrics,
+    pub reactor_metrics: Option<ReactorMetrics>,
     pub baseline_metrics: Option<QualityMetrics>,
     pub champion_metrics: Option<QualityMetrics>,
     pub delta: Option<QualityMetrics>,
@@ -312,6 +320,7 @@ pub struct StrategyComparison {
     pub quality: QualityMetrics,
     pub latency: LatencyMetrics,
     pub telemetry: Option<crate::search::SearchTelemetry>,
+    pub reactor_metrics: Option<ReactorMetrics>,
 }
 
 #[derive(Debug, Clone)]
@@ -465,6 +474,11 @@ pub fn run_quality_evaluation(
         .as_ref()
         .map(|baseline| quality_delta(&metrics, baseline));
 
+    let signal_gain = baseline_metrics
+        .as_ref()
+        .map(|baseline| metrics.ndcg_at_10 - baseline.ndcg_at_10)
+        .unwrap_or(0.0);
+
     Ok(QualityEvaluationReport {
         metadata: build_metadata(
             &request.strategy,
@@ -476,6 +490,11 @@ pub fn run_quality_evaluation(
             Some(&request.dense_model),
         ),
         metrics,
+        reactor_metrics: Some(ReactorMetrics {
+            shortlist_compression: request.shortlist as f64 / 10.0,
+            signal_gain,
+            emission_fidelity: 1.0,
+        }),
         baseline_metrics,
         champion_metrics,
         delta,
@@ -668,6 +687,11 @@ pub fn run_comparative_evaluation(
             quality,
             latency,
             telemetry: Some(telemetry),
+            reactor_metrics: Some(ReactorMetrics {
+                shortlist_compression: request.shortlist as f64 / 10.0, // Placeholder ratio
+                signal_gain: 0.0, // Calculated later against baseline
+                emission_fidelity: 1.0, // Placeholder
+            }),
         });
 
         metadata.push(build_metadata(
@@ -681,6 +705,19 @@ pub fn run_comparative_evaluation(
         ));
     }
 
+    // Calculate signal gain against bm25 baseline
+    let baseline_ndcg = results
+        .iter()
+        .find(|r| r.strategy == "bm25")
+        .map(|r| r.quality.ndcg_at_10)
+        .unwrap_or(0.0);
+
+    for res in &mut results {
+        if let Some(rm) = &mut res.reactor_metrics {
+            rm.signal_gain = res.quality.ndcg_at_10 - baseline_ndcg;
+        }
+    }
+
     Ok(ComparativeEvaluationReport { metadata, results })
 }
 
@@ -691,18 +728,18 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
     writeln!(out, "\x1b[1mComparative Search Strategy Evaluation\x1b[0m").unwrap();
     writeln!(
         out,
-        "──────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
+        "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
     )
     .unwrap();
     writeln!(
         out,
-        "{:<25} {:<12} {:>10} {:>10} {:>10} {:>12} {:>15}",
-        "Strategy", "Expansion", "nDCG@10", "MRR@10", "Recall@10", "p50 (ms)", "Cache Hits"
+        "{:<25} {:<12} {:>10} {:>10} {:>10} {:>10} {:>10} {:>12} {:>15}",
+        "Strategy", "Expansion", "nDCG@10", "MRR@10", "Recall@10", "S-Compress", "S-Gain", "p50 (ms)", "Cache Hits"
     )
     .unwrap();
     writeln!(
         out,
-        "──────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
+        "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
     )
     .unwrap();
 
@@ -718,6 +755,11 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
         .map(|r| r.quality.recall_at_10)
         .collect();
     let latencies: Vec<f64> = report.results.iter().map(|r| r.latency.p50_ms).collect();
+    let gains: Vec<f64> = report
+        .results
+        .iter()
+        .map(|r| r.reactor_metrics.as_ref().map(|m| m.signal_gain).unwrap_or(0.0))
+        .collect();
 
     for res in &report.results {
         let bar = render_bar(res.quality.ndcg_at_10, 10);
@@ -736,15 +778,21 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
         let mrr_c = get_color(res.quality.mrr_at_10, &mrrs, true);
         let recall_c = get_color(res.quality.recall_at_10, &recalls, true);
         let lat_c = get_color(res.latency.p50_ms, &latencies, false);
+        
+        let signal_gain = res.reactor_metrics.as_ref().map(|m| m.signal_gain).unwrap_or(0.0);
+        let s_compress = res.reactor_metrics.as_ref().map(|m| m.shortlist_compression).unwrap_or(0.0);
+        let gain_c = get_color(signal_gain, &gains, true);
 
         writeln!(
             out,
-            "{}{:<25}\x1b[0m {:<12} {}{:>10.4}\x1b[0m {}{:>10.4}\x1b[0m {}{:>10.4}\x1b[0m {}{:>12.2}\x1b[0m {:>15}  {}",
+            "{}{:<25}\x1b[0m {:<12} {}{:>10.4}\x1b[0m {}{:>10.4}\x1b[0m {}{:>10.4}\x1b[0m {:>10.2} {}{:>10.4}\x1b[0m {}{:>12.2}\x1b[0m {:>15}  {}",
             ndcg_c, res.strategy, // Use nDCG color for strategy name
             res.expansion,
             ndcg_c, res.quality.ndcg_at_10,
             mrr_c, res.quality.mrr_at_10,
             recall_c, res.quality.recall_at_10,
+            s_compress,
+            gain_c, signal_gain,
             lat_c, res.latency.p50_ms,
             hits,
             bar
@@ -753,7 +801,7 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
     }
     writeln!(
         out,
-        "──────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
+        "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
     )
     .unwrap();
 
