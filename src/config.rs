@@ -15,6 +15,8 @@ pub struct Config {
     pub rerank: RerankConfig,
     #[serde(default)]
     pub gemma: GemmaConfig,
+    #[serde(default)]
+    pub prompts: PromptsConfig,
 }
 
 pub struct Ignore {
@@ -102,6 +104,23 @@ pub struct GemmaConfig {
     pub model_revision: String,
     #[serde(default = "default_gemma_max_length")]
     pub max_length: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptsConfig {
+    pub hyde: Option<String>,
+    pub splade: Option<String>,
+    pub classified: Option<String>,
+}
+
+impl Default for PromptsConfig {
+    fn default() -> Self {
+        Self {
+            hyde: None,
+            splade: None,
+            classified: None,
+        }
+    }
 }
 
 fn default_strategy() -> String {
@@ -304,6 +323,18 @@ impl Config {
             }
         }
 
+        if let Some(prompts) = partial.prompts {
+            if let Some(hyde) = prompts.hyde {
+                self.prompts.hyde = Some(hyde);
+            }
+            if let Some(splade) = prompts.splade {
+                self.prompts.splade = Some(splade);
+            }
+            if let Some(classified) = prompts.classified {
+                self.prompts.classified = Some(classified);
+            }
+        }
+
         Ok(())
     }
 }
@@ -315,6 +346,14 @@ struct PartialConfig {
     model: Option<PartialModelConfig>, // Legacy
     rerank: Option<PartialModelConfig>,
     gemma: Option<PartialModelConfig>,
+    prompts: Option<PartialPromptsConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+struct PartialPromptsConfig {
+    hyde: Option<String>,
+    splade: Option<String>,
+    classified: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

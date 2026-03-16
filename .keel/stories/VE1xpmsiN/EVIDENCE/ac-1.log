@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-16T05:07:58.503912137-07:00
+mode: manual
+---
+Added PromptsConfig struct and added it to Config.

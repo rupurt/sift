@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-16T05:08:02.257765067-07:00
+mode: manual
+---
+Updated merge_file and PartialConfig to correctly parse the prompts section.

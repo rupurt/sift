@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-16T05:08:06.029287024-07:00
+mode: manual
+---
+Implemented Default trait for PromptsConfig with None fallbacks.
