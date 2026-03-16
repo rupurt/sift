@@ -110,7 +110,7 @@ just sift optimize --dataset scifact --iterations 3
 We use `criterion` for high-precision measurement of hot-path functions like tokenization and scoring.
 
 ```bash
-just sift-bench
+just bench
 ```
 
 ### Flamegraphs
@@ -118,7 +118,7 @@ Identify CPU bottlenecks and visualize where time is being spent in the search p
 
 ```bash
 # Requires cargo-flamegraph installed
-just sift-flamegraph all --dataset scifact
+just flamegraph all --dataset scifact
 ```
 
 ---
