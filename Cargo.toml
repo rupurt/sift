@@ -55,6 +55,9 @@ tempfile = "3.26.0"
 name = "search_bench"
 harness = false
 
+[profile.release]
+debug = true
+
 # The profile that 'cargo dist' will build with
 [profile.dist]
 inherits = "release"
