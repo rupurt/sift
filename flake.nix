@@ -35,6 +35,7 @@
           rust
           pkgs.just
           pkgs.cargo-nextest
+          pkgs.cargo-flamegraph
           pkgs.bzip2
           pkgs.xz
           pkgs.zlib
