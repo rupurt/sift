@@ -4,10 +4,10 @@
 
 | Factor | Score | Rationale |
 |--------|-------|-----------|
-| Impact | 5 | Drastically reduces latency for repeat queries (seconds to milliseconds). |
-| Confidence | 4 | Zig has proven this model at scale. File locking and `bincode` are well-understood in Rust. |
-| Effort | 3 | Requires restructuring `PreparedCorpus` to build around cache logic. |
-| Risk | 2 | The primary risk is cache invalidation bugs leading to stale results. |
+| Impact | 5 | Drastically reduces latency for repeat queries (seconds to milliseconds). [SRC-01] |
+| Confidence | 4 | Zig has proven this model at scale. File locking and `bincode` are well-understood in Rust. [SRC-01] |
+| Effort | 3 | Requires restructuring `PreparedCorpus` to build around cache logic. [SRC-02] |
+| Risk | 2 | The primary risk is cache invalidation bugs leading to stale results. [SRC-02] |
 
 *Scores range from 1-5:*
 - 1 = Very Low
@@ -20,7 +20,7 @@
 
 ### Opportunity Cost
 
-The main opportunity cost is the time spent building binary serialization and file locks instead of adding more retrieval capabilities. This is an acceptable trade because the current system cannot scale to larger repos without a massive slowdown.
+The main opportunity cost is the time spent building binary serialization and file locks instead of adding more retrieval capabilities. This is an acceptable trade because the current system cannot scale to larger repos without a massive slowdown. [SRC-01]
 
 ### Findings
 
@@ -36,18 +36,13 @@ The following must hold:
 
 ### Alternatives Considered
 
-Alternatives considered:
-
-- Global Flat File Index.
-  Rejected because concurrent writes require global file locks, becoming a bottleneck. [SRC-01]
-- Per-Project `.sift/cache-manifest`.
-  Rejected because it violates the zero-friction constraint by writing artifacts to the user's project directory. [SRC-02]
-- Global Directory of Manifests by Path Hash.
-  Recommended. Keeps user directory untouched and minimizes global locking conflicts. [SRC-01]
+- **Global Flat File Index:** Rejected because concurrent writes require global file locks, becoming a bottleneck. [SRC-01]
+- **Per-Project `.sift/cache-manifest`:** Rejected because it violates the zero-friction constraint by writing artifacts to the user's project directory. [SRC-02]
+- **Global Directory of Manifests by Path Hash:** Recommended. Keeps user directory untouched and minimizes global locking conflicts. [SRC-01]
 
 ## Recommendation
 
-- [x] Proceed → convert to epic [SRC-01] [SRC-02]
+- [x] Proceed → convert to epic [SRC-01] [SRC-01] [SRC-02]
 - [ ] Park → revisit later
 - [ ] Decline → document learnings
 

@@ -4,6 +4,26 @@ id: 1vzSne000
 
 # True Hybrid Retrieval Architecture — Survey
 
+## Overview
+
+This research explores replacing sift's current rerank-only pipeline with "true" hybrid retrieval, which combines independent lexical (BM25) and semantic (Vector) retrieval channels followed by a fusion stage.
+
+## Feasibility
+
+A pure-Rust implementation is feasible. Candle provides a stable CPU inference path [SRC-03], while PageIndex's architecture offers a proven model for section-aware retrieval and aggregation [SRC-01, SRC-02]. Reciprocal Rank Fusion (RRF) is a simple, effective algorithm for combining independent ranked lists [SRC-05].
+
+## Key Findings
+
+1. Sift's current `hybrid` engine is a rerank pipeline, not true hybrid retrieval.
+2. True hybrid retrieval should replace the dense rerank stage with independent vector retrieval over structure-aware sections [SRC-01, SRC-02].
+3. PageIndex provides strong architectural guidance: retrieve chunks, aggregate to parent docs/nodes, and return the parent object [SRC-01].
+4. The first true-hybrid slice should use exact in-memory vector search over section embeddings rather than ANN or persisted indices [SRC-03].
+
+## Unknowns
+
+- Can exact vector search over all sections in a large corpus stay within the 200ms latency target?
+- What is the quality impact of the section-to-document score aggregation algorithm?
+
 ## Market Research
 
 ### Existing Solutions

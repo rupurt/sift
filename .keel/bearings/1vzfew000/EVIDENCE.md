@@ -4,6 +4,21 @@
 
 We need a caching strategy that relies on file system heuristics (like Zig) rather than a persistent sidecar daemon or database process. This allows `sift` to be as fast as a compiler while retaining the zero-setup CLI experience.
 
+## Feasibility
+
+Heuristic-based caching is highly feasible in Rust using standard library `std::fs::Metadata` and the `blake3` crate for fast hashing [SRC-01]. Advisory file locking via `fs4` ensures safe concurrent access to global cache manifests [SRC-02].
+
+## Key Findings
+
+- Zig's model of mapping `(mtime, size, inode)` to a content hash allows for O(1) change detection on subsequent runs [SRC-01].
+- Decoupling the Metadata Store from the Content-Addressable Storage (CAS) allows the same blob to be reused across different projects [SRC-01].
+- Maintaining a "database-free" architecture requires partitioning manifests by project path to avoid global write contention [SRC-02].
+
+## Unknowns
+
+- How will `inode` stability behave across different filesystems (e.g., networked drives or Docker mounts)?
+- What is the performance impact of loading very large (1GB+) project manifests into memory?
+
 ## Analysis of Zig's Caching Model
 
 Zig achieves incredibly fast incremental builds without databases by leveraging the file system directly:

@@ -7,13 +7,13 @@
 
 | Bearing | Status | Evidence | Assessment | Readiness | EV | Laid |
 |---------|--------|----------|------------|-----------|----|------|
-| [Raw Document Retrieval Architecture Research](bearings/1vzJVa000/) | laid | ✓ | ✓ | decision-ready | 3.47 | ✓ |
-| [Rich Document Extraction Support](bearings/1vzMXf000/) | laid | ✓ | ✓ | decision-ready | 3.34 | ✓ |
-| [True Hybrid Retrieval Architecture](bearings/1vzSne000/) | laid | ✓ | ✓ | decision-ready | 2.59 | ✓ |
-| [Composable Search Strategy Architecture](bearings/1vzXLN000/) | laid | ✓ | ✓ | decision-ready | 3.31 | ✓ |
-| [Zig-Style Global File Cache](bearings/1vzfew000/) | laid | ✓ | ✓ | decision-ready | 4.44 | ✓ |
-| [Comprehensive Performance Instrumentation](bearings/1vziaX000/) | laid | ✓ | ✓ | decision-ready | 6.56 | ✓ |
-| [Embeddable Library Packaging Research](bearings/VDVQurZER/) | laid | ✓ | ✓ | decision-ready | 4.86 | ✓ |
+| [Raw Document Retrieval Architecture Research](bearings/1vzJVa000/) | laid | ✓ | ✓ | repair citations | - | ✓ |
+| [Rich Document Extraction Support](bearings/1vzMXf000/) | laid | ✓ | ✓ | repair citations | - | ✓ |
+| [True Hybrid Retrieval Architecture](bearings/1vzSne000/) | laid | ✓ | ✓ | repair citations | - | ✓ |
+| [Composable Search Strategy Architecture](bearings/1vzXLN000/) | laid | ✓ | ✓ | repair citations | - | ✓ |
+| [Zig-Style Global File Cache](bearings/1vzfew000/) | laid | ✓ | ✓ | repair citations | - | ✓ |
+| [Comprehensive Performance Instrumentation](bearings/1vziaX000/) | laid | ✓ | ✓ | repair citations | - | ✓ |
+| [Embeddable Library Packaging Research](bearings/VDVQurZER/) | laid | ✓ | ✓ | repair citations | - | ✓ |
 
 ## Epics
 

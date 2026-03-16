@@ -14,6 +14,7 @@ Shared guidance for AI agents working with this repository.
 These define the binding constraints and workflow:
 
 - `INSTRUCTIONS.md` — canonical workflow and operational guidance.
+- `WORLD.md` — the conceptual world model and "physics" of Sift.
 - `CONSTITUTION.md` — repository operating principles and binding delivery rules.
 - `ARCHITECTURE.md` — current system architecture and component boundaries.
 - `CONFIGURATION.md` — runtime, build, and environment configuration guidance.
@@ -22,7 +23,7 @@ These define the binding constraints and workflow:
 - `README.md` — repository intent and product positioning.
 - `flake.nix` — Nix development environment and shared tooling.
 
-Use this order when interpreting constraints: ADRs, then `INSTRUCTIONS.md`, then `CONSTITUTION.md`.
+Use this order when interpreting constraints: ADRs, then `INSTRUCTIONS.md`, then `WORLD.md`, then `CONSTITUTION.md`.
 
 ## Project Overview
 

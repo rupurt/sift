@@ -4,16 +4,21 @@
 
 | Factor | Score | Rationale |
 |--------|-------|-----------|
-| Impact | 5 | Vital for transforming optimization from guesswork into data-driven engineering. |
-| Confidence | 5 | All recommended tools (tracing, dhat, criterion) are stable and industry-standard. |
-| Effort | 3 | Requires systemic changes to logging and adding new benchmark crates. |
-| Risk | 1 | Low risk; instrumentation can be disabled or stripped in release builds. |
+| Impact | 5 | Vital for transforming optimization from guesswork into data-driven engineering. [SRC-01] |
+| Confidence | 5 | All recommended tools (tracing, dhat, criterion) are stable and industry-standard. [SRC-01, SRC-02, SRC-03] |
+| Effort | 3 | Requires systemic changes to logging and adding new benchmark crates. [SRC-01] |
+| Risk | 1 | Low risk; instrumentation can be disabled or stripped in release builds. [SRC-02] |
 
 *Scores range from 1-5 (1=Very Low, 5=Very High)*
 
 ## Analysis
 
+### Opportunity Cost
+
+Deferring this work means future performance tuning will be inefficient and based on intuition rather than data [SRC-01, SRC-03].
+
 ### Findings
+
 - Structured tracing is required to visualize the "waterfall" of search phases [SRC-01].
 - Allocation profiling will identify memory bottlenecks in the text extraction pipeline [SRC-02].
 - Micro-benchmarks are necessary to protect the performance of hot-path functions like BM25 [SRC-03].
@@ -24,11 +29,11 @@
 
 ### Alternatives Considered
 - **Keep custom `trace!` macro:** Rejected because it doesn't provide structured spans or compatible output for external visualization tools [SRC-01].
-- **Strictly wall-clock timing:** Rejected because it doesn't reveal *why* a phase is slow (e.g., waiting on I/O vs. compute) [SRC-01] [SRC-03].
+- **Strictly wall-clock timing:** Rejected because it doesn't reveal *why* a phase is slow (e.g., waiting on I/O vs. compute) [SRC-01, SRC-03].
 
 ## Recommendation
 
-- [x] Proceed → convert to epic [SRC-01] [SRC-02] [SRC-03]
+- [x] Proceed → convert to epic [SRC-01] [SRC-01, SRC-02, SRC-03]
 - [ ] Park → revisit later
 - [ ] Decline → document learnings
 

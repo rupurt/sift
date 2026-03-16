@@ -86,8 +86,9 @@ See the **[Configuration Guide](CONFIGURATION.md)** for full details.
 ## For Developers
 
 ### Embedding Sift
-Sift is designed to be embedded as a Rust library. It provides a formal **Modular Engine** architecture with traits for IR, Execution, and Storage.
+Sift is designed to be embedded as a Rust library. It provides a formal **Reactor Architecture** with traits for configuration (IR), execution, and mass storage.
 
+-   **[WORLD.md](WORLD.md):** The conceptual world model and "physics" of Sift.
 -   **[ARCHITECTURE.md](ARCHITECTURE.md):** Detailed look at the internal design.
 -   **[RESEARCH.md](RESEARCH.md):** The vision for the modular engine.
 -   **[examples/sift-embed](examples/sift-embed):** A runnable example of how to embed Sift in your own project.

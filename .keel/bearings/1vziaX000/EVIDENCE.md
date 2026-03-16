@@ -1,5 +1,24 @@
 # Comprehensive Performance Instrumentation — Evidence & Survey
 
+## Overview
+
+We will integrate standard Rust telemetry and benchmarking tools (`tracing`, `dhat`, `criterion`) to provide a data-driven path for performance optimization.
+
+## Feasibility
+
+The proposed tools are all mature, pure-Rust crates that integrate directly into the existing `cargo` toolchain. `tracing` is the defacto standard for structured logging [SRC-01], `dhat` is the canonical heap profiler [SRC-02], and `criterion` is the most widely used micro-benchmarking library [SRC-03]. All are feasible.
+
+## Key Findings
+
+- Structured tracing with `tracing` will allow us to visualize the "waterfall" latency of the search pipeline [SRC-01].
+- Heap profiling with `dhat` is the most effective method for identifying memory "hot spots" in text-heavy processing [SRC-02].
+- Micro-benchmarks with `criterion` are essential for preventing performance regressions in critical, low-level functions like BM25 scoring [SRC-03].
+
+## Unknowns
+
+- What is the overhead of including `tracing` spans in a release build?
+- Can `dhat` be run effectively in CI to detect allocation regressions automatically?
+
 ## Instrumentation Strategies for Sift
 
 ### 1. Structured Spans (`tracing` crate)

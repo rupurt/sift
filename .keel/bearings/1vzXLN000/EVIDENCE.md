@@ -4,6 +4,25 @@ id: 1vzXLN000
 
 # Composable Search Strategy Architecture — Survey
 
+## Overview
+
+This research evaluates the move from a monolithic search engine to a composable strategy architecture using DDD and hexagonal principles.
+
+## Feasibility
+
+Code inspection confirms that the current retrieval paths (BM25, vector) are already logically independent and can be refactored into a port/adapter model [SRC-01, SRC-02, SRC-03]. Pure-Rust model runtimes like Candle provide a viable, cross-platform foundation for this architecture [SRC-09].
+
+## Key Findings
+
+- A layered pipeline (Expansion -> Retrieval -> Fusion -> Reranking) provides the best balance of recall and precision [SRC-05, SRC-06].
+- RRF remains the most robust fusion algorithm when combining lexical and semantic scores from different domains [SRC-01, SRC-07].
+- Section-aware retrieval is critical for whole-document fidelity, as document-level embeddings often dilute technical intent [SRC-02, SRC-06].
+
+## Unknowns
+
+- What is the maximum number of parallel retrievers we can execute before I/O contention offsets the quality gain?
+- How should the domain model handle strategy-specific telemetry without leaking adapter details?
+
 ## Current System Evidence
 
 Code inspection of the current implementation shows:

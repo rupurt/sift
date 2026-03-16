@@ -4,17 +4,22 @@ id: VDVQurZER
 
 # Embeddable Library Packaging Research — Evidence
 
-## Sources
+## Feasibility
 
-| ID | Class | Provenance | Location | Observed / Published | Retrieved | Authority | Freshness | Notes |
-|----|-------|------------|----------|----------------------|-----------|-----------|-----------|-------|
-| SRC-01 | manual | repo:file-inspection | Cargo.toml | 2026-03-10 | 2026-03-10 | high | high | The package is already named `sift` and ships both library and executable targets from one package; there is no separate CLI crate today. |
-| SRC-02 | manual | repo:file-inspection | src/lib.rs | 2026-03-10 | 2026-03-10 | high | high | The top-level library exports broad internal modules (`cache`, `dense`, `eval`, `extract`, `hybrid`, `search`, `segment`, `system`, `vector`) instead of a narrow facade. |
-| SRC-03 | manual | repo:file-inspection | src/search/mod.rs | 2026-03-10 | 2026-03-10 | high | high | The `search` module re-exports adapters, application, corpus, domain, and presentation internals, which turns architectural implementation detail into public API. |
-| SRC-04 | manual | repo:file-inspection | src/search/domain.rs | 2026-03-10 | 2026-03-10 | high | high | Public search types carry operational details such as telemetry, cache path, query cache, model specs, and `clap::ValueEnum` derives, indicating CLI and runtime concerns leak into the library contract. |
-| SRC-05 | manual | repo:file-inspection | src/main.rs | 2026-03-10 | 2026-03-10 | high | high | The executable already composes the library directly, proving embed-ability is feasible and that the missing work is boundary curation, not core extraction. |
-| SRC-06 | manual | repo:file-inspection | ARCHITECTURE.md | 2026-03-10 | 2026-03-10 | medium | high | The documented architecture explicitly aims for domain isolation and hexagonal boundaries, which supports a library-first packaging direction. |
-| SRC-07 | manual | repo:file-inspection | tests/performance_test.rs | 2026-03-10 | 2026-03-10 | high | high | Integration tests already use `sift` as a library (`run_search`, `SearchRequest`, `LocalFileCorpusRepository`, `DenseModelSpec`), showing the crate is usable from Rust today even if the API is low-level. |
+An embeddable library is highly feasible. The current `sift` package already exposes a library target that is consumed by the main executable and integration tests [SRC-01, SRC-05, SRC-07]. The primary challenge is not technical but architectural: curating a stable, narrow public facade from the currently over-exposed internal modules [SRC-02, SRC-03, SRC-04].
+
+## Key Findings
+
+1. `sift` is already an embeddable Rust crate in practice because the package ships a library target and the binary/tests already consume it directly [SRC-01, SRC-05, SRC-07].
+2. The primary blocker is not feasibility but API stability: the current public surface is much wider and more implementation-specific than an external embedding contract should be [SRC-02, SRC-03, SRC-04].
+3. The lowest-risk path is a library-first cutover within the existing package: curate the facade first, then consider deeper package splits only if the curated API still leaves dependency or release problems unsolved [SRC-01, SRC-02, SRC-05].
+4. The repository's documented hexagonal architecture already supports this direction, so the recommended change is mostly packaging discipline rather than architectural invention [SRC-06].
+
+## Unknowns
+
+- Which capabilities should become opt-in cargo features for embedders who do not want evaluation, rich-document extraction, or LLM reranking support?
+- Whether the eventual crates.io story should keep the library and executable in one package permanently or promote the CLI into a separate package later.
+- What the final ergonomic public API should look like: a high-level `SiftBuilder`/`SiftEngine` facade, lower-level search services, or both.
 
 ## Technical Research
 
@@ -58,27 +63,14 @@ The evidence supports a phased packaging plan:
 5. Reassess whether a workspace split still adds value after the facade and
    feature boundaries exist. [SRC-03] [SRC-04]
 
-## Key Findings
+## Sources
 
-1. `sift` is already an embeddable Rust crate in practice because the package
-   ships a library target and the binary/tests already consume it directly.
-   [SRC-01] [SRC-05] [SRC-07]
-2. The primary blocker is not feasibility but API stability: the current public
-   surface is much wider and more implementation-specific than an external
-   embedding contract should be. [SRC-02] [SRC-03] [SRC-04]
-3. The lowest-risk path is a library-first cutover within the existing package:
-   curate the facade first, then consider deeper package splits only if the
-   curated API still leaves dependency or release problems unsolved. [SRC-01]
-   [SRC-02] [SRC-05]
-4. The repository's documented hexagonal architecture already supports this
-   direction, so the recommended change is mostly packaging discipline rather
-   than architectural invention. [SRC-06]
-
-## Unknowns
-
-- Which capabilities should become opt-in cargo features for embedders who do
-  not want evaluation, rich-document extraction, or LLM reranking support?
-- Whether the eventual crates.io story should keep the library and executable in
-  one package permanently or promote the CLI into a separate package later.
-- What the final ergonomic public API should look like: a high-level
-  `SiftBuilder`/`SiftEngine` facade, lower-level search services, or both.
+| ID | Class | Provenance | Location | Observed / Published | Retrieved | Authority | Freshness | Notes |
+|----|-------|------------|----------|----------------------|-----------|-----------|-----------|-------|
+| SRC-01 | manual | repo:file-inspection | Cargo.toml | 2026-03-10 | 2026-03-10 | high | high | The package is already named `sift` and ships both library and executable targets from one package; there is no separate CLI crate today. |
+| SRC-02 | manual | repo:file-inspection | src/lib.rs | 2026-03-10 | 2026-03-10 | high | high | The top-level library exports broad internal modules (`cache`, `dense`, `eval`, `extract`, `hybrid`, `search`, `segment`, `system`, `vector`) instead of a narrow facade. |
+| SRC-03 | manual | repo:file-inspection | src/search/mod.rs | 2026-03-10 | 2026-03-10 | high | high | The `search` module re-exports adapters, application, corpus, domain, and presentation internals, which turns architectural implementation detail into public API. |
+| SRC-04 | manual | repo:file-inspection | src/search/domain.rs | 2026-03-10 | 2026-03-10 | high | high | Public search types carry operational details such as telemetry, cache path, query cache, model specs, and `clap::ValueEnum` derives, indicating CLI and runtime concerns leak into the library contract. |
+| SRC-05 | manual | repo:file-inspection | src/main.rs | 2026-03-10 | 2026-03-10 | high | high | The executable already composes the library directly, proving embed-ability is feasible and that the missing work is boundary curation, not core extraction. |
+| SRC-06 | manual | repo:file-inspection | ARCHITECTURE.md | 2026-03-10 | 2026-03-10 | medium | high | The documented architecture explicitly aims for domain isolation and hexagonal boundaries, which supports a library-first packaging direction. |
+| SRC-07 | manual | repo:file-inspection | tests/performance_test.rs | 2026-03-10 | 2026-03-10 | high | high | Integration tests already use `sift` as a library (`run_search`, `SearchRequest`, `LocalFileCorpusRepository`, `DenseModelSpec`), showing the crate is usable from Rust today even if the API is low-level. |
