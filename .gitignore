@@ -33,3 +33,8 @@ result-*
 # Local evaluation caches
 /.cache/
 /.keel/cache/
+
+# Profiling
+perf.data
+perf.data.old
+flamegraph.svg
