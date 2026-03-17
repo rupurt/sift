@@ -103,7 +103,7 @@ embed-sift-here query:
     cargo run --manifest-path examples/sift-embed/Cargo.toml -- search '{{query}}'
 
 flamegraph *args:
-    cargo flamegraph -- eval {{args}}
+    cargo flamegraph --root -- eval {{args}}
 
 bench:
     cargo bench

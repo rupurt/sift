@@ -117,7 +117,8 @@ just bench
 Identify CPU bottlenecks and visualize where time is being spent in the search pipeline.
 
 ```bash
-# Requires cargo-flamegraph installed
+# Requires cargo-flamegraph installed.
+# Note: This command uses sudo to access kernel performance counters.
 just flamegraph all --dataset scifact
 ```
 
