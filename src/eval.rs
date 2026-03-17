@@ -427,7 +427,10 @@ pub fn run_quality_evaluation(
             baseline_req.prompts = request.prompts.clone();
 
             let baseline_plan = registry.resolve(strategy)?;
-            let baseline_llm = crate::search::SearchServiceBuilder::load_llm_reranker(&baseline_plan, &baseline_req)?;
+            let baseline_llm = crate::search::SearchServiceBuilder::load_llm_reranker(
+                &baseline_plan,
+                &baseline_req,
+            )?;
 
             let baseline_env = crate::search::SearchEnvironment::new(
                 &baseline_req,
@@ -463,7 +466,8 @@ pub fn run_quality_evaluation(
         champion_req.query_cache = Some(query_cache.clone());
         champion_req.prompts = request.prompts.clone();
 
-        let champion_llm = crate::search::SearchServiceBuilder::load_llm_reranker(&champion_plan, &champion_req)?;
+        let champion_llm =
+            crate::search::SearchServiceBuilder::load_llm_reranker(&champion_plan, &champion_req)?;
 
         let champion_env = crate::search::SearchEnvironment::new(
             &champion_req,
@@ -551,7 +555,8 @@ pub fn run_latency_evaluation(
 
     let registry = crate::search::StrategyPresetRegistry::default_registry();
     let latency_plan = registry.resolve(&request.strategy)?;
-    let latency_llm = crate::search::SearchServiceBuilder::load_llm_reranker(&latency_plan, &latency_req)?;
+    let latency_llm =
+        crate::search::SearchServiceBuilder::load_llm_reranker(&latency_plan, &latency_req)?;
 
     let env = crate::search::SearchEnvironment::new(
         &latency_req,
@@ -653,7 +658,8 @@ pub fn run_comparative_evaluation(
         comp_req.query_cache = Some(query_cache.clone());
 
         let comp_plan = registry.resolve(name)?;
-        let comp_llm = crate::search::SearchServiceBuilder::load_llm_reranker(&comp_plan, &comp_req)?;
+        let comp_llm =
+            crate::search::SearchServiceBuilder::load_llm_reranker(&comp_plan, &comp_req)?;
 
         let env = crate::search::SearchEnvironment::new(
             &comp_req,
@@ -713,7 +719,7 @@ pub fn run_comparative_evaluation(
             telemetry: Some(telemetry),
             reactor_metrics: Some(ReactorMetrics {
                 shortlist_compression: request.shortlist as f64 / 10.0, // Placeholder ratio
-                signal_gain: 0.0, // Calculated later against baseline
+                signal_gain: 0.0,       // Calculated later against baseline
                 emission_fidelity: 1.0, // Placeholder
             }),
         });
@@ -758,7 +764,15 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
     writeln!(
         out,
         "{:<25} {:<12} {:>10} {:>10} {:>10} {:>10} {:>10} {:>12} {:>15}",
-        "Strategy", "Expansion", "nDCG@10", "MRR@10", "Recall@10", "S-Compress", "S-Gain", "p50 (ms)", "Cache Hits"
+        "Strategy",
+        "Expansion",
+        "nDCG@10",
+        "MRR@10",
+        "Recall@10",
+        "S-Compress",
+        "S-Gain",
+        "p50 (ms)",
+        "Cache Hits"
     )
     .unwrap();
     writeln!(
@@ -782,7 +796,12 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
     let gains: Vec<f64> = report
         .results
         .iter()
-        .map(|r| r.reactor_metrics.as_ref().map(|m| m.signal_gain).unwrap_or(0.0))
+        .map(|r| {
+            r.reactor_metrics
+                .as_ref()
+                .map(|m| m.signal_gain)
+                .unwrap_or(0.0)
+        })
         .collect();
 
     for res in &report.results {
@@ -802,9 +821,17 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
         let mrr_c = get_color(res.quality.mrr_at_10, &mrrs, true);
         let recall_c = get_color(res.quality.recall_at_10, &recalls, true);
         let lat_c = get_color(res.latency.p50_ms, &latencies, false);
-        
-        let signal_gain = res.reactor_metrics.as_ref().map(|m| m.signal_gain).unwrap_or(0.0);
-        let s_compress = res.reactor_metrics.as_ref().map(|m| m.shortlist_compression).unwrap_or(0.0);
+
+        let signal_gain = res
+            .reactor_metrics
+            .as_ref()
+            .map(|m| m.signal_gain)
+            .unwrap_or(0.0);
+        let s_compress = res
+            .reactor_metrics
+            .as_ref()
+            .map(|m| m.shortlist_compression)
+            .unwrap_or(0.0);
         let gain_c = get_color(signal_gain, &gains, true);
 
         writeln!(

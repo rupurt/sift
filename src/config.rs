@@ -106,21 +106,11 @@ pub struct GemmaConfig {
     pub max_length: usize,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PromptsConfig {
     pub hyde: Option<String>,
     pub splade: Option<String>,
     pub classified: Option<String>,
-}
-
-impl Default for PromptsConfig {
-    fn default() -> Self {
-        Self {
-            hyde: None,
-            splade: None,
-            classified: None,
-        }
-    }
 }
 
 fn default_strategy() -> String {

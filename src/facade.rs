@@ -265,9 +265,10 @@ impl Sift {
         };
 
         if options.gemma_model.is_some() || plan.reranking == RerankingPolicy::Gemma {
-            return options.gemma_model.clone().or_else(|| {
-                Some(GemmaModelSpec::default())
-            });
+            return options
+                .gemma_model
+                .clone()
+                .or_else(|| Some(GemmaModelSpec::default()));
         }
 
         None

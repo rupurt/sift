@@ -91,9 +91,15 @@ impl EngineFactory {
         service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
         service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
 
-        let mut hyde = LlmExpander::new(Box::new(HydeStrategy { custom_prompt: None }));
-        let mut splade = LlmExpander::new(Box::new(SpladeStrategy { custom_prompt: None }));
-        let mut classified = LlmExpander::new(Box::new(ClassifiedStrategy { custom_prompt: None }));
+        let mut hyde = LlmExpander::new(Box::new(HydeStrategy {
+            custom_prompt: None,
+        }));
+        let mut splade = LlmExpander::new(Box::new(SpladeStrategy {
+            custom_prompt: None,
+        }));
+        let mut classified = LlmExpander::new(Box::new(ClassifiedStrategy {
+            custom_prompt: None,
+        }));
 
         if let Some(r) = &llm_reranker {
             let generative = Arc::new(RerankerAsGenerative(r.clone())) as Arc<dyn GenerativeModel>;

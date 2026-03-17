@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use std::fs;
 
 use crate::config::{Config, Ignore};
-use crate::eval::{run_quality_evaluation, QualityEvaluationRequest};
-use crate::search::adapters::qwen::{QwenModelSpec, QwenReranker};
+use crate::eval::{QualityEvaluationRequest, run_quality_evaluation};
 use crate::search::GenerativeModel;
+use crate::search::adapters::qwen::{QwenModelSpec, QwenReranker};
 
 pub struct OptimizeRequest {
     pub corpus_dir: PathBuf,
@@ -19,7 +19,11 @@ pub struct OptimizeRequest {
     pub query_limit: Option<usize>,
 }
 
-pub fn run_optimization(request: &OptimizeRequest, ignore: Option<&Ignore>, config: &Config) -> Result<()> {
+pub fn run_optimization(
+    request: &OptimizeRequest,
+    ignore: Option<&Ignore>,
+    config: &Config,
+) -> Result<()> {
     tracing::info!("Starting Sift Prompt Optimizer...");
 
     let mut current_config = config.clone();
@@ -30,9 +34,21 @@ pub fn run_optimization(request: &OptimizeRequest, ignore: Option<&Ignore>, conf
     let reranker = QwenReranker::load(qwen_spec)?;
 
     let strategies = vec![
-        ("page-index-splade", "splade", "Provide 5 synonymous technical keywords, API names, or standard library functions."),
-        ("page-index-classified", "classified", "Identify the core domain. Write a concise, 2-sentence summary describing the underlying subject matter, methodology, and expected document type."),
-        ("page-index-llm", "hyde", "Generate a concise, hypothetical technical document snippet that would satisfy the user's intent. Focus on code structures, API names, and implementation logic."),
+        (
+            "page-index-splade",
+            "splade",
+            "Provide 5 synonymous technical keywords, API names, or standard library functions.",
+        ),
+        (
+            "page-index-classified",
+            "classified",
+            "Identify the core domain. Write a concise, 2-sentence summary describing the underlying subject matter, methodology, and expected document type.",
+        ),
+        (
+            "page-index-llm",
+            "hyde",
+            "Generate a concise, hypothetical technical document snippet that would satisfy the user's intent. Focus on code structures, API names, and implementation logic.",
+        ),
     ];
 
     for (strategy_name, config_key, intent_desc) in strategies {
@@ -65,12 +81,18 @@ pub fn run_optimization(request: &OptimizeRequest, ignore: Option<&Ignore>, conf
             _ => None,
         };
 
-        tracing::info!("Baseline Signal Gain for {}: {:.4}", strategy_name, best_gain);
+        tracing::info!(
+            "Baseline Signal Gain for {}: {:.4}",
+            strategy_name,
+            best_gain
+        );
 
         for i in 0..request.iterations {
             tracing::info!("Iteration {}/{}", i + 1, request.iterations);
 
-            let current_prompt_text = best_prompt.clone().unwrap_or_else(|| "You are an expert.".to_string());
+            let current_prompt_text = best_prompt
+                .clone()
+                .unwrap_or_else(|| "You are an expert.".to_string());
             let mutation_prompt = format!(
                 "<|im_start|>system\nYou are an AI prompt engineer. Your goal is to improve a system prompt used for semantic search query expansion. The prompt should instruct an LLM to: {}\nOutput ONLY the raw new prompt text. Do not include any conversational filler, markdown formatting, or quotes around the prompt.<|im_end|>\n<|im_start|>user\nCurrent Prompt: {}\nGenerate a variation of this prompt that is more concise and focuses heavily on technical software engineering terms.<|im_end|>\n<|im_start|>assistant\n",
                 intent_desc, current_prompt_text
@@ -88,7 +110,9 @@ pub fn run_optimization(request: &OptimizeRequest, ignore: Option<&Ignore>, conf
 
             match config_key {
                 "splade" => eval_req.prompts.as_mut().unwrap().splade = Some(new_prompt.clone()),
-                "classified" => eval_req.prompts.as_mut().unwrap().classified = Some(new_prompt.clone()),
+                "classified" => {
+                    eval_req.prompts.as_mut().unwrap().classified = Some(new_prompt.clone())
+                }
                 "hyde" => eval_req.prompts.as_mut().unwrap().hyde = Some(new_prompt.clone()),
                 _ => {}
             }
@@ -120,7 +144,7 @@ pub fn run_optimization(request: &OptimizeRequest, ignore: Option<&Ignore>, conf
 
     // Save to local sift.toml
     tracing::info!("Saving optimized prompts to ./sift.toml");
-    
+
     // We only serialize the prompts section to avoid wiping out other config if it wasn't there
     let toml_string = toml::to_string(&current_config.prompts)?;
     let mut final_toml = String::new();

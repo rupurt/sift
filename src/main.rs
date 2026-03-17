@@ -8,20 +8,21 @@ use sift::internal::{
     config::{Config, Ignore},
     dense::DenseModelSpec,
     eval::{
-        download_scifact_dataset, materialize_scifact_dir, render_comparative_report,
-        run_comparative_evaluation, run_latency_evaluation, run_quality_evaluation,
-        LatencyEvaluationRequest, QualityEvaluationRequest,
+        LatencyEvaluationRequest, QualityEvaluationRequest, download_scifact_dataset,
+        materialize_scifact_dir, render_comparative_report, run_comparative_evaluation,
+        run_latency_evaluation, run_quality_evaluation,
     },
+    optimize::{OptimizeRequest, run_optimization},
     search::{
+        OutputFormat,
         adapters::gemma::GemmaModelSpec,
         adapters::qwen::{DEFAULT_QWEN_MODEL_ID, DEFAULT_QWEN_REVISION, QwenModelSpec},
-        render_search_response, OutputFormat,
+        render_search_response,
     },
-    optimize::{run_optimization, OptimizeRequest},
     system::Telemetry,
 };
 use sift::{Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[cfg(test)]
 mod versioning;
@@ -659,7 +660,7 @@ fn main() -> Result<()> {
                 query_limit,
             };
             run_optimization(&req, Some(&ignore), &config)?;
-        },
+        }
         Commands::Config => {
             let toml_string = toml::to_string_pretty(&config)?;
             println!("{}", Config::highlight_toml(&toml_string));

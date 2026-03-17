@@ -37,8 +37,8 @@ use std::sync::{Arc, RwLock};
 
 pub type QueryEmbeddingCache = Arc<RwLock<HashMap<String, Vec<f32>>>>;
 
-use crate::search::adapters::qwen::QwenModelSpec;
 use crate::search::adapters::gemma::GemmaModelSpec;
+use crate::search::adapters::qwen::QwenModelSpec;
 
 #[derive(Debug, Clone)]
 pub struct SearchRequest {
