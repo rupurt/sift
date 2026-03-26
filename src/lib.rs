@@ -24,7 +24,8 @@ mod system;
 mod vector;
 
 pub use crate::facade::{
-    Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift, SiftBuilder,
+    Conversation, Fusion, GenerativeModel, Reranking, Retriever, SearchInput, SearchOptions, Sift,
+    SiftBuilder,
 };
 pub use crate::search::{ScoreConfidence, SearchHit, SearchResponse};
 

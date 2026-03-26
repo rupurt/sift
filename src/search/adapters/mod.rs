@@ -592,6 +592,14 @@ impl GenerativeModel for RerankerAsGenerative {
             anyhow::bail!("Reranker does not support generation")
         }
     }
+
+    fn start_conversation(&self) -> Result<Box<dyn Conversation>> {
+        if let Some(generative) = self.0.as_generative() {
+            generative.start_conversation()
+        } else {
+            anyhow::bail!("Reranker does not support stateful conversations")
+        }
+    }
 }
 
 #[cfg(test)]

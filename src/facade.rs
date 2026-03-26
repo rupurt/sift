@@ -8,6 +8,7 @@ use crate::config::{Config, Ignore};
 use crate::dense::DenseModelSpec;
 use crate::search::adapters::gemma::GemmaModelSpec;
 use crate::search::adapters::qwen::QwenModelSpec;
+pub use crate::search::domain::{Conversation, GenerativeModel};
 use crate::search::{
     Embedder, FusionPolicy, LocalFileCorpusRepository, QueryEmbeddingCache, RerankingPolicy,
     RetrieverPolicy, SearchRequest, SearchResponse, StrategyPresetRegistry, run_search,
@@ -207,6 +208,24 @@ impl Sift {
             &LocalFileCorpusRepository,
             embedder,
         )
+    }
+
+    pub fn generative(&self, options: SearchOptions) -> Result<Arc<dyn GenerativeModel>> {
+        let strategy = options
+            .strategy
+            .clone()
+            .unwrap_or_else(|| self.config.search.strategy.clone());
+        let rerank_model = self
+            .resolve_rerank_model(&strategy, &options)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "No generative model (rerank_model) could be resolved from config/options"
+                )
+            })?;
+
+        Ok(Arc::new(crate::search::adapters::qwen::QwenReranker::load(
+            rerank_model,
+        )?))
     }
 
     fn resolve_embedder(

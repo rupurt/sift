@@ -472,8 +472,14 @@ pub trait Reranker: Send + Sync {
     }
 }
 
+pub trait Conversation: Send + Sync {
+    fn send(&mut self, message: &str, max_tokens: usize) -> Result<String>;
+    fn history(&self) -> &[String];
+}
+
 pub trait GenerativeModel: Send + Sync {
     fn generate(&self, prompt: &str, max_tokens: usize) -> Result<String>;
+    fn start_conversation(&self) -> Result<Box<dyn Conversation>>;
 }
 
 #[cfg(test)]

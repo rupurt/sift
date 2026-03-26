@@ -127,6 +127,92 @@ pub fn ensure_hf_asset(model_id: &str, revision: &str, path: &Path, filename: &s
     Ok(())
 }
 
+pub struct QwenModelSession {
+    model: QwenModel,
+    lm_head: candle_nn::Linear,
+    tokens: Vec<u32>,
+    device: Device,
+}
+
+impl QwenModelSession {
+    pub fn new(config: &QwenConfig, vb: &VarBuilder<'static>, device: &Device) -> Result<Self> {
+        let model = QwenModel::new(config, vb.clone())?;
+        let lm_head = if config.tie_word_embeddings {
+            candle_nn::Linear::new(
+                vb.pp("model.embed_tokens")
+                    .get((config.vocab_size, config.hidden_size), "weight")?,
+                None,
+            )
+        } else {
+            candle_nn::linear_no_bias(config.hidden_size, config.vocab_size, vb.pp("lm_head"))?
+        };
+
+        Ok(Self {
+            model,
+            lm_head,
+            tokens: Vec::new(),
+            device: device.clone(),
+        })
+    }
+
+    pub fn generate(
+        &mut self,
+        prompt: &str,
+        max_tokens: usize,
+        tokenizer: &Tokenizer,
+    ) -> Result<String> {
+        let encoding = tokenizer
+            .encode(prompt, true)
+            .map_err(|m| anyhow!("encoding failed: {}", m))?;
+
+        let new_tokens = encoding.get_ids();
+        let mut generated_tokens = Vec::new();
+        let eos_token_id = tokenizer.token_to_id("<|im_end|>").unwrap_or(151645);
+
+        for (i, &token) in new_tokens.iter().enumerate() {
+            let tokens_tensor = Tensor::new(&[token], &self.device)?.unsqueeze(0)?;
+            let is_first = self.tokens.is_empty() && i == 0;
+            let pos = if is_first { 0 } else { self.tokens.len() };
+            self.model.forward(&tokens_tensor, pos, None)?;
+            self.tokens.push(token);
+        }
+
+        for _ in 0..max_tokens {
+            let last_token = *self.tokens.last().unwrap();
+            let tokens_tensor = Tensor::new(&[last_token], &self.device)?.unsqueeze(0)?;
+
+            let hidden_states = self
+                .model
+                .forward(&tokens_tensor, self.tokens.len() - 1, None)?;
+            let last_hidden = hidden_states.narrow(1, 0, 1)?;
+            let logits = last_hidden.apply(&self.lm_head)?;
+            let last_logit = logits.get(0)?.get(0)?;
+
+            // Simple greedy decoding
+            let next_token = last_logit
+                .to_vec1::<f32>()?
+                .iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(i, _)| i as u32)
+                .unwrap();
+
+            if next_token == eos_token_id {
+                break;
+            }
+
+            self.tokens.push(next_token);
+            generated_tokens.push(next_token);
+        }
+
+        let decoded = tokenizer
+            .decode(&generated_tokens, true)
+            .map_err(|m| anyhow!("decoding failed: {}", m))?;
+
+        Ok(decoded)
+    }
+}
+
 pub fn qwen_generate(
     prompt: &str,
     max_tokens: usize,
@@ -135,61 +221,6 @@ pub fn qwen_generate(
     tokenizer: &Tokenizer,
     device: &Device,
 ) -> Result<String> {
-    let encoding = tokenizer
-        .encode(prompt, true)
-        .map_err(|m| anyhow!("encoding failed: {}", m))?;
-
-    let mut tokens = encoding.get_ids().to_vec();
-    let mut generated_tokens = Vec::new();
-
-    let mut model = QwenModel::new(config, vb.clone())?;
-
-    let lm_head = if config.tie_word_embeddings {
-        candle_nn::Linear::new(
-            vb.pp("model.embed_tokens")
-                .get((config.vocab_size, config.hidden_size), "weight")?,
-            None,
-        )
-    } else {
-        candle_nn::linear_no_bias(config.hidden_size, config.vocab_size, vb.pp("lm_head"))?
-    };
-
-    let eos_token_id = tokenizer.token_to_id("<|im_end|>").unwrap_or(151645);
-
-    for i in 0..max_tokens {
-        let context_size = if i == 0 { tokens.len() } else { 1 };
-        let tokens_tensor = if i == 0 {
-            Tensor::new(tokens.as_slice(), device)?.unsqueeze(0)?
-        } else {
-            let last_token = *tokens.last().unwrap();
-            Tensor::new(&[last_token], device)?.unsqueeze(0)?
-        };
-
-        let hidden_states = model.forward(&tokens_tensor, tokens.len() - context_size, None)?;
-        let last_hidden = hidden_states.narrow(1, tokens_tensor.dim(1)? - 1, 1)?;
-        let logits = last_hidden.apply(&lm_head)?;
-        let last_logit = logits.get(0)?.get(0)?;
-
-        // Simple greedy decoding
-        let next_token = last_logit
-            .to_vec1::<f32>()?
-            .iter()
-            .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i as u32)
-            .unwrap();
-
-        if next_token == eos_token_id {
-            break;
-        }
-
-        tokens.push(next_token);
-        generated_tokens.push(next_token);
-    }
-
-    let decoded = tokenizer
-        .decode(&generated_tokens, true)
-        .map_err(|m| anyhow!("decoding failed: {}", m))?;
-
-    Ok(decoded)
+    let mut session = QwenModelSession::new(config, vb, device)?;
+    session.generate(prompt, max_tokens, tokenizer)
 }

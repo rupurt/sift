@@ -157,6 +157,39 @@ impl GenerativeModel for QwenReranker {
             &self.device,
         )
     }
+
+    fn start_conversation(&self) -> Result<Box<dyn Conversation>> {
+        let session =
+            super::llm_utils::QwenModelSession::new(&self.config, &self.vb, &self.device)?;
+        Ok(Box::new(QwenConversation {
+            session,
+            tokenizer: self.tokenizer.clone(),
+            history: Vec::new(),
+        }))
+    }
+}
+
+pub struct QwenConversation {
+    session: super::llm_utils::QwenModelSession,
+    tokenizer: Tokenizer,
+    history: Vec<String>,
+}
+
+use crate::search::domain::Conversation;
+
+impl Conversation for QwenConversation {
+    fn send(&mut self, message: &str, max_tokens: usize) -> Result<String> {
+        self.history.push(message.to_string());
+        let response = self
+            .session
+            .generate(message, max_tokens, &self.tokenizer)?;
+        self.history.push(response.clone());
+        Ok(response)
+    }
+
+    fn history(&self) -> &[String] {
+        &self.history
+    }
 }
 
 impl Reranker for QwenReranker {

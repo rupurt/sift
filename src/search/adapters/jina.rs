@@ -182,6 +182,10 @@ impl GenerativeModel for JinaReranker {
             &self.device,
         )
     }
+
+    fn start_conversation(&self) -> Result<Box<dyn crate::search::domain::Conversation>> {
+        anyhow::bail!("JinaReranker does not support stateful conversations yet")
+    }
 }
 
 impl Reranker for JinaReranker {
