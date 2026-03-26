@@ -23,7 +23,10 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs { inherit system overlays; };
+        pkgs = import nixpkgs {
+          inherit system overlays;
+          config.allowUnfree = true;
+        };
         rust = pkgs.rust-bin.stable.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" ];
           targets = [ "x86_64-unknown-linux-gnu" "x86_64-unknown-linux-musl" ];
@@ -44,6 +47,7 @@
 
         linuxInputs = pkgs.lib.optionals isLinux [
           pkgs.mold
+          pkgs.cudatoolkit
         ];
 
         cargoToml = (builtins.fromTOML (builtins.readFile ./Cargo.toml));
@@ -57,11 +61,19 @@
             lockFile = ./Cargo.lock;
             outputHashes = {
               "candle-core-0.9.2" = "sha256-GeU7yc4vqN0hy3tJAq0LDhwnpO4XDeVVmxaBchKWkWg=";
+              "candle-nn-0.9.2" = "sha256-GeU7yc4vqN0hy3tJAq0LDhwnpO4XDeVVmxaBchKWkWg=";
+              "candle-transformers-0.9.2" = "sha256-GeU7yc4vqN0hy3tJAq0LDhwnpO4XDeVVmxaBchKWkWg=";
+              "candle-kernels-0.9.2" = "sha256-GeU7yc4vqN0hy3tJAq0LDhwnpO4XDeVVmxaBchKWkWg=";
+              "candle-ug-0.9.2" = "sha256-GeU7yc4vqN0hy3tJAq0LDhwnpO4XDeVVmxaBchKWkWg=";
             };
           };
-          nativeBuildInputs = [ pkgs.pkg-config ];
-          buildInputs = [ pkgs.bzip2 pkgs.xz pkgs.zlib ];
+          nativeBuildInputs = [ pkgs.pkg-config ] ++ pkgs.lib.optionals isLinux [ pkgs.cudatoolkit ];
+          buildInputs = [ pkgs.bzip2 pkgs.xz pkgs.zlib ] ++ pkgs.lib.optionals isLinux [ pkgs.cudatoolkit ];
           doCheck = false;
+
+          CUDA_PATH = pkgs.lib.optionalString isLinux "${pkgs.cudatoolkit}";
+          CUDA_COMPUTE_CAP = "80";
+          NVCC_PREPEND_FLAGS = pkgs.lib.optionalString isLinux "-I${pkgs.cudatoolkit}/include";
         };
 
         siftStatic = pkgs.pkgsStatic.rustPlatform.buildRustPackage {
@@ -72,11 +84,19 @@
             lockFile = ./Cargo.lock;
             outputHashes = {
               "candle-core-0.9.2" = "sha256-GeU7yc4vqN0hy3tJAq0LDhwnpO4XDeVVmxaBchKWkWg=";
+              "candle-nn-0.9.2" = "sha256-GeU7yc4vqN0hy3tJAq0LDhwnpO4XDeVVmxaBchKWkWg=";
+              "candle-transformers-0.9.2" = "sha256-GeU7yc4vqN0hy3tJAq0LDhwnpO4XDeVVmxaBchKWkWg=";
+              "candle-kernels-0.9.2" = "sha256-GeU7yc4vqN0hy3tJAq0LDhwnpO4XDeVVmxaBchKWkWg=";
+              "candle-ug-0.9.2" = "sha256-GeU7yc4vqN0hy3tJAq0LDhwnpO4XDeVVmxaBchKWkWg=";
             };
           };
-          nativeBuildInputs = [ pkgs.pkg-config ];
-          buildInputs = [ pkgs.bzip2 pkgs.xz pkgs.zlib ];
+          nativeBuildInputs = [ pkgs.pkg-config ] ++ pkgs.lib.optionals isLinux [ pkgs.cudatoolkit ];
+          buildInputs = [ pkgs.bzip2 pkgs.xz pkgs.zlib ] ++ pkgs.lib.optionals isLinux [ pkgs.cudatoolkit ];
           doCheck = false;
+
+          CUDA_PATH = pkgs.lib.optionalString isLinux "${pkgs.cudatoolkit}";
+          CUDA_COMPUTE_CAP = "80";
+          NVCC_PREPEND_FLAGS = pkgs.lib.optionalString isLinux "-I${pkgs.cudatoolkit}/include";
         };
       in {
         packages = {

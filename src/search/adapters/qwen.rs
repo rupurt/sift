@@ -74,7 +74,7 @@ impl QwenReranker {
         let tokenizer = Tokenizer::from_file(&tokenizer_path)
             .map_err(|m| anyhow!("failed to load tokenizer: {}", m))?;
 
-        let device = Device::Cpu;
+        let device = super::llm_utils::get_device()?;
         let vb = unsafe {
             VarBuilder::from_mmaped_safetensors(
                 std::slice::from_ref(&weights_path),
@@ -159,8 +159,12 @@ impl GenerativeModel for QwenReranker {
     }
 
     fn start_conversation(&self) -> Result<Box<dyn Conversation>> {
-        let session =
+        let mut session =
             super::llm_utils::QwenModelSession::new(&self.config, &self.vb, &self.device)?;
+
+        let system_prompt = "<|im_start|>system\nYou are Paddles, a helpful AI assistant and mech suit operator. You provide concise and accurate technical advice.<|im_end|>\n";
+        session.generate(system_prompt, 0, &self.tokenizer)?;
+
         Ok(Box::new(QwenConversation {
             session,
             tokenizer: self.tokenizer.clone(),
@@ -180,9 +184,13 @@ use crate::search::domain::Conversation;
 impl Conversation for QwenConversation {
     fn send(&mut self, message: &str, max_tokens: usize) -> Result<String> {
         self.history.push(message.to_string());
+        let prompted = format!(
+            "<|im_start|>user\n{}<|im_end|>\n<|im_start|>assistant\n",
+            message
+        );
         let response = self
             .session
-            .generate(message, max_tokens, &self.tokenizer)?;
+            .generate(&prompted, max_tokens, &self.tokenizer)?;
         self.history.push(response.clone());
         Ok(response)
     }

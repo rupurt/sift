@@ -127,6 +127,26 @@ pub fn ensure_hf_asset(model_id: &str, revision: &str, path: &Path, filename: &s
     Ok(())
 }
 
+pub fn get_device() -> Result<Device> {
+    #[cfg(feature = "cuda")]
+    {
+        match Device::new_cuda(0) {
+            Ok(d) => {
+                tracing::info!("Using CUDA device 0");
+                Ok(d)
+            }
+            Err(e) => {
+                tracing::warn!("Failed to initialize CUDA, falling back to CPU: {:?}", e);
+                Ok(Device::Cpu)
+            }
+        }
+    }
+    #[cfg(not(feature = "cuda"))]
+    {
+        Ok(Device::Cpu)
+    }
+}
+
 pub struct QwenModelSession {
     model: QwenModel,
     lm_head: candle_nn::Linear,
@@ -169,12 +189,11 @@ impl QwenModelSession {
         let mut generated_tokens = Vec::new();
         let eos_token_id = tokenizer.token_to_id("<|im_end|>").unwrap_or(151645);
 
-        for (i, &token) in new_tokens.iter().enumerate() {
-            let tokens_tensor = Tensor::new(&[token], &self.device)?.unsqueeze(0)?;
-            let is_first = self.tokens.is_empty() && i == 0;
-            let pos = if is_first { 0 } else { self.tokens.len() };
+        if !new_tokens.is_empty() {
+            let tokens_tensor = Tensor::new(new_tokens, &self.device)?.unsqueeze(0)?;
+            let pos = self.tokens.len();
             self.model.forward(&tokens_tensor, pos, None)?;
-            self.tokens.push(token);
+            self.tokens.extend_from_slice(new_tokens);
         }
 
         for _ in 0..max_tokens {
@@ -203,13 +222,33 @@ impl QwenModelSession {
 
             self.tokens.push(next_token);
             generated_tokens.push(next_token);
+
+            // Check for stop sequences in the decoded text so far
+            let current_text = tokenizer
+                .decode(&generated_tokens, true)
+                .map_err(|m| anyhow!("decoding failed: {}", m))?;
+
+            if current_text.contains("<|im_end|>")
+                || current_text.contains("Human:")
+                || current_text.contains("User:")
+                || current_text.contains("<|im_start|>")
+            {
+                break;
+            }
         }
 
-        let decoded = tokenizer
+        let mut decoded = tokenizer
             .decode(&generated_tokens, true)
             .map_err(|m| anyhow!("decoding failed: {}", m))?;
 
-        Ok(decoded)
+        // Clean up any trailing stop sequences
+        for stop_seq in ["<|im_end|>", "Human:", "User:", "<|im_start|>"] {
+            if let Some(idx) = decoded.find(stop_seq) {
+                decoded.truncate(idx);
+            }
+        }
+
+        Ok(decoded.trim().to_string())
     }
 }
 

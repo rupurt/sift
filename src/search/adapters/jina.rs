@@ -97,7 +97,7 @@ impl JinaReranker {
         let tokenizer = Tokenizer::from_file(&tokenizer_path)
             .map_err(|m| anyhow!("failed to load tokenizer: {}", m))?;
 
-        let device = Device::Cpu;
+        let device = super::llm_utils::get_device()?;
         let vb = unsafe {
             VarBuilder::from_mmaped_safetensors(
                 std::slice::from_ref(&weights_path),

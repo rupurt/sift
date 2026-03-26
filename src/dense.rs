@@ -159,7 +159,11 @@ impl DenseReranker {
                 .map_err(|err| anyhow!(err.to_string()))
                 .with_context(|| format!("load tokenizer from {}", assets.vocab.display()))?;
 
+        #[cfg(feature = "cuda")]
+        let device = Device::new_cuda(0).unwrap_or(Device::Cpu);
+        #[cfg(not(feature = "cuda"))]
         let device = Device::Cpu;
+
         let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[assets.weights], DTYPE, &device)? };
         let max_length = spec
             .max_length
