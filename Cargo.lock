@@ -305,7 +305,7 @@ dependencies = [
 [[package]]
 name = "candle-core"
 version = "0.9.2"
-source = "git+https://github.com/woodRock/candle?branch=feat-qwen3.5-support#e9e4929f3e31b6183cc17e7be0596929c6725257"
+source = "git+https://github.com/rupurt/candle?branch=feat-qwen3.5-support#7667bbcb7f158545f9311ffb9bff6caacb699efa"
 dependencies = [
  "byteorder",
  "candle-kernels",
@@ -331,7 +331,7 @@ dependencies = [
 [[package]]
 name = "candle-kernels"
 version = "0.9.2"
-source = "git+https://github.com/woodRock/candle?branch=feat-qwen3.5-support#e9e4929f3e31b6183cc17e7be0596929c6725257"
+source = "git+https://github.com/rupurt/candle?branch=feat-qwen3.5-support#7667bbcb7f158545f9311ffb9bff6caacb699efa"
 dependencies = [
  "cudaforge",
 ]
@@ -339,7 +339,7 @@ dependencies = [
 [[package]]
 name = "candle-nn"
 version = "0.9.2"
-source = "git+https://github.com/woodRock/candle?branch=feat-qwen3.5-support#e9e4929f3e31b6183cc17e7be0596929c6725257"
+source = "git+https://github.com/rupurt/candle?branch=feat-qwen3.5-support#7667bbcb7f158545f9311ffb9bff6caacb699efa"
 dependencies = [
  "candle-core",
  "half",
@@ -354,7 +354,7 @@ dependencies = [
 [[package]]
 name = "candle-transformers"
 version = "0.9.2"
-source = "git+https://github.com/woodRock/candle?branch=feat-qwen3.5-support#e9e4929f3e31b6183cc17e7be0596929c6725257"
+source = "git+https://github.com/rupurt/candle?branch=feat-qwen3.5-support#7667bbcb7f158545f9311ffb9bff6caacb699efa"
 dependencies = [
  "byteorder",
  "candle-core",
@@ -372,7 +372,7 @@ dependencies = [
 [[package]]
 name = "candle-ug"
 version = "0.9.2"
-source = "git+https://github.com/woodRock/candle?branch=feat-qwen3.5-support#e9e4929f3e31b6183cc17e7be0596929c6725257"
+source = "git+https://github.com/rupurt/candle?branch=feat-qwen3.5-support#7667bbcb7f158545f9311ffb9bff6caacb699efa"
 dependencies = [
  "ug",
  "ug-cuda",

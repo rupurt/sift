@@ -1,8 +1,9 @@
-use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use anyhow::Result;
+pub use crate::internal::config::Ignore;
+use anyhow::{Result, anyhow};
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
@@ -18,94 +19,135 @@ pub enum Engine {
 }
 
 impl Engine {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Bm25 => "bm25",
-            Self::Hybrid => "hybrid",
+    pub fn is_hybrid(&self) -> bool {
+        matches!(self, Engine::Hybrid)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SearchPlan {
+    pub name: String,
+    pub query_expansion: QueryExpansionPolicy,
+    pub retrievers: Vec<RetrieverPolicy>,
+    pub fusion: FusionPolicy,
+    pub reranking: RerankingPolicy,
+}
+
+impl SearchPlan {
+    pub fn default_lexical() -> Self {
+        Self {
+            name: "lexical".to_string(),
+            query_expansion: QueryExpansionPolicy::None,
+            retrievers: vec![RetrieverPolicy::Bm25],
+            fusion: FusionPolicy::Rrf,
+            reranking: RerankingPolicy::None,
+        }
+    }
+
+    pub fn categorize_score(&self, score: f64) -> ScoreConfidence {
+        if score > 0.8 {
+            ScoreConfidence::High
+        } else if score > 0.4 {
+            ScoreConfidence::Medium
+        } else {
+            ScoreConfidence::Low
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OutputFormat {
-    Text,
-    Json,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ScoreConfidence {
+    High,
+    Medium,
+    Low,
 }
 
-use crate::system::Telemetry;
-use std::sync::{Arc, RwLock};
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum QueryExpansionPolicy {
+    None,
+    Synonym,
+    Hyde,
+    Splade,
+    Classified,
+}
 
-pub type QueryEmbeddingCache = Arc<RwLock<HashMap<String, Vec<f32>>>>;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum RetrieverPolicy {
+    Bm25,
+    Phrase,
+    Vector,
+}
 
-use crate::search::adapters::gemma::GemmaModelSpec;
-use crate::search::adapters::qwen::QwenModelSpec;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum FusionPolicy {
+    Rrf,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum RerankingPolicy {
+    None,
+    PositionAware,
+    Llm,
+    Jina,
+    Gemma,
+}
 
 #[derive(Debug, Clone)]
 pub struct SearchRequest {
-    pub strategy: String,
     pub query: String,
     pub intent: Option<String>,
     pub path: PathBuf,
+    pub strategy: String,
     pub limit: usize,
     pub shortlist: usize,
-    pub dense_model: DenseModelSpec,
-    pub rerank_model: Option<QwenModelSpec>,
-    pub gemma_model: Option<GemmaModelSpec>,
-    pub prompts: Option<crate::config::PromptsConfig>,
     pub verbose: u8,
     pub retrievers: Option<Vec<RetrieverPolicy>>,
     pub fusion: Option<FusionPolicy>,
     pub reranking: Option<RerankingPolicy>,
-    pub telemetry: Arc<Telemetry>,
-    pub cache_dir: Option<PathBuf>,
+    pub dense_model: DenseModelSpec,
+    pub rerank_model: Option<crate::search::adapters::qwen::QwenModelSpec>,
+    pub gemma_model: Option<crate::search::adapters::gemma::GemmaModelSpec>,
     pub query_cache: Option<QueryEmbeddingCache>,
+    pub cache_dir: Option<PathBuf>,
+    pub telemetry: std::sync::Arc<crate::system::Telemetry>,
+    pub prompts: Option<crate::config::PromptsConfig>,
 }
 
 impl SearchRequest {
-    pub fn new(strategy: impl Into<String>, query: impl Into<String>, path: PathBuf) -> Self {
+    pub fn new(strategy: &str, query: impl Into<String>, path: PathBuf) -> Self {
         Self {
-            strategy: strategy.into(),
             query: query.into(),
             intent: None,
             path,
+            strategy: strategy.to_string(),
             limit: 10,
-            shortlist: 10,
-            dense_model: DenseModelSpec::default(),
-            rerank_model: None,
-            gemma_model: None,
-            prompts: None,
+            shortlist: 50,
             verbose: 0,
             retrievers: None,
             fusion: None,
             reranking: None,
-            telemetry: Arc::new(Telemetry::new()),
-            cache_dir: None,
+            dense_model: DenseModelSpec::default(),
+            rerank_model: None,
+            gemma_model: None,
             query_cache: None,
+            cache_dir: None,
+            telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
+            prompts: None,
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResponse {
     pub strategy: String,
     pub root: String,
     pub indexed_files: usize,
     pub skipped_files: usize,
     pub results: Vec<SearchHit>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct SearchTelemetry {
-    pub heuristic_hit_rate: f64,
-    pub blob_hit_rate: f64,
-    pub embedding_hit_rate: f64,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ScoreConfidence {
-    High,
-    Medium,
-    Low,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -118,7 +160,7 @@ pub struct SearchHit {
     pub snippet: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoadedCorpus {
     pub documents: Vec<Document>,
     pub total_bytes: u64,
@@ -147,46 +189,34 @@ impl Document {
     pub fn text(&self) -> &str {
         &self.text
     }
-
     pub fn segments(&self) -> &[Segment] {
         &self.segments
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ScoredDocument {
-    pub id: String,
-    pub path: PathBuf,
-    pub score: f64,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct RankedDocument {
-    pub id: String,
-    pub path: PathBuf,
-    pub score: f64,
-    pub bm25_score: f64,
-    pub dense_score: Option<f64>,
-    pub snippet: Option<String>,
-}
-
+#[derive(Clone)]
 pub struct Bm25Index {
-    pub documents: Vec<Document>,
     pub doc_freq: HashMap<String, usize>,
+    pub term_freqs: HashMap<String, HashMap<String, usize>>,
+    pub doc_lengths: HashMap<String, usize>,
     pub avg_doc_len: f64,
+    pub num_docs: usize,
 }
 
 impl Bm25Index {
     pub fn build(documents: &[Document]) -> Self {
         let mut doc_freq = HashMap::new();
-        let total_len = documents
-            .iter()
-            .map(|document| document.length)
-            .sum::<usize>();
+        let mut term_freqs = HashMap::new();
+        let mut doc_lengths = HashMap::new();
+        let mut total_len = 0;
 
-        for document in documents {
-            let unique_terms = document.terms.keys().collect::<HashSet<_>>();
-            for term in unique_terms {
+        for doc in documents {
+            let terms: HashSet<_> = doc.terms.keys().collect();
+            term_freqs.insert(doc.id.clone(), doc.terms.clone());
+            doc_lengths.insert(doc.id.clone(), doc.length);
+            total_len += doc.length;
+
+            for term in terms {
                 *doc_freq.entry(term.clone()).or_insert(0) += 1;
             }
         }
@@ -198,175 +228,42 @@ impl Bm25Index {
         };
 
         Self {
-            documents: documents.to_vec(),
             doc_freq,
+            term_freqs,
+            doc_lengths,
             avg_doc_len,
+            num_docs: documents.len(),
         }
     }
 
-    pub fn score(&self, query: &str) -> Vec<ScoredDocument> {
-        if self.documents.is_empty() {
-            return Vec::new();
-        }
+    pub fn score(&self, query: &[String]) -> Vec<(String, f64)> {
+        let mut scores = HashMap::new();
+        let k1 = 1.2;
+        let b = 0.75;
 
-        let mut query_terms = tokenize(query);
-        query_terms.sort();
-        query_terms.dedup();
-
-        let total_docs = self.documents.len() as f64;
-        let mut ranked = Vec::with_capacity(self.documents.len());
-
-        for document in &self.documents {
-            let mut score = 0.0;
-
-            for term in &query_terms {
-                let tf = document.terms.get(term).copied().unwrap_or(0) as f64;
-                if tf == 0.0 {
-                    continue;
+        for term in query {
+            if let Some(&df) = self.doc_freq.get(term) {
+                let idf = ((self.num_docs as f64 - df as f64 + 0.5) / (df as f64 + 0.5) + 1.0).ln();
+                for (doc_id, terms) in &self.term_freqs {
+                    let Some(&tf) = terms.get(term) else {
+                        continue;
+                    };
+                    let doc_len = *self.doc_lengths.get(doc_id).unwrap_or(&0) as f64;
+                    let tf = tf as f64;
+                    let score = idf * (tf * (k1 + 1.0))
+                        / (tf + k1 * (1.0 - b + b * doc_len / self.avg_doc_len));
+                    *scores.entry(doc_id.clone()).or_insert(0.0) += score;
                 }
-
-                let idf = {
-                    let doc_freq = self.doc_freq.get(term).copied().unwrap_or(0) as f64;
-                    ((total_docs - doc_freq + 0.5) / (doc_freq + 0.5) + 1.0).ln()
-                };
-                let length_ratio = if self.avg_doc_len > 0.0 {
-                    document.length as f64 / self.avg_doc_len
-                } else {
-                    1.0
-                };
-                let denominator = tf + 1.5 * (1.0 - 0.75 + 0.75 * length_ratio);
-                score += idf * (tf * (1.5 + 1.0) / denominator);
-            }
-
-            if score > 0.0 {
-                ranked.push(ScoredDocument {
-                    id: document.id.clone(),
-                    path: document.path.clone(),
-                    score,
-                });
             }
         }
-
-        ranked.sort_by(|left, right| {
-            right
-                .score
-                .partial_cmp(&left.score)
-                .unwrap_or(Ordering::Equal)
-                .then_with(|| left.id.cmp(&right.id))
+        let mut results: Vec<_> = scores.into_iter().collect();
+        results.sort_by(|a, b| {
+            b.1.partial_cmp(&a.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(&b.0))
         });
-        ranked
+        results
     }
-}
-
-pub fn tokenize(text: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
-    let mut current = String::new();
-
-    for ch in text.chars() {
-        if ch.is_alphanumeric() {
-            current.extend(ch.to_lowercase());
-        } else if !current.is_empty() {
-            tokens.push(std::mem::take(&mut current));
-        }
-    }
-
-    if !current.is_empty() {
-        tokens.push(current);
-    }
-
-    tokens
-}
-
-// --- NEW DOMAIN TYPES ---
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct SearchPlan {
-    pub name: String,
-    pub query_expansion: QueryExpansionPolicy,
-    pub retrievers: Vec<RetrieverPolicy>,
-    pub fusion: FusionPolicy,
-    pub reranking: RerankingPolicy,
-}
-
-impl SearchPlan {
-    pub fn categorize_score(&self, score: f64) -> ScoreConfidence {
-        // RRF_K is constant at 60.0 currently.
-        // Max score per retriever is 1 / (60 + 1) ~= 0.01639.
-        let max_possible = self.retrievers.len() as f64 / 61.0;
-        if max_possible == 0.0 {
-            return ScoreConfidence::Low;
-        }
-
-        let normalized = (score / max_possible).min(1.0);
-
-        if normalized > 0.8 {
-            ScoreConfidence::High
-        } else if normalized > 0.5 {
-            ScoreConfidence::Medium
-        } else {
-            ScoreConfidence::Low
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum QueryExpansionPolicy {
-    None,
-    Synonym,
-    Hyde,
-    Splade,
-    Classified,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
-#[serde(rename_all = "kebab-case")]
-pub enum RetrieverPolicy {
-    Bm25,
-    Phrase,
-    Vector,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
-#[serde(rename_all = "kebab-case")]
-pub enum FusionPolicy {
-    Rrf,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
-#[serde(rename_all = "kebab-case")]
-pub enum RerankingPolicy {
-    None,
-    PositionAware,
-    Llm,
-    Jina,
-    Gemma,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Candidate {
-    pub id: String,
-    pub path: PathBuf,
-    pub score: f64,
-    pub contributors: Vec<ContributorScore>,
-    pub snippet: Option<String>,
-    pub snippet_location: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ContributorScore {
-    pub retriever: RetrieverPolicy,
-    pub score: f64,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CandidateList {
-    pub results: Vec<Candidate>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct QueryVariant {
-    pub text: String,
-    pub weight: f64,
 }
 
 pub struct StrategyPreset {
@@ -374,75 +271,203 @@ pub struct StrategyPreset {
     pub plan: SearchPlan,
 }
 
-pub struct PreparedCorpus<'a> {
-    pub documents: &'a [Document],
-    pub bm25_index: Option<&'a Bm25Index>,
+pub struct StrategyPresetRegistry {
+    presets: HashMap<String, SearchPlan>,
 }
 
-pub trait CorpusRepository: Send + Sync {
-    fn load(
-        &self,
-        path: &std::path::Path,
-        ignore: Option<&crate::config::Ignore>,
-        verbose: u8,
-        embedder: Option<&dyn Embedder>,
-        telemetry: &crate::system::Telemetry,
-        cache_base: Option<&std::path::Path>,
-    ) -> Result<LoadedCorpus>;
+impl Default for StrategyPresetRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
-pub trait Embedder: Send + Sync {
-    fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>>;
-    fn dimension(&self) -> usize;
-}
-
-pub struct CachedEmbedder {
-    pub inner: Arc<dyn Embedder>,
-    pub cache: QueryEmbeddingCache,
-}
-
-impl Embedder for CachedEmbedder {
-    fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
-        let mut results = Vec::with_capacity(texts.len());
-        let mut missing_indices = Vec::new();
-        let mut missing_texts = Vec::new();
-
-        {
-            let cache = self.cache.read().unwrap();
-            for (i, text) in texts.iter().enumerate() {
-                if let Some(embedding) = cache.get(text) {
-                    tracing::debug!("query cache hit for: '{}'", text);
-                    results.push((i, embedding.clone()));
-                } else {
-                    tracing::debug!("query cache miss for: '{}'", text);
-                    missing_indices.push(i);
-                    missing_texts.push(text.clone());
-                }
-            }
+impl StrategyPresetRegistry {
+    pub fn new() -> Self {
+        Self {
+            presets: HashMap::new(),
         }
-
-        if !missing_texts.is_empty() {
-            let embeddings = self.inner.embed(&missing_texts)?;
-            let mut cache = self.cache.write().unwrap();
-            for (i, embedding) in missing_indices.into_iter().zip(embeddings) {
-                cache.insert(texts[i].clone(), embedding.clone());
-                results.push((i, embedding));
-            }
-        }
-
-        results.sort_by_key(|(i, _)| *i);
-        Ok(results.into_iter().map(|(_, e)| e).collect())
     }
 
-    fn dimension(&self) -> usize {
-        self.inner.dimension()
+    pub fn register(&mut self, name: &str, plan: SearchPlan) {
+        self.presets.insert(name.to_string(), plan);
+    }
+
+    pub fn resolve(&self, name: &str) -> Result<SearchPlan> {
+        self.presets
+            .get(name)
+            .cloned()
+            .ok_or_else(|| anyhow!("strategy not found: {}", name))
+    }
+
+    pub fn names(&self) -> Vec<String> {
+        let mut names: Vec<_> = self.presets.keys().cloned().collect();
+        names.sort();
+        names
+    }
+
+    pub fn default_registry() -> Self {
+        let mut registry = Self::new();
+
+        let lexical_plan = SearchPlan {
+            name: "lexical".to_string(),
+            query_expansion: QueryExpansionPolicy::None,
+            retrievers: vec![RetrieverPolicy::Bm25],
+            fusion: FusionPolicy::Rrf,
+            reranking: RerankingPolicy::None,
+        };
+        registry.register("lexical", lexical_plan.clone());
+        registry.register(
+            "bm25",
+            SearchPlan {
+                name: "bm25".to_string(),
+                ..lexical_plan.clone()
+            },
+        );
+
+        registry.register(
+            "vector",
+            SearchPlan {
+                name: "vector".to_string(),
+                query_expansion: QueryExpansionPolicy::None,
+                retrievers: vec![RetrieverPolicy::Vector],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::None,
+            },
+        );
+
+        let hybrid_plan = SearchPlan {
+            name: "hybrid".to_string(),
+            query_expansion: QueryExpansionPolicy::None,
+            retrievers: vec![RetrieverPolicy::Bm25, RetrieverPolicy::Vector],
+            fusion: FusionPolicy::Rrf,
+            reranking: RerankingPolicy::None,
+        };
+        registry.register("hybrid", hybrid_plan);
+
+        let page_index_hybrid_plan = SearchPlan {
+            name: "page-index-hybrid".to_string(),
+            query_expansion: QueryExpansionPolicy::Splade,
+            retrievers: vec![
+                RetrieverPolicy::Bm25,
+                RetrieverPolicy::Phrase,
+                RetrieverPolicy::Vector,
+            ],
+            fusion: FusionPolicy::Rrf,
+            reranking: RerankingPolicy::PositionAware,
+        };
+        registry.register("page-index-hybrid", page_index_hybrid_plan.clone());
+        registry.register(
+            "legacy-hybrid",
+            SearchPlan {
+                name: "legacy-hybrid".to_string(),
+                query_expansion: QueryExpansionPolicy::None,
+                retrievers: page_index_hybrid_plan.retrievers.clone(),
+                fusion: page_index_hybrid_plan.fusion,
+                reranking: page_index_hybrid_plan.reranking,
+            },
+        );
+
+        let page_index_llm_plan = SearchPlan {
+            name: "page-index-llm".to_string(),
+            query_expansion: QueryExpansionPolicy::Hyde,
+            retrievers: vec![
+                RetrieverPolicy::Bm25,
+                RetrieverPolicy::Phrase,
+                RetrieverPolicy::Vector,
+            ],
+            fusion: FusionPolicy::Rrf,
+            reranking: RerankingPolicy::Llm,
+        };
+        registry.register("page-index-llm", page_index_llm_plan);
+
+        // page-index-qwen (alias for page-index-llm for explicit Qwen testing)
+        registry.register(
+            "page-index-qwen",
+            SearchPlan {
+                name: "page-index-qwen".to_string(),
+                query_expansion: QueryExpansionPolicy::None,
+                retrievers: vec![
+                    RetrieverPolicy::Bm25,
+                    RetrieverPolicy::Phrase,
+                    RetrieverPolicy::Vector,
+                ],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::Llm,
+            },
+        );
+
+        // page-index-splade (generative expansion focus)
+        registry.register(
+            "page-index-splade",
+            SearchPlan {
+                name: "page-index-splade".to_string(),
+                query_expansion: QueryExpansionPolicy::Splade,
+                retrievers: vec![
+                    RetrieverPolicy::Bm25,
+                    RetrieverPolicy::Phrase,
+                    RetrieverPolicy::Vector,
+                ],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::PositionAware,
+            },
+        );
+
+        // page-index-classified (classification-driven expansion)
+        registry.register(
+            "page-index-classified",
+            SearchPlan {
+                name: "page-index-classified".to_string(),
+                query_expansion: QueryExpansionPolicy::Classified,
+                retrievers: vec![
+                    RetrieverPolicy::Bm25,
+                    RetrieverPolicy::Phrase,
+                    RetrieverPolicy::Vector,
+                ],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::PositionAware,
+            },
+        );
+
+        // page-index-jina (Jina Reranker v3)
+        registry.register(
+            "page-index-jina",
+            SearchPlan {
+                name: "page-index-jina".to_string(),
+                query_expansion: QueryExpansionPolicy::Splade,
+                retrievers: vec![
+                    RetrieverPolicy::Bm25,
+                    RetrieverPolicy::Phrase,
+                    RetrieverPolicy::Vector,
+                ],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::Jina,
+            },
+        );
+
+        // page-index-gemma (Gemma 3)
+        registry.register(
+            "page-index-gemma",
+            SearchPlan {
+                name: "page-index-gemma".to_string(),
+                query_expansion: QueryExpansionPolicy::Splade,
+                retrievers: vec![
+                    RetrieverPolicy::Bm25,
+                    RetrieverPolicy::Phrase,
+                    RetrieverPolicy::Vector,
+                ],
+                fusion: FusionPolicy::Rrf,
+                reranking: RerankingPolicy::Gemma,
+            },
+        );
+
+        registry
     }
 }
 
 pub trait Retriever: Send + Sync {
     fn retrieve(
         &self,
-        query_variants: &[QueryVariant],
+        query: &[QueryVariant],
         corpus: &PreparedCorpus,
         limit: usize,
         verbose: u8,
@@ -451,12 +476,7 @@ pub trait Retriever: Send + Sync {
 }
 
 pub trait Fuser: Send + Sync {
-    fn fuse(
-        &self,
-        candidate_lists: &[CandidateList],
-        limit: usize,
-        verbose: u8,
-    ) -> Result<CandidateList>;
+    fn fuse(&self, lists: &[CandidateList], limit: usize, verbose: u8) -> Result<CandidateList>;
 }
 
 pub trait Expander: Send + Sync {
@@ -482,54 +502,165 @@ pub trait GenerativeModel: Send + Sync {
     fn start_conversation(&self) -> Result<Box<dyn Conversation>>;
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CandidateList {
+    pub results: Vec<Candidate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Candidate {
+    pub id: String,
+    pub path: std::path::PathBuf,
+    pub score: f64,
+    pub contributors: Vec<ContributorScore>,
+    pub snippet: Option<String>,
+    pub snippet_location: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ContributorScore {
+    pub retriever: RetrieverPolicy,
+    pub score: f64,
+}
+
+pub trait Embedder: Send + Sync {
+    fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>>;
+    fn dimension(&self) -> usize;
+}
+
+#[derive(Clone)]
+pub struct CachedEmbedder {
+    pub inner: Arc<dyn Embedder>,
+    pub cache: QueryEmbeddingCache,
+}
+
+impl Embedder for CachedEmbedder {
+    fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+        if texts.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let mut cached = Vec::with_capacity(texts.len());
+        let mut missing_indices = Vec::new();
+        let mut missing_texts = Vec::new();
+
+        {
+            let cache = self
+                .cache
+                .read()
+                .map_err(|_| anyhow!("query embedding cache read lock poisoned"))?;
+
+            for (index, text) in texts.iter().enumerate() {
+                if let Some(embedding) = cache.get(text) {
+                    cached.push(Some(embedding.clone()));
+                } else {
+                    cached.push(None);
+                    missing_indices.push(index);
+                    missing_texts.push(text.clone());
+                }
+            }
+        }
+
+        if !missing_texts.is_empty() {
+            let computed = self.inner.embed(&missing_texts)?;
+            if computed.len() != missing_texts.len() {
+                return Err(anyhow!(
+                    "embedder returned {} embeddings for {} inputs",
+                    computed.len(),
+                    missing_texts.len()
+                ));
+            }
+
+            let mut cache = self
+                .cache
+                .write()
+                .map_err(|_| anyhow!("query embedding cache write lock poisoned"))?;
+
+            for (result_offset, original_index) in missing_indices.into_iter().enumerate() {
+                let embedding = computed[result_offset].clone();
+                let text = texts[original_index].clone();
+                cache.insert(text, embedding.clone());
+                cached[original_index] = Some(embedding);
+            }
+        }
+
+        cached
+            .into_iter()
+            .map(|embedding| {
+                embedding.ok_or_else(|| anyhow!("missing embedding after cache resolution"))
+            })
+            .collect()
+    }
+
+    fn dimension(&self) -> usize {
+        self.inner.dimension()
+    }
+}
+
+pub type QueryEmbeddingCache = Arc<std::sync::RwLock<HashMap<String, Vec<f32>>>>;
+
+pub trait CorpusRepository: Send + Sync {
+    fn load(
+        &self,
+        path: &std::path::Path,
+        ignore: Option<&Ignore>,
+        verbose: u8,
+        embedder: Option<&dyn Embedder>,
+        telemetry: &crate::system::Telemetry,
+        cache_dir: Option<&std::path::Path>,
+    ) -> Result<LoadedCorpus>;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SearchTelemetry {
+    pub heuristic_hits: usize,
+    pub blob_hits: usize,
+    pub embedding_hits: usize,
+    pub total_files: usize,
+    pub total_segments: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QueryVariant {
+    pub text: String,
+    pub weight: f64,
+}
+
+pub struct PreparedCorpus<'a> {
+    pub documents: &'a [Document],
+    pub bm25_index: Option<&'a Bm25Index>,
+}
+
+pub fn tokenize(text: &str) -> Vec<String> {
+    text.to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum OutputFormat {
+    Json,
+    Text,
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    struct MockEmbedder {
-        call_count: Arc<AtomicUsize>,
-    }
-
-    impl Embedder for MockEmbedder {
-        fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
-            self.call_count.fetch_add(1, Ordering::SeqCst);
-            Ok(texts.iter().map(|_| vec![0.0; 384]).collect())
-        }
-
-        fn dimension(&self) -> usize {
-            384
-        }
-    }
+    use super::{
+        QueryExpansionPolicy, RerankingPolicy, RetrieverPolicy, StrategyPresetRegistry,
+    };
 
     #[test]
-    fn cached_embedder_avoids_redundant_calls() {
-        let call_count = Arc::new(AtomicUsize::new(0));
-        let inner = Arc::new(MockEmbedder {
-            call_count: call_count.clone(),
-        });
-        let cache = Arc::new(RwLock::new(HashMap::new()));
-        let embedder = CachedEmbedder {
-            inner: inner.clone(),
-            cache: cache.clone(),
-        };
+    fn default_registry_includes_vector_strategy() {
+        let plan = StrategyPresetRegistry::default_registry()
+            .resolve("vector")
+            .expect("vector preset should be registered");
 
-        let texts = vec!["query1".to_string(), "query2".to_string()];
-
-        // First call: 1 call to inner (for both texts)
-        let res1 = embedder.embed(&texts).unwrap();
-        assert_eq!(res1.len(), 2);
-        assert_eq!(call_count.load(Ordering::SeqCst), 1);
-
-        // Second call with same texts: 0 additional calls to inner
-        let res2 = embedder.embed(&texts).unwrap();
-        assert_eq!(res2.len(), 2);
-        assert_eq!(call_count.load(Ordering::SeqCst), 1);
-
-        // Third call with one new text: 1 additional call to inner (for the new text)
-        let texts2 = vec!["query1".to_string(), "query3".to_string()];
-        let res3 = embedder.embed(&texts2).unwrap();
-        assert_eq!(res3.len(), 2);
-        assert_eq!(call_count.load(Ordering::SeqCst), 2);
+        assert_eq!(plan.name, "vector");
+        assert_eq!(plan.query_expansion, QueryExpansionPolicy::None);
+        assert_eq!(plan.retrievers, vec![RetrieverPolicy::Vector]);
+        assert_eq!(plan.reranking, RerankingPolicy::None);
     }
 }

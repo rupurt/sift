@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-26T15:59:40.846084536-07:00
+mode: manual
+---
+Verified in src/optimize.rs: run_optimization establishes a baseline via run_quality_evaluation, iterates for 0..request.iterations, mutates prompts with the local Qwen model, reevaluates each candidate, and keeps the best prompt via the new_gain > best_gain hill-climbing comparison.

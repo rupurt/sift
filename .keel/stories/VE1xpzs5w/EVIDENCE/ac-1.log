@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-26T16:00:15.145416952-07:00
+mode: manual
+---
+Verified with the built CLI help surface and main.rs dispatch: `sift optimize --help` renders the Optimize command usage, and src/main.rs wires Commands::Optimize into run_optimization with resolved corpus, queries, qrels, iteration count, and verbosity.

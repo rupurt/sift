@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::Ignore;
 use crate::dense::{DenseModelSpec, DenseReranker};
-use crate::search::{LoadedCorpus, SearchRequest, load_search_corpus};
+use crate::search::{LoadedCorpus, SearchEngine, SearchRequest, load_search_corpus};
 use crate::system::{HardwareSummary, current_git_sha, detect_hardware_summary};
 
 const LATENCY_TARGET_MS: f64 = 200.0;
@@ -501,7 +501,7 @@ pub fn run_quality_evaluation(
     Ok(QualityEvaluationReport {
         metadata: build_metadata(
             &request.strategy,
-            env.plan.clone(),
+            env.ir.plan.clone(),
             baseline_strategy,
             Some(champion_strategy_name),
             &request.command,
@@ -578,7 +578,16 @@ pub fn run_latency_evaluation(
 
     for query_text in queries_vec.iter().take(total_queries) {
         let started = Instant::now();
-        let _ = env.search(query_text, None, 10, request.shortlist, request.verbose)?;
+        let mut turn_req = SearchRequest::new(
+            &request.strategy,
+            query_text.to_string(),
+            request.corpus_dir.clone(),
+        );
+        turn_req.shortlist = request.shortlist;
+        turn_req.verbose = request.verbose;
+        turn_req.telemetry = env.telemetry.clone();
+
+        let _ = env.search(&turn_req)?;
         timings.push(started.elapsed().as_secs_f64() * 1000.0)
     }
 
@@ -590,7 +599,7 @@ pub fn run_latency_evaluation(
     Ok(LatencyEvaluationReport {
         metadata: build_metadata(
             &request.strategy,
-            env.plan.clone(),
+            env.ir.plan.clone(),
             None,
             None,
             &request.command,
@@ -695,7 +704,13 @@ pub fn run_comparative_evaluation(
 
         for query_text in queries_vec.iter().take(total_queries) {
             let started = Instant::now();
-            let _ = env.search(query_text, None, 10, request.shortlist, request.verbose)?;
+            let mut turn_req =
+                SearchRequest::new(name, query_text.to_string(), request.corpus_dir.clone());
+            turn_req.shortlist = request.shortlist;
+            turn_req.verbose = request.verbose;
+            turn_req.telemetry = env.telemetry.clone();
+
+            let _ = env.search(&turn_req)?;
             timings.push(started.elapsed().as_secs_f64() * 1000.0);
         }
         timings.sort_by(|left, right| left.partial_cmp(right).unwrap_or(Ordering::Equal));
@@ -713,7 +728,7 @@ pub fn run_comparative_evaluation(
 
         results.push(StrategyComparison {
             strategy: name.clone(),
-            expansion: format!("{:?}", env.plan.query_expansion),
+            expansion: format!("{:?}", env.ir.plan.query_expansion),
             quality,
             latency,
             telemetry: Some(telemetry),
@@ -726,7 +741,7 @@ pub fn run_comparative_evaluation(
 
         metadata.push(build_metadata(
             name,
-            env.plan.clone(),
+            env.ir.plan.clone(),
             None,
             None,
             &request.command,
@@ -808,10 +823,8 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
         let bar = render_bar(res.quality.ndcg_at_10, 10);
         let hits = if let Some(t) = &res.telemetry {
             format!(
-                "{:.0}/{:.0}/{:.0}%",
-                t.heuristic_hit_rate * 100.0,
-                t.blob_hit_rate * 100.0,
-                t.embedding_hit_rate * 100.0
+                "{}/{}/{} hits",
+                t.heuristic_hits, t.blob_hits, t.embedding_hits
             )
         } else {
             "-".to_string()
@@ -864,12 +877,7 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
             meta.hardware.os, meta.hardware.arch
         )
         .unwrap();
-        writeln!(
-            out,
-            "  CPU:      {}",
-            meta.hardware.cpu_brand.as_deref().unwrap_or("unknown")
-        )
-        .unwrap();
+        writeln!(out, "  CPU:      {}", meta.hardware.cpu_brand).unwrap();
         writeln!(
             out,
             "  Corpus:   {} documents, {} bytes",
@@ -957,7 +965,7 @@ fn build_metadata(
         baseline_strategy,
         champion_strategy,
         command: command.to_string(),
-        git_sha: current_git_sha(),
+        git_sha: Some(current_git_sha()),
         corpus_documents: corpus.documents.len(),
         corpus_bytes: corpus.total_bytes,
         segment_strategy: "structure-aware".to_string(),
@@ -1004,7 +1012,14 @@ fn evaluate_quality(
             .get(*query_id)
             .with_context(|| format!("missing query text for qrels query-id '{query_id}'"))?;
 
-        let response = env.search(query_text, None, 10, shortlist, verbose)?;
+        let mut turn_req =
+            SearchRequest::new(&env.ir.plan.name, query_text.to_string(), PathBuf::new());
+        turn_req.shortlist = shortlist;
+        turn_req.limit = 10;
+        turn_req.verbose = verbose;
+        turn_req.telemetry = env.telemetry.clone();
+
+        let response = env.search(&turn_req)?;
 
         let ranked_ids: Vec<String> = response
             .results
@@ -1036,9 +1051,26 @@ fn evaluate_quality(
             recall_at_10: recall_total / counted_queries as f64,
         },
         crate::search::SearchTelemetry {
-            heuristic_hit_rate: env.telemetry.heuristic_hit_rate(),
-            blob_hit_rate: env.telemetry.blob_hit_rate(),
-            embedding_hit_rate: env.telemetry.embedding_hit_rate(),
+            heuristic_hits: env
+                .telemetry
+                .heuristic_hits
+                .load(std::sync::atomic::Ordering::Relaxed),
+            blob_hits: env
+                .telemetry
+                .blob_hits
+                .load(std::sync::atomic::Ordering::Relaxed),
+            embedding_hits: env
+                .telemetry
+                .embedding_hits
+                .load(std::sync::atomic::Ordering::Relaxed),
+            total_files: env
+                .telemetry
+                .total_files
+                .load(std::sync::atomic::Ordering::Relaxed),
+            total_segments: env
+                .telemetry
+                .total_segments
+                .load(std::sync::atomic::Ordering::Relaxed),
         },
     ))
 }

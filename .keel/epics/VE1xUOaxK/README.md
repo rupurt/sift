@@ -20,8 +20,8 @@ mission: VE1xO97NW
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 1/3 stories done
+**Progress:** 0/1 voyages complete, 2/3 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Configurable Prompts](voyages/VE1xdk4hF/) | in-progress | 1/3 |
+| [Configurable Prompts](voyages/VE1xdk4hF/) | in-progress | 2/3 |
 <!-- END GENERATED -->

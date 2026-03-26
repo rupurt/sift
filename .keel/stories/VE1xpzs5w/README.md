@@ -2,13 +2,14 @@
 id: VE1xpzs5w
 title: Implement Sift Optimize Command
 type: feat
-status: in-progress
+status: needs-human-verification
 created_at: 2026-03-16T04:56:40
-updated_at: 2026-03-16T05:16:28
+updated_at: 2026-03-26T16:01:05
 operator-signal: 
 scope: VE1xUOaxK/VE1xdk4hF
 index: 3
 started_at: 2026-03-16T05:16:28
+submitted_at: 2026-03-26T16:01:05
 ---
 
 # Implement Sift Optimize Command
@@ -19,7 +20,7 @@ This story introduces the `sift optimize` CLI command, an automated offline loop
 
 ## Acceptance Criteria
 
-- [ ] [SRS-03/AC-01] Create `sift optimize` CLI command. <!-- verify: manual -->
-- [ ] [SRS-03/AC-02] Implement greedy hill-climbing optimization loop over `test-queries.tsv` and `qrels`. <!-- verify: manual -->
-- [ ] [SRS-03/AC-03] Save highest-yielding prompts to `./sift.toml`. <!-- verify: manual -->
-- [ ] [SRS-04/AC-04] Ensure LLM generation errors are handled gracefully without crashing the loop. <!-- verify: manual -->
+- [x] [SRS-03/AC-01] Create `sift optimize` CLI command. <!-- verify: manual, SRS-03:start:end, proof: ac-1.log -->
+- [x] [SRS-03/AC-02] Implement greedy hill-climbing optimization loop over `test-queries.tsv` and `qrels`. <!-- verify: manual, SRS-03:start:end, proof: ac-2.log -->
+- [x] [SRS-03/AC-03] Save highest-yielding prompts to `./sift.toml`. <!-- verify: manual, SRS-03:start:end, proof: ac-3.log -->
+- [x] [SRS-04/AC-04] Ensure LLM generation errors are handled gracefully without crashing the loop. <!-- verify: manual, SRS-04:start:end, proof: ac-4.log -->

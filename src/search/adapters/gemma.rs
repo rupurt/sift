@@ -7,7 +7,7 @@ use candle_nn::VarBuilder;
 use candle_transformers::models::gemma3::{Config as GemmaConfig, Model as GemmaModel};
 use tokenizers::Tokenizer;
 
-use super::llm_utils::{Gemma3ConfigPartial, ensure_hf_asset};
+use super::llm_utils::{Gemma3ConfigPartial, ensure_hf_asset, load_mmaped_safetensors_with_repair};
 use crate::cache::cache_dir;
 use crate::search::domain::{CandidateList, GenerativeModel, Reranker};
 
@@ -75,13 +75,13 @@ impl GemmaReranker {
             .map_err(|m| anyhow!("failed to load tokenizer: {}", m))?;
 
         let device = Device::Cpu;
-        let vb = unsafe {
-            VarBuilder::from_mmaped_safetensors(
-                std::slice::from_ref(&weights_path),
-                DType::F32,
-                &device,
-            )?
-        };
+        let vb = load_mmaped_safetensors_with_repair(
+            &spec.model_id,
+            &spec.revision,
+            &weights_path,
+            DType::F32,
+            &device,
+        )?;
 
         Ok(Self {
             model_id: spec.model_id,

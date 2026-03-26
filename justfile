@@ -24,15 +24,10 @@ build profile="debug":
             source_bin="$source_root/$profile_dir/sift" \
         ;; \
         release) \
+            cargo build --release; \
             profile_dir=release; \
-            if [ -f "{{justfile_directory()}}/flake.nix" ] && command -v nix >/dev/null 2>&1; then \
-                out_path="$(nix build .#sift --print-out-paths --no-link | tail -n 1)"; \
-                source_bin="$out_path/bin/sift"; \
-            else \
-                cargo build --release; \
-                source_root="${CARGO_TARGET_DIR:-$local_target}"; \
-                source_bin="$source_root/$profile_dir/sift"; \
-            fi \
+            source_root="${CARGO_TARGET_DIR:-$local_target}"; \
+            source_bin="$source_root/$profile_dir/sift"; \
         ;; \
         *) echo "unsupported build profile: {{profile}} (expected debug or release)" >&2; exit 1 ;; \
     esac; \

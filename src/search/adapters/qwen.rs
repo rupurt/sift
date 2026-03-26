@@ -7,7 +7,9 @@ use candle_nn::VarBuilder;
 use candle_transformers::models::qwen2::{Config as QwenConfig, Model as QwenModel};
 use tokenizers::Tokenizer;
 
-use super::llm_utils::{QwenConfigPartial, ensure_hf_asset, qwen_generate};
+use super::llm_utils::{
+    QwenConfigPartial, ensure_hf_asset, load_mmaped_safetensors_with_repair, qwen_generate,
+};
 use crate::cache::cache_dir;
 use crate::search::domain::{CandidateList, GenerativeModel, Reranker};
 
@@ -75,13 +77,13 @@ impl QwenReranker {
             .map_err(|m| anyhow!("failed to load tokenizer: {}", m))?;
 
         let device = super::llm_utils::get_device()?;
-        let vb = unsafe {
-            VarBuilder::from_mmaped_safetensors(
-                std::slice::from_ref(&weights_path),
-                DType::F32,
-                &device,
-            )?
-        };
+        let vb = load_mmaped_safetensors_with_repair(
+            &spec.model_id,
+            &spec.revision,
+            &weights_path,
+            DType::F32,
+            &device,
+        )?;
 
         Ok(Self {
             model_id: spec.model_id,

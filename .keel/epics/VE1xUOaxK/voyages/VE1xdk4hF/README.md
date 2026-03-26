@@ -25,11 +25,11 @@ started_at: 2026-03-16T05:05:04
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 1/3 stories complete
+**Progress:** 2/3 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
 | [Add Prompt Configuration to Sift Toml](../../../../stories/VE1xpmsiN/README.md) | feat | done |
-| [Update Expanders to Use Configured Prompts](../../../../stories/VE1xptJ3y/README.md) | feat | needs-human-verification |
-| [Implement Sift Optimize Command](../../../../stories/VE1xpzs5w/README.md) | feat | backlog |
+| [Update Expanders to Use Configured Prompts](../../../../stories/VE1xptJ3y/README.md) | feat | done |
+| [Implement Sift Optimize Command](../../../../stories/VE1xpzs5w/README.md) | feat | needs-human-verification |
 <!-- END GENERATED -->

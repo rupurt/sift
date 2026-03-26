@@ -7,15 +7,18 @@ use candle_nn::VarBuilder;
 use candle_transformers::models::qwen2::{Config as QwenConfig, Model as QwenModel};
 use tokenizers::Tokenizer;
 
-use super::llm_utils::{QwenConfigPartial, ensure_hf_asset, qwen_generate};
 use crate::cache::cache_dir;
-use crate::search::domain::{CandidateList, GenerativeModel, Reranker};
+use crate::search::adapters::llm_utils::{
+    QwenConfigPartial, ensure_hf_asset, load_mmaped_safetensors_with_repair, qwen_generate,
+};
+use crate::search::domain::GenerativeModel;
+use crate::search::domain::{CandidateList, Reranker};
 
 pub const DEFAULT_JINA_MODEL_ID: &str = "jinaai/jina-reranker-v3";
 pub const DEFAULT_JINA_REVISION: &str = "main";
 pub const DEFAULT_JINA_MAX_LENGTH: usize = 512;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct JinaModelSpec {
     pub model_id: String,
     pub revision: String,
@@ -39,8 +42,10 @@ pub struct Projector {
 
 impl Projector {
     pub fn new(vb: VarBuilder) -> Result<Self> {
-        let linear1 = candle_nn::linear_no_bias(1024, 512, vb.pp("0"))?;
-        let linear2 = candle_nn::linear_no_bias(512, 512, vb.pp("2"))?;
+        let linear1_weight = vb.pp("0").get((512, 1024), "weight")?;
+        let linear1 = candle_nn::Linear::new(linear1_weight, None);
+        let linear2_weight = vb.pp("2").get((512, 512), "weight")?;
+        let linear2 = candle_nn::Linear::new(linear2_weight, None);
         Ok(Self { linear1, linear2 })
     }
 
@@ -48,16 +53,16 @@ impl Projector {
         let x = self.linear1.forward(x)?;
         let x = x.relu()?;
         let x = self.linear2.forward(&x)?;
-        // Normalize for cosine similarity
+        // Normalize
         let norm = x.sqr()?.sum_keepdim(1)?.sqrt()?;
         Ok(x.broadcast_div(&norm)?)
     }
 }
 
 pub struct JinaReranker {
-    pub model_id: String,
-    pub revision: String,
-    pub max_length: usize,
+    _model_id: String,
+    _revision: String,
+    _max_length: usize,
     tokenizer: Tokenizer,
     config: QwenConfig,
     vb: VarBuilder<'static>,
@@ -72,17 +77,10 @@ impl JinaReranker {
             .join(Path::new(&spec.model_id))
             .join(Path::new(&spec.revision));
 
-        let config_path = root.join("config.json");
-        let tokenizer_path = root.join("tokenizer.json");
         let weights_path = root.join("model.safetensors");
+        let tokenizer_path = root.join("tokenizer.json");
+        let config_path = root.join("config.json");
 
-        ensure_hf_asset(&spec.model_id, &spec.revision, &config_path, "config.json")?;
-        ensure_hf_asset(
-            &spec.model_id,
-            &spec.revision,
-            &tokenizer_path,
-            "tokenizer.json",
-        )?;
         ensure_hf_asset(
             &spec.model_id,
             &spec.revision,
@@ -90,27 +88,28 @@ impl JinaReranker {
             "model.safetensors",
         )?;
 
-        let config_partial: QwenConfigPartial =
-            serde_json::from_str(&fs::read_to_string(&config_path)?)?;
+        let config_content = fs::read_to_string(&config_path)?;
+        let config_partial: QwenConfigPartial = serde_json::from_str(&config_content)?;
         let config = config_partial.into_config()?;
 
         let tokenizer = Tokenizer::from_file(&tokenizer_path)
             .map_err(|m| anyhow!("failed to load tokenizer: {}", m))?;
 
         let device = super::llm_utils::get_device()?;
-        let vb = unsafe {
-            VarBuilder::from_mmaped_safetensors(
-                std::slice::from_ref(&weights_path),
-                DType::F32,
-                &device,
-            )?
-        };
+        let vb = load_mmaped_safetensors_with_repair(
+            &spec.model_id,
+            &spec.revision,
+            &weights_path,
+            DType::F32,
+            &device,
+        )?;
+
         let projector = Projector::new(vb.pp("projector"))?;
 
         Ok(Self {
-            model_id: spec.model_id,
-            revision: spec.revision,
-            max_length: spec.max_length,
+            _model_id: spec.model_id,
+            _revision: spec.revision,
+            _max_length: spec.max_length,
             tokenizer,
             config,
             vb,
@@ -136,11 +135,11 @@ impl JinaReranker {
         let q_id = self
             .tokenizer
             .token_to_id(q_token)
-            .ok_or_else(|| anyhow!("missing q_token in vocab"))?;
+            .ok_or_else(|| anyhow!("missing query token in vocab"))?;
         let d_id = self
             .tokenizer
             .token_to_id(d_token)
-            .ok_or_else(|| anyhow!("missing d_token in vocab"))?;
+            .ok_or_else(|| anyhow!("missing doc token in vocab"))?;
 
         let q_pos = tokens
             .iter()
@@ -240,7 +239,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[ignore] // Requires model download and HF_TOKEN
+    // Requires model download and HF_TOKEN
     fn test_jina_load() {
         let spec = JinaModelSpec::default();
         let res = JinaReranker::load(spec);

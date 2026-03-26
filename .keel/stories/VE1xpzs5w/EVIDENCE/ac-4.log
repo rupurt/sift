@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-26T15:59:40.874730470-07:00
+mode: manual
+---
+Verified in src/optimize.rs: prompt mutation errors and per-iteration evaluation errors are caught with match arms that emit tracing::warn! and continue, preventing the optimization loop from crashing on LLM or evaluation failures.

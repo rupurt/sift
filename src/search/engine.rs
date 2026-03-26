@@ -1,9 +1,9 @@
 use super::adapters::*;
-use super::application::{SearchService, StrategyPresetRegistry, resolve_snippet_from_candidate};
+use super::application::{SearchService, resolve_snippet_from_candidate};
 use super::domain::{
-    Bm25Index, CachedEmbedder, Embedder, FusionPolicy, GenerativeModel, LoadedCorpus,
-    PreparedCorpus, QueryEmbeddingCache, QueryExpansionPolicy, Reranker, RerankingPolicy,
-    SearchHit, SearchPlan, SearchRequest, SearchResponse,
+    Bm25Index, Embedder, FusionPolicy, GenerativeModel, LoadedCorpus, PreparedCorpus,
+    QueryEmbeddingCache, QueryExpansionPolicy, Reranker, RerankingPolicy, SearchHit, SearchPlan,
+    SearchRequest, SearchResponse, StrategyPresetRegistry,
 };
 use anyhow::Result;
 use std::sync::Arc;
@@ -15,7 +15,6 @@ pub trait SearchStorage: Send + Sync {
 }
 
 /// Abstract representation of a search strategy.
-/// Initially this wraps the SearchPlan, but will evolve into a Graph IR.
 pub trait SearchIR: Send + Sync {
     fn plan(&self) -> &SearchPlan;
 }
@@ -36,7 +35,63 @@ pub trait SearchEngine: Send + Sync {
     fn as_any(&self) -> &dyn std::any::Any;
 }
 
+#[derive(Clone)]
+pub struct SearchEnvironment {
+    pub ir: PresetIR,
+    pub execution: PipelineExecution,
+    pub storage: LocalCorpusStorage,
+    pub telemetry: Arc<crate::system::Telemetry>,
+}
+
+impl SearchEngine for SearchEnvironment {
+    fn search(&self, request: &SearchRequest) -> Result<SearchResponse> {
+        self.execution.execute(&self.ir, &self.storage, request)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+impl SearchEnvironment {
+    pub fn new(
+        request: &SearchRequest,
+        corpus: &LoadedCorpus,
+        index: &Bm25Index,
+        embedder: Option<Arc<dyn Embedder>>,
+        llm_reranker: Option<Arc<dyn Reranker>>,
+    ) -> Result<Self> {
+        let factory = EngineFactory::default();
+        let engine = factory.build(
+            &request.strategy,
+            LocalCorpusStorage {
+                corpus: Arc::new(corpus.clone()),
+                index: Arc::new(index.clone()),
+            },
+            embedder,
+            request.query_cache.clone(),
+            llm_reranker,
+        )?;
+
+        // Downcast to concrete type
+        let boxed_any = engine.as_any();
+        if let Some(env) = boxed_any
+            .downcast_ref::<GenericEngine<PresetIR, PipelineExecution, LocalCorpusStorage>>()
+        {
+            Ok(SearchEnvironment {
+                ir: env.ir.clone(),
+                execution: env.execution.clone(),
+                storage: env.storage.clone(),
+                telemetry: request.telemetry.clone(),
+            })
+        } else {
+            anyhow::bail!("failed to downcast search engine to SearchEnvironment")
+        }
+    }
+}
+
 /// A concrete implementation of SearchEngine that ties the traits together.
+#[derive(Clone)]
 pub struct GenericEngine<IR, Exec, Storage>
 where
     IR: SearchIR,
@@ -50,9 +105,9 @@ where
 
 impl<IR, Exec, Storage> SearchEngine for GenericEngine<IR, Exec, Storage>
 where
-    IR: SearchIR + 'static,
-    Exec: SearchExecution + 'static,
-    Storage: SearchStorage + 'static,
+    IR: SearchIR + 'static + Clone,
+    Exec: SearchExecution + 'static + Clone,
+    Storage: SearchStorage + 'static + Clone,
 {
     fn search(&self, request: &SearchRequest) -> Result<SearchResponse> {
         self.execution.execute(&self.ir, &self.storage, request)
@@ -137,7 +192,8 @@ impl EngineFactory {
 
         if let Some(e) = embedder {
             let final_embedder = if let Some(cache) = query_cache {
-                Arc::new(CachedEmbedder { inner: e, cache }) as Arc<dyn Embedder>
+                Arc::new(crate::search::domain::CachedEmbedder { inner: e, cache })
+                    as Arc<dyn Embedder>
             } else {
                 e
             };
@@ -147,7 +203,9 @@ impl EngineFactory {
         }
 
         let ir = PresetIR { plan };
-        let execution = PipelineExecution { service };
+        let execution = PipelineExecution {
+            service: Arc::new(service),
+        };
 
         Ok(Box::new(GenericEngine {
             ir,
@@ -170,12 +228,14 @@ impl SearchStorage for LocalCorpusStorage {
     fn corpus(&self) -> &LoadedCorpus {
         &self.corpus
     }
+
     fn bm25_index(&self) -> &Bm25Index {
         &self.index
     }
 }
 
 /// Standard IR adapter for named presets.
+#[derive(Clone)]
 pub struct PresetIR {
     pub plan: SearchPlan,
 }
@@ -187,8 +247,9 @@ impl SearchIR for PresetIR {
 }
 
 /// Standard execution adapter for the multi-stage search pipeline.
+#[derive(Clone)]
 pub struct PipelineExecution {
-    pub service: SearchService,
+    pub service: Arc<SearchService>,
 }
 
 impl SearchExecution for PipelineExecution {
@@ -206,43 +267,34 @@ impl SearchExecution for PipelineExecution {
             bm25_index: Some(index),
         };
 
-        let candidates = self.service.execute(
-            plan,
-            &request.query,
-            request.intent.as_deref(),
-            &prepared,
-            request.limit,
-            request.shortlist,
-            request.verbose,
-            &request.telemetry,
-        )?;
+        let results = self.service.execute(plan, request, &prepared)?;
 
-        let results = candidates
+        let hits = results
             .results
             .into_iter()
             .enumerate()
-            .map(|(index, result)| {
-                let mut path = result.path.display().to_string();
+            .map(|(idx, res)| {
+                let mut path = res.path.display().to_string();
                 if path.starts_with("./") {
                     path = path.chars().skip(2).collect();
                 }
                 SearchHit {
                     path,
-                    rank: index + 1,
-                    score: result.score,
-                    confidence: plan.categorize_score(result.score),
-                    location: result.snippet_location.clone(),
-                    snippet: resolve_snippet_from_candidate(corpus, &result, &request.query),
+                    rank: idx + 1,
+                    score: res.score,
+                    confidence: plan.categorize_score(res.score),
+                    location: res.snippet_location.clone(),
+                    snippet: resolve_snippet_from_candidate(corpus, &res, &request.query),
                 }
             })
             .collect();
 
         Ok(SearchResponse {
-            strategy: plan.name.clone(),
+            strategy: request.strategy.clone(),
             root: request.path.display().to_string(),
             indexed_files: corpus.indexed_files,
             skipped_files: corpus.skipped_files,
-            results,
+            results: hits,
         })
     }
 }

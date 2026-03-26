@@ -1,8 +1,8 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow, bail};
-use candle_core::{Device, Tensor};
+use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::qwen2::{Config as QwenConfig, Model as QwenModel};
 use serde::Deserialize;
@@ -78,6 +78,7 @@ impl Gemma3ConfigPartial {
 impl QwenConfigPartial {
     pub fn into_config(self) -> Result<QwenConfig> {
         Ok(QwenConfig {
+            head_dim: self.head_dim,
             vocab_size: self.vocab_size,
             hidden_size: self.hidden_size,
             intermediate_size: self.intermediate_size,
@@ -104,6 +105,12 @@ pub fn ensure_hf_asset(model_id: &str, revision: &str, path: &Path, filename: &s
         return Ok(());
     }
 
+    download_hf_asset(model_id, revision, path, filename)
+}
+
+fn download_hf_asset(model_id: &str, revision: &str, path: &Path, filename: &str) -> Result<()> {
+    let tmp_path = temp_download_path(path)?;
+
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -120,11 +127,48 @@ pub fn ensure_hf_asset(model_id: &str, revision: &str, path: &Path, filename: &s
     }
 
     let mut response = request.call()?;
-    let mut file = fs::File::create(path)?;
+    let mut file = fs::File::create(&tmp_path)?;
     let mut reader = response.body_mut().as_reader();
     std::io::copy(&mut reader, &mut file)?;
+    file.sync_all()?;
+    fs::rename(&tmp_path, path)?;
 
     Ok(())
+}
+
+fn temp_download_path(path: &Path) -> Result<PathBuf> {
+    let file_name = path
+        .file_name()
+        .ok_or_else(|| anyhow!("missing filename for download target {}", path.display()))?;
+
+    Ok(path.with_file_name(format!(".{}.part", file_name.to_string_lossy())))
+}
+
+pub fn load_mmaped_safetensors_with_repair(
+    model_id: &str,
+    revision: &str,
+    weights_path: &Path,
+    dtype: DType,
+    device: &Device,
+) -> Result<VarBuilder<'static>> {
+    let weights = [weights_path.to_path_buf()];
+
+    match unsafe { VarBuilder::from_mmaped_safetensors(&weights, dtype, device) } {
+        Ok(vb) => Ok(vb),
+        Err(err) => {
+            tracing::warn!(
+                "failed to load {}, redownloading weights: {:?}",
+                weights_path.display(),
+                err
+            );
+            if weights_path.exists() {
+                fs::remove_file(weights_path)?;
+            }
+            ensure_hf_asset(model_id, revision, weights_path, "model.safetensors")?;
+            unsafe { VarBuilder::from_mmaped_safetensors(&weights, dtype, device) }
+                .map_err(Into::into)
+        }
+    }
 }
 
 pub fn get_device() -> Result<Device> {
@@ -155,6 +199,16 @@ pub struct QwenModelSession {
 }
 
 impl QwenModelSession {
+    fn select_next_token(logits: &Tensor) -> Result<u32> {
+        Ok(logits
+            .to_vec1::<f32>()?
+            .iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(i, _)| i as u32)
+            .unwrap_or_default())
+    }
+
     pub fn new(config: &QwenConfig, vb: &VarBuilder<'static>, device: &Device) -> Result<Self> {
         let model = QwenModel::new(config, vb.clone())?;
         let lm_head = if config.tie_word_embeddings {
@@ -182,39 +236,45 @@ impl QwenModelSession {
         tokenizer: &Tokenizer,
     ) -> Result<String> {
         let encoding = tokenizer
-            .encode(prompt, true)
+            .encode(prompt, self.tokens.is_empty())
             .map_err(|m| anyhow!("encoding failed: {}", m))?;
 
         let new_tokens = encoding.get_ids();
         let mut generated_tokens = Vec::new();
         let eos_token_id = tokenizer.token_to_id("<|im_end|>").unwrap_or(151645);
+        let mut pending_next_token = None;
 
         if !new_tokens.is_empty() {
             let tokens_tensor = Tensor::new(new_tokens, &self.device)?.unsqueeze(0)?;
             let pos = self.tokens.len();
-            self.model.forward(&tokens_tensor, pos, None)?;
+            let hidden_states = self.model.forward(&tokens_tensor, pos, None)?;
             self.tokens.extend_from_slice(new_tokens);
+
+            if max_tokens > 0 {
+                let last_hidden = hidden_states.narrow(1, new_tokens.len() - 1, 1)?;
+                let logits = last_hidden.apply(&self.lm_head)?;
+                let last_logit = logits.get(0)?.get(0)?;
+                pending_next_token = Some(Self::select_next_token(&last_logit)?);
+            }
+        } else if max_tokens > 0 && self.tokens.is_empty() {
+            return Ok(String::new());
         }
 
         for _ in 0..max_tokens {
-            let last_token = *self.tokens.last().unwrap();
-            let tokens_tensor = Tensor::new(&[last_token], &self.device)?.unsqueeze(0)?;
-
-            let hidden_states = self
-                .model
-                .forward(&tokens_tensor, self.tokens.len() - 1, None)?;
-            let last_hidden = hidden_states.narrow(1, 0, 1)?;
-            let logits = last_hidden.apply(&self.lm_head)?;
-            let last_logit = logits.get(0)?.get(0)?;
-
-            // Simple greedy decoding
-            let next_token = last_logit
-                .to_vec1::<f32>()?
-                .iter()
-                .enumerate()
-                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|(i, _)| i as u32)
-                .unwrap();
+            let next_token = match pending_next_token.take() {
+                Some(token) => token,
+                None => {
+                    let last_token = *self.tokens.last().unwrap();
+                    let tokens_tensor = Tensor::new(&[last_token], &self.device)?.unsqueeze(0)?;
+                    let hidden_states =
+                        self.model
+                            .forward(&tokens_tensor, self.tokens.len() - 1, None)?;
+                    let last_hidden = hidden_states.narrow(1, 0, 1)?;
+                    let logits = last_hidden.apply(&self.lm_head)?;
+                    let last_logit = logits.get(0)?.get(0)?;
+                    Self::select_next_token(&last_logit)?
+                }
+            };
 
             if next_token == eos_token_id {
                 break;

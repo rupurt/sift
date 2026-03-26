@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-26T15:59:52.644462932-07:00
+mode: manual
+---
+Verified in src/optimize.rs: the optimizer serializes the winning prompt set into a [prompts] TOML section and writes it to ./sift.toml via fs::write("./sift.toml", final_toml).

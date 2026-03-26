@@ -223,6 +223,10 @@ impl Sift {
                 )
             })?;
 
+        println!(
+            "[DEBUG] Sift::generative: loading QwenReranker with spec: {:?}",
+            rerank_model
+        );
         Ok(Arc::new(crate::search::adapters::qwen::QwenReranker::load(
             rerank_model,
         )?))
