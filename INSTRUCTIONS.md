@@ -16,7 +16,7 @@ Every session follows this deterministic cycle:
    - Record your move in the mission `LOG.md`.
    - **Pace-setting**: Execute `keel poke "Sealing move: <summary>"` to synchronize the pacemaker with the board state.
    - **Commit**: Execute `git commit`. The pre-commit hook, when installed via `keel hooks install`, automatically runs `just check` and `just test`. Resolve any issues if the commit is rejected.
-6. **Re-orient**: After the commit lands, run `keel doctor` and `keel flow --scene` to see what the board needs next.
+6. **Re-orient**: After the commit lands, run `keel doctor --status` and `keel flow --scene` to see what the board needs next.
 
 This is the plug-the-chord-back-in moment: reconnect to the board's current state. If the delivery lane has ready work, start the next loop immediately. Only stop to ask the human when you reach a manual lane, such as design direction, bearing assessment, or human verification.
 
@@ -75,7 +75,7 @@ Apply these checks to every change before finalizing work:
    - **CIRCULATORY**: Workflow (graph integrity and topology)
    - **PACEMAKER**: Heartbeat (system energization and commit stability)
    - **KINETIC**: Delivery (backlog liquidity and execution capacity)
-3. **Pacemaker Protocol**: The system's heartbeat (`.keel/heartbeat`) is its pacemaker. Ensure the pacemaker is stable and committed before concluding any unit of work. Every commit MUST be preceded by a `keel poke "Sealing move: <summary>"` to refresh the pulse and reflect the latest change, especially when working without a story. Uncommitted energy is a signal of an open tactical loop. Any commit that includes `.keel/heartbeat` MUST append the output of `keel mission next --status` to the commit message body so reviewers can see the board's importance snapshot at the time of the commit.
+3. **Pacemaker Protocol**: The system's heartbeat (`.keel/heartbeat`) is its pacemaker. Ensure the pacemaker is stable and committed before concluding any unit of work. Every commit MUST be preceded by a `keel poke "Sealing move: <summary>"` to refresh the pulse and reflect the latest change, especially when working without a story. Uncommitted energy is a signal of an open tactical loop. Any commit that includes `.keel/heartbeat` MUST append the output of `keel doctor --status` to the commit message body so reviewers can see the board's importance snapshot at the time of the commit.
 4. **Gardening First**: Tend to the garden before notifying the human operator or requesting input.
 5. **Notification Threshold**: Only request human intervention when you reach a manual lane that requires design direction or a decision on application behavior, such as assessing a bearing, planning a voyage, or human verification of a complex story.
 6. **Automated Guardrails**: You do not need to run `just fmt-check`, `just clippy`, or `just test` manually before every commit. The pre-commit hook, when installed via `keel hooks install`, enforces the configured checks. If a commit fails, resolve the reported issues and try again.
