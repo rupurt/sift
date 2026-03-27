@@ -20,8 +20,8 @@ mission: VF1UOlGfX
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 0/3 stories done
+**Progress:** 1/1 voyages complete, 3/3 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Define Turn Model and Emission Contract](voyages/VF1Vt0WCT/) | in-progress | 0/3 |
+| [Define Turn Model and Emission Contract](voyages/VF1Vt0WCT/) | done | 3/3 |
 <!-- END GENERATED -->

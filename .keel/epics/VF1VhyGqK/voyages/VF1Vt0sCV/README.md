@@ -1,11 +1,12 @@
 ---
 id: VF1Vt0sCV
 title: Add Turn Traces and Agentic Evaluation
-status: planned
+status: in-progress
 epic: VF1VhyGqK
 created_at: 2026-03-26T17:34:31
 index: 1
 updated_at: 2026-03-26T17:39:53
+started_at: 2026-03-26T19:04:32
 ---
 
 # Add Turn Traces and Agentic Evaluation
@@ -24,11 +25,11 @@ updated_at: 2026-03-26T17:39:53
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/3 stories complete
+**Progress:** 1/3 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
-| [Emit Inspectable Turn Traces And Context Actions](../../../../stories/VF1Vxv5U1/README.md) | feat | icebox |
-| [Add Multi-Hop Agentic Evaluation Fixtures And Harness](../../../../stories/VF1VxvFU2/README.md) | feat | icebox |
+| [Emit Inspectable Turn Traces And Context Actions](../../../../stories/VF1Vxv5U1/README.md) | feat | done |
+| [Add Multi-Hop Agentic Evaluation Fixtures And Harness](../../../../stories/VF1VxvFU2/README.md) | feat | needs-human-verification |
 | [Benchmark Agentic Search Against The Hybrid Champion](../../../../stories/VF1VxvOU3/README.md) | feat | icebox |
 <!-- END GENERATED -->

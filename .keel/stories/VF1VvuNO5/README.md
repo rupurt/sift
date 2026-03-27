@@ -2,14 +2,15 @@
 id: VF1VvuNO5
 title: Make Search Plans Authoritative For Controller Execution
 type: feat
-status: needs-human-verification
+status: done
 created_at: 2026-03-26T17:34:42
-updated_at: 2026-03-26T18:50:45
+updated_at: 2026-03-26T18:58:54
 operator-signal: 
 scope: VF1Vhy2qJ/VF1Vt0iCU
 index: 1
 started_at: 2026-03-26T18:38:04
 submitted_at: 2026-03-26T18:50:45
+completed_at: 2026-03-26T18:58:54
 ---
 
 # Make Search Plans Authoritative For Controller Execution

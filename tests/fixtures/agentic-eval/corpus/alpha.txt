@@ -1,0 +1,1 @@
+Alpha module receives the inbound request and identifies the beta handoff that finishes response assembly.

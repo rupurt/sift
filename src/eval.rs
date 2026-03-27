@@ -313,6 +313,63 @@ pub struct ComparativeEvaluationReport {
     pub results: Vec<StrategyComparison>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AgenticFixtureSet {
+    pub tasks: Vec<AgenticTaskFixture>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AgenticTaskFixture {
+    pub id: String,
+    pub turns: Vec<AgenticTurnFixture>,
+    #[serde(default)]
+    pub expected_final_documents: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AgenticTurnFixture {
+    pub query: String,
+    #[serde(default)]
+    pub expected_documents: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AgenticEvaluationMetrics {
+    pub task_success_rate: f64,
+    pub average_turn_recall: f64,
+    pub average_turns: f64,
+    pub average_prune_actions: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AgenticTurnEvaluation {
+    pub turn_id: String,
+    pub query: String,
+    pub expected_documents: Vec<String>,
+    pub hit_documents: Vec<String>,
+    pub recall_at_10: f64,
+    pub prune_actions: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AgenticTaskEvaluation {
+    pub task_id: String,
+    pub success: bool,
+    pub turns_executed: usize,
+    pub prune_actions: usize,
+    pub final_documents: Vec<String>,
+    pub expected_final_documents: Vec<String>,
+    pub trace: crate::search::SearchTrace,
+    pub turns: Vec<AgenticTurnEvaluation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AgenticEvaluationReport {
+    pub metadata: EvaluationMetadata,
+    pub metrics: AgenticEvaluationMetrics,
+    pub tasks: Vec<AgenticTaskEvaluation>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StrategyComparison {
     pub strategy: String,
@@ -348,6 +405,19 @@ pub struct LatencyEvaluationRequest {
     pub dense_model: DenseModelSpec,
     pub verbose: u8,
     pub query_limit: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AgenticEvaluationRequest {
+    pub strategy: String,
+    pub command: String,
+    pub corpus_dir: PathBuf,
+    pub fixtures_path: PathBuf,
+    pub shortlist: usize,
+    pub dense_model: DenseModelSpec,
+    pub retained_evidence_limit: usize,
+    pub verbose: u8,
+    pub prompts: Option<crate::config::PromptsConfig>,
 }
 
 pub fn run_quality_evaluation(
@@ -616,6 +686,195 @@ pub fn run_latency_evaluation(
             p90_over_target_ms: over_target_ms(p90_ms),
             max_over_target_ms: over_target_ms(max_ms),
         },
+    })
+}
+
+pub fn run_agentic_evaluation(
+    request: &AgenticEvaluationRequest,
+    ignore: Option<&Ignore>,
+) -> Result<AgenticEvaluationReport> {
+    let fixtures = load_agentic_fixture_set(&request.fixtures_path)?;
+    if fixtures.tasks.is_empty() {
+        bail!("agentic evaluation requires at least one task fixture");
+    }
+
+    let registry = crate::search::StrategyPresetRegistry::default_registry();
+    let plan = registry.resolve(&request.strategy)?;
+
+    let metadata_telemetry = std::sync::Arc::new(crate::system::Telemetry::new());
+    let corpus = load_search_corpus(
+        &request.corpus_dir,
+        ignore,
+        request.verbose,
+        None,
+        &metadata_telemetry,
+        None,
+    )?;
+
+    let mut config = crate::config::Config::default();
+    config.search.strategy = request.strategy.clone();
+    config.search.shortlist = request.shortlist;
+    config.embedding.model_id = request.dense_model.model_id.clone();
+    config.embedding.model_revision = request.dense_model.revision.clone();
+    config.embedding.max_length = request.dense_model.max_length;
+    if let Some(prompts) = &request.prompts {
+        config.prompts = prompts.clone();
+    }
+
+    let query_cache = std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
+    let telemetry = std::sync::Arc::new(crate::system::Telemetry::new());
+    let builder = crate::facade::Sift::builder()
+        .with_config(config)
+        .with_telemetry(telemetry)
+        .with_query_cache(query_cache);
+    let engine = match ignore {
+        Some(_) => builder.with_ignore(crate::config::Ignore::load()).build(),
+        None => builder.without_ignore().build(),
+    };
+
+    let mut task_results = Vec::new();
+    let mut successful_tasks = 0_usize;
+    let mut total_turns = 0_usize;
+    let mut total_prune_actions = 0_usize;
+    let mut recall_sum = 0.0;
+    let mut recall_count = 0_usize;
+
+    for task in &fixtures.tasks {
+        if task.turns.is_empty() {
+            bail!("agentic task '{}' requires at least one turn", task.id);
+        }
+
+        let turns = task
+            .turns
+            .iter()
+            .enumerate()
+            .map(|(index, turn)| {
+                crate::search::SearchTurnRequest::new(&request.corpus_dir, turn.query.clone())
+                    .with_session_id(task.id.clone())
+                    .with_turn_id(format!("turn-{}", index + 1))
+                    .with_sequence(index + 1)
+                    .with_limit(10)
+                    .with_shortlist(request.shortlist)
+                    .with_emission_mode(crate::search::SearchEmissionMode::Protocol)
+            })
+            .collect();
+
+        let response = engine.search_controller(
+            crate::search::SearchControllerRequest::new(plan.clone(), turns)
+                .with_session_id(task.id.clone())
+                .with_retained_evidence_limit(request.retained_evidence_limit),
+        )?;
+        if response.turns.len() != task.turns.len() {
+            bail!(
+                "agentic task '{}' executed {} turn(s), expected {}",
+                task.id,
+                response.turns.len(),
+                task.turns.len()
+            );
+        }
+
+        let mut turn_results = Vec::new();
+        let mut task_prune_actions = 0_usize;
+
+        for (turn_response, fixture_turn) in response.turns.iter().zip(task.turns.iter()) {
+            let trace_turn = turn_response.trace.turns.first().ok_or_else(|| {
+                anyhow!("missing trace for turn '{}'", turn_response.turn.turn_id)
+            })?;
+            let prune_actions = trace_turn
+                .decisions
+                .iter()
+                .filter(|decision| decision.action == crate::search::SearchControllerAction::Prune)
+                .count();
+            task_prune_actions += prune_actions;
+
+            let hit_documents: Vec<String> = match &turn_response.emission {
+                crate::search::SearchEmission::Protocol(protocol) => protocol
+                    .hits
+                    .iter()
+                    .map(|hit| search_path_to_document_id(&hit.path))
+                    .collect::<Vec<_>>(),
+                crate::search::SearchEmission::View(view) => view
+                    .results
+                    .iter()
+                    .map(|hit| search_path_to_document_id(&hit.path))
+                    .collect::<Vec<_>>(),
+                crate::search::SearchEmission::Latent(latent) => latent
+                    .hits
+                    .iter()
+                    .map(|hit| search_path_to_document_id(&hit.path))
+                    .collect::<Vec<_>>(),
+            };
+
+            let recall_at_10 = if fixture_turn.expected_documents.is_empty() {
+                1.0
+            } else {
+                recall_against_expected(&hit_documents, &fixture_turn.expected_documents)
+            };
+            if !fixture_turn.expected_documents.is_empty() {
+                recall_sum += recall_at_10;
+                recall_count += 1;
+            }
+
+            turn_results.push(AgenticTurnEvaluation {
+                turn_id: turn_response.turn.turn_id.clone(),
+                query: fixture_turn.query.clone(),
+                expected_documents: fixture_turn.expected_documents.clone(),
+                hit_documents,
+                recall_at_10,
+                prune_actions,
+            });
+        }
+
+        let final_documents: Vec<_> = response
+            .state
+            .retained_evidence
+            .iter()
+            .map(|evidence| search_path_to_document_id(&evidence.path))
+            .collect();
+        let success =
+            expected_documents_satisfied(&task.expected_final_documents, &final_documents);
+        if success {
+            successful_tasks += 1;
+        }
+
+        total_turns += response.turns.len();
+        total_prune_actions += task_prune_actions;
+        task_results.push(AgenticTaskEvaluation {
+            task_id: task.id.clone(),
+            success,
+            turns_executed: response.turns.len(),
+            prune_actions: task_prune_actions,
+            final_documents,
+            expected_final_documents: task.expected_final_documents.clone(),
+            trace: response.trace.clone(),
+            turns: turn_results,
+        });
+    }
+
+    let mut metadata = build_metadata(
+        &request.strategy,
+        plan,
+        None,
+        None,
+        &request.command,
+        &corpus,
+        Some(&request.dense_model),
+    );
+    metadata.shortlist = Some(request.shortlist);
+
+    Ok(AgenticEvaluationReport {
+        metadata,
+        metrics: AgenticEvaluationMetrics {
+            task_success_rate: successful_tasks as f64 / fixtures.tasks.len() as f64,
+            average_turn_recall: if recall_count == 0 {
+                1.0
+            } else {
+                recall_sum / recall_count as f64
+            },
+            average_turns: total_turns as f64 / fixtures.tasks.len() as f64,
+            average_prune_actions: total_prune_actions as f64 / fixtures.tasks.len() as f64,
+        },
+        tasks: task_results,
     })
 }
 
@@ -1151,6 +1410,44 @@ fn load_qrels(path: &Path) -> Result<HashMap<String, HashMap<String, u32>>> {
     }
 
     Ok(qrels)
+}
+
+fn load_agentic_fixture_set(path: &Path) -> Result<AgenticFixtureSet> {
+    let contents = fs::read_to_string(path)
+        .with_context(|| format!("failed to read agentic fixtures {}", path.display()))?;
+    serde_json::from_str(&contents)
+        .with_context(|| format!("failed to parse agentic fixtures {}", path.display()))
+}
+
+fn search_path_to_document_id(path: &str) -> String {
+    Path::new(path)
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or(path)
+        .to_string()
+}
+
+fn expected_documents_satisfied(expected: &[String], actual: &[String]) -> bool {
+    if expected.is_empty() {
+        return true;
+    }
+
+    let actual: HashSet<_> = actual.iter().map(String::as_str).collect();
+    expected
+        .iter()
+        .all(|expected_id| actual.contains(expected_id.as_str()))
+}
+
+fn recall_against_expected(results: &[String], expected: &[String]) -> f64 {
+    if expected.is_empty() {
+        return 1.0;
+    }
+
+    let relevant: HashMap<_, _> = expected
+        .iter()
+        .map(|document_id| (document_id.clone(), 1_u32))
+        .collect();
+    recall_at_10(results, &relevant)
 }
 
 fn mrr_at_10(results: &[String], relevances: &HashMap<String, u32>) -> f64 {

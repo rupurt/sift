@@ -8,9 +8,10 @@ use sift::internal::{
     config::{Config, Ignore},
     dense::DenseModelSpec,
     eval::{
-        LatencyEvaluationRequest, QualityEvaluationRequest, download_scifact_dataset,
-        materialize_scifact_dir, render_comparative_report, run_comparative_evaluation,
-        run_latency_evaluation, run_quality_evaluation,
+        AgenticEvaluationRequest, LatencyEvaluationRequest, QualityEvaluationRequest,
+        download_scifact_dataset, materialize_scifact_dir, render_comparative_report,
+        run_agentic_evaluation, run_comparative_evaluation, run_latency_evaluation,
+        run_quality_evaluation,
     },
     optimize::{OptimizeRequest, run_optimization},
     search::{
@@ -389,6 +390,27 @@ enum EvalCommands {
         #[arg(long)]
         query_limit: Option<usize>,
     },
+    /// Run planned multi-turn agentic evaluation fixtures
+    Agentic {
+        #[arg(long)]
+        strategy: Option<String>,
+        #[arg(long)]
+        corpus: PathBuf,
+        #[arg(long)]
+        fixtures: PathBuf,
+        #[arg(long)]
+        shortlist: Option<usize>,
+        #[arg(long)]
+        retained_evidence_limit: Option<usize>,
+        #[arg(long)]
+        model_id: Option<String>,
+        #[arg(long)]
+        model_revision: Option<String>,
+        #[arg(long)]
+        max_length: Option<usize>,
+        #[arg(short, long, action = clap::ArgAction::Count)]
+        verbose: u8,
+    },
 }
 
 #[derive(clap::ValueEnum, Clone, Copy)]
@@ -427,6 +449,7 @@ fn main() -> Result<()> {
             EvalCommands::All { verbose, .. } => *verbose,
             EvalCommands::Quality { verbose, .. } => *verbose,
             EvalCommands::Latency { verbose, .. } => *verbose,
+            EvalCommands::Agentic { verbose, .. } => *verbose,
         },
         Commands::Optimize { verbose, .. } => *verbose,
         Commands::Search(search) => search.verbose,
@@ -629,6 +652,41 @@ fn main() -> Result<()> {
                         ),
                         verbose,
                         query_limit,
+                    },
+                    Some(&ignore),
+                )?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            }
+            EvalCommands::Agentic {
+                strategy,
+                corpus,
+                fixtures,
+                shortlist,
+                retained_evidence_limit,
+                model_id,
+                model_revision,
+                max_length,
+                verbose,
+            } => {
+                let strategy = strategy.unwrap_or_else(|| config.search.strategy.clone());
+                let shortlist = shortlist.unwrap_or(config.search.shortlist);
+                let report = run_agentic_evaluation(
+                    &AgenticEvaluationRequest {
+                        strategy,
+                        command: command_line,
+                        corpus_dir: corpus,
+                        fixtures_path: fixtures,
+                        shortlist,
+                        dense_model: DenseModelSpec::with_overrides(
+                            model_id.clone().or(Some(config.embedding.model_id.clone())),
+                            model_revision
+                                .clone()
+                                .or(Some(config.embedding.model_revision.clone())),
+                            max_length.or(Some(config.embedding.max_length)),
+                        ),
+                        retained_evidence_limit: retained_evidence_limit.unwrap_or(1),
+                        verbose,
+                        prompts: Some(config.prompts.clone()),
                     },
                     Some(&ignore),
                 )?;

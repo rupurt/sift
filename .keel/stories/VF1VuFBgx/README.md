@@ -2,14 +2,15 @@
 id: VF1VuFBgx
 title: Add Turn-Native Search Domain And Controller Requests
 type: feat
-status: needs-human-verification
+status: done
 created_at: 2026-03-26T17:34:36
-updated_at: 2026-03-26T18:08:03
+updated_at: 2026-03-26T18:58:53
 operator-signal: 
 scope: VF1VhxmqI/VF1Vt0WCT
 index: 1
 started_at: 2026-03-26T18:03:08
 submitted_at: 2026-03-26T18:08:03
+completed_at: 2026-03-26T18:58:53
 ---
 
 # Add Turn-Native Search Domain And Controller Requests

@@ -121,6 +121,60 @@ fn embedded_facade_projects_search_into_latent_emissions() {
 }
 
 #[test]
+fn emission_contracts_round_trip_through_serde() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(
+        corpus.path().join("guide.txt"),
+        "serde-stable emission contracts remain inspectable",
+    )
+    .expect("write corpus file");
+
+    let engine = Sift::builder().build();
+    let protocol = engine
+        .search_turn(
+            SearchTurnRequest::new(corpus.path(), "serde-stable")
+                .with_session_id("session-serde")
+                .with_turn_id("turn-protocol")
+                .with_strategy("bm25")
+                .with_limit(1)
+                .with_shortlist(1)
+                .with_emission_mode(SearchEmissionMode::Protocol),
+        )
+        .expect("protocol turn search");
+    let latent = engine
+        .search_turn(
+            SearchTurnRequest::new(corpus.path(), "serde-stable")
+                .with_session_id("session-serde")
+                .with_turn_id("turn-latent")
+                .with_strategy("bm25")
+                .with_limit(1)
+                .with_shortlist(1)
+                .with_emission_mode(SearchEmissionMode::Latent),
+        )
+        .expect("latent turn search");
+
+    let protocol_json =
+        serde_json::to_value(&protocol).expect("serialize protocol emission contract");
+    let latent_json = serde_json::to_value(&latent).expect("serialize latent emission contract");
+
+    assert_eq!(protocol_json["emission"]["kind"], "protocol");
+    assert_eq!(
+        protocol_json["trace"]["turns"][0]["emission_mode"],
+        "protocol"
+    );
+    assert_eq!(latent_json["emission"]["kind"], "latent");
+    assert_eq!(latent_json["trace"]["turns"][0]["emission_mode"], "latent");
+
+    let decoded_protocol: sift::SearchTurnResponse =
+        serde_json::from_value(protocol_json).expect("decode protocol response");
+    let decoded_latent: sift::SearchTurnResponse =
+        serde_json::from_value(latent_json).expect("decode latent response");
+
+    assert_eq!(decoded_protocol, protocol);
+    assert_eq!(decoded_latent, latent);
+}
+
+#[test]
 fn embedded_facade_accepts_explicit_turn_plans_without_registry_lookup() {
     let corpus = tempfile::tempdir().expect("temp corpus");
     std::fs::write(
@@ -215,5 +269,61 @@ fn embedded_facade_runs_controller_turns_from_explicit_plan_state() {
             .expect("terminal turn")
             .action,
         SearchControllerAction::Terminate
+    );
+}
+
+#[test]
+fn controller_records_pruning_when_context_budget_is_exceeded() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(
+        corpus.path().join("alpha.txt"),
+        "alpha implementation details for bounded controller context",
+    )
+    .expect("write alpha corpus file");
+    std::fs::write(
+        corpus.path().join("beta.txt"),
+        "beta implementation details for bounded controller context",
+    )
+    .expect("write beta corpus file");
+
+    let plan = custom_lexical_plan("bounded-controller-lexical");
+    let engine = Sift::builder().build();
+    let response = engine
+        .search_controller(
+            SearchControllerRequest::new(
+                plan,
+                vec![
+                    SearchTurnRequest::new(corpus.path(), "alpha")
+                        .with_turn_id("turn-a")
+                        .with_limit(1)
+                        .with_shortlist(1),
+                    SearchTurnRequest::new(corpus.path(), "beta")
+                        .with_turn_id("turn-b")
+                        .with_limit(1)
+                        .with_shortlist(1),
+                ],
+            )
+            .with_retained_evidence_limit(1),
+        )
+        .expect("bounded controller search");
+
+    assert_eq!(response.state.retained_evidence.len(), 1);
+    assert!(
+        response.state.retained_evidence[0]
+            .path
+            .ends_with("beta.txt"),
+        "fresh evidence should displace stale context under the budget"
+    );
+    assert!(
+        response.trace.turns[0]
+            .decisions
+            .iter()
+            .all(|decision| decision.action != SearchControllerAction::Prune)
+    );
+    assert!(
+        response.trace.turns[1]
+            .decisions
+            .iter()
+            .any(|decision| decision.action == SearchControllerAction::Prune)
     );
 }

@@ -155,6 +155,12 @@ pub struct Sift {
     embedder: Option<Arc<dyn Embedder>>,
 }
 
+#[derive(Debug, Clone)]
+struct BoundedRetainedEvidence {
+    retained: Vec<crate::search::RetainedEvidence>,
+    pruned: usize,
+}
+
 impl Sift {
     pub fn builder() -> SiftBuilder {
         SiftBuilder::new()
@@ -356,13 +362,13 @@ impl Sift {
                 &state.retained_evidence,
                 request.retained_evidence_limit,
             );
-            turn_request.retained_evidence = carried_evidence.clone();
+            turn_request.retained_evidence = carried_evidence.retained.clone();
 
             let search_request = self.build_turn_search_request(&turn_request, &request.plan);
             let response = env.search(&search_request)?;
             let updated_retained = self.derive_retained_evidence(
                 &response,
-                &carried_evidence,
+                &carried_evidence.retained,
                 request.retained_evidence_limit,
             );
             let continue_more = idx + 1 < turn_limit;
@@ -376,12 +382,24 @@ impl Sift {
                 ),
             ];
 
-            if !updated_retained.is_empty() {
+            if !updated_retained.retained.is_empty() {
                 decisions.push(
                     SearchControllerDecision::new(SearchControllerAction::Retain).with_rationale(
                         format!(
                             "retained {} evidence item(s) under the controller budget",
-                            updated_retained.len()
+                            updated_retained.retained.len()
+                        ),
+                    ),
+                );
+            }
+
+            let pruned = carried_evidence.pruned + updated_retained.pruned;
+            if pruned > 0 {
+                decisions.push(
+                    SearchControllerDecision::new(SearchControllerAction::Prune).with_rationale(
+                        format!(
+                            "pruned {} evidence item(s) to preserve the controller budget",
+                            pruned
                         ),
                     ),
                 );
@@ -412,7 +430,7 @@ impl Sift {
                 &turn_request,
                 &request.plan,
                 response,
-                updated_retained.clone(),
+                updated_retained.retained.clone(),
                 decisions,
                 !continue_more,
                 if continue_more {
@@ -423,7 +441,7 @@ impl Sift {
             );
 
             previous_turn_id = Some(turn_response.turn.turn_id.clone());
-            state.retained_evidence = updated_retained;
+            state.retained_evidence = updated_retained.retained;
             state.next_turn = idx + 1;
             state.completed = !continue_more;
             trace_turns.push(turn_response.trace.turns[0].clone());
@@ -606,12 +624,8 @@ impl Sift {
         primary: &[crate::search::RetainedEvidence],
         secondary: &[crate::search::RetainedEvidence],
         limit: usize,
-    ) -> Vec<crate::search::RetainedEvidence> {
-        if limit == 0 {
-            return Vec::new();
-        }
-
-        let mut merged = Vec::new();
+    ) -> BoundedRetainedEvidence {
+        let mut unique = Vec::new();
         let mut seen = HashSet::new();
 
         for evidence in primary.iter().chain(secondary.iter()) {
@@ -622,14 +636,16 @@ impl Sift {
                 evidence.snippet.as_deref().unwrap_or("")
             );
             if seen.insert(key) {
-                merged.push(evidence.clone());
-                if merged.len() >= limit {
-                    break;
-                }
+                unique.push(evidence.clone());
             }
         }
 
-        merged
+        let pruned = unique.len().saturating_sub(limit);
+
+        BoundedRetainedEvidence {
+            retained: unique.into_iter().take(limit).collect(),
+            pruned,
+        }
     }
 
     fn derive_retained_evidence(
@@ -637,7 +653,7 @@ impl Sift {
         response: &SearchResponse,
         prior: &[crate::search::RetainedEvidence],
         limit: usize,
-    ) -> Vec<crate::search::RetainedEvidence> {
+    ) -> BoundedRetainedEvidence {
         let fresh: Vec<_> = response
             .results
             .iter()

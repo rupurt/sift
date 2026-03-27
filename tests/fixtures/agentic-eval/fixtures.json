@@ -1,0 +1,32 @@
+{
+  "tasks": [
+    {
+      "id": "alpha-beta-handoff",
+      "turns": [
+        {
+          "query": "alpha module",
+          "expected_documents": ["alpha"]
+        },
+        {
+          "query": "beta module",
+          "expected_documents": ["beta"]
+        }
+      ],
+      "expected_final_documents": ["beta"]
+    },
+    {
+      "id": "policy-audit-escalation",
+      "turns": [
+        {
+          "query": "policy layer",
+          "expected_documents": ["policy"]
+        },
+        {
+          "query": "audit trail",
+          "expected_documents": ["audit"]
+        }
+      ],
+      "expected_final_documents": ["audit"]
+    }
+  ]
+}

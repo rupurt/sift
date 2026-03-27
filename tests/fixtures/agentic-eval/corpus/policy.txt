@@ -1,0 +1,1 @@
+The policy layer decides whether a change requires an audit trail before it can be shipped.

@@ -14,7 +14,7 @@ reuse.
 1.  **Raw Dataset:** The original dataset files (e.g., SciFact `corpus.jsonl`).
 2.  **Materialized Corpus:** A directory of individual text files derived from the raw dataset. This is what `sift` searches during evaluations to simulate a real-world local project structure.
 3.  **Qrels:** "Query Relevance" judgements. A file mapping query IDs to the correct document IDs.
-4.  **Trajectory (planned):** A multi-turn search trace for agentic evaluation, including query decomposition, retrieval turns, and context edits.
+4.  **Trajectory:** A planned multi-turn search trace for agentic evaluation, including ordered retrieval turns, retained evidence, and context edits.
 
 ---
 
@@ -89,15 +89,24 @@ Sift allows you to compare different query expansion strategies to see which one
 - **`page-index-classified`**: Measures the quality of intent-based classification.
 - **`page-index-llm`**: Measures the quality of full HyDE expansion combined with LLM reranking.
 
-### 6. Agentic Evaluation Gap
-The current harness does **not** yet evaluate a formal turn-based search agent.
-That future layer should add metrics such as:
+### 6. Agentic Evaluation (`eval agentic`)
+Sift now includes a repo-local harness for planned multi-turn evaluation. These fixtures describe explicit turn sequences and expected documents so the current controller can be measured deterministically without requiring a hosted service or a learned planner.
 
-- End-to-end task success over multi-hop queries.
-- Turns to answer and tool calls per successful trajectory.
-- Context pruning precision / recall for retained evidence.
-- Evidence recall across turns, not just in a single final ranking.
-- Wall-clock latency for the full search trajectory, not just one retrieval pass.
+```bash
+just sift eval agentic \
+  --corpus tests/fixtures/agentic-eval/corpus \
+  --fixtures tests/fixtures/agentic-eval/fixtures.json \
+  --strategy bm25
+```
+
+The agentic report captures:
+
+- End-to-end task success over planned multi-turn trajectories.
+- Per-turn document recall against expected documents.
+- Average turns executed per task.
+- Context pruning actions emitted by the controller trace.
+
+This harness is intentionally fixture-driven: it evaluates the current local controller and trace contracts, not an autonomous query-decomposition model. Comparative benchmarking against the hybrid champion remains a separate step.
 
 ---
 

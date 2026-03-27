@@ -141,7 +141,7 @@ impl SearchRequest {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SearchResponse {
     pub strategy: String,
     pub root: String,
@@ -383,6 +383,7 @@ impl SearchControllerRequest {
 pub enum SearchControllerAction {
     Retrieve,
     Retain,
+    Prune,
     Emit,
     Continue,
     Terminate,
@@ -470,7 +471,7 @@ pub struct LatentSearchEmission {
     pub hits: Vec<LatentSearchHit>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", content = "payload", rename_all = "kebab-case")]
 pub enum SearchEmission {
     View(SearchResponse),
@@ -478,14 +479,14 @@ pub enum SearchEmission {
     Latent(LatentSearchEmission),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SearchTurnResponse {
     pub turn: SearchTurn,
     pub trace: SearchTrace,
     pub emission: SearchEmission,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SearchControllerResponse {
     pub plan: SearchPlan,
     pub state: SearchControllerState,
