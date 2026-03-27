@@ -12,9 +12,12 @@ pub use corpus::load_search_corpus;
 pub use domain::{
     Bm25Index, CachedEmbedder, Candidate, CandidateList, ContributorScore, Conversation,
     CorpusRepository, Document, Embedder, Expander, Fuser, FusionPolicy, GenerativeModel,
-    LoadedCorpus, OutputFormat, PreparedCorpus, QueryEmbeddingCache, QueryVariant, Reranker,
-    RerankingPolicy, Retriever, RetrieverPolicy, ScoreConfidence, SearchHit, SearchPlan,
-    SearchRequest, SearchResponse, SearchTelemetry, StrategyPresetRegistry, tokenize,
+    LatentSearchEmission, LatentSearchHit, LoadedCorpus, OutputFormat, PreparedCorpus,
+    ProtocolSearchEmission, QueryEmbeddingCache, QueryVariant, Reranker, RerankingPolicy,
+    RetainedEvidence, Retriever, RetrieverPolicy, ScoreConfidence, SearchControllerAction,
+    SearchControllerDecision, SearchEmission, SearchEmissionMode, SearchHit, SearchPlan,
+    SearchRequest, SearchResponse, SearchTelemetry, SearchTrace, SearchTurn, SearchTurnRequest,
+    SearchTurnResponse, SearchTurnTrace, StrategyPresetRegistry, tokenize,
 };
 pub use engine::{SearchEngine, SearchEnvironment};
 #[allow(unused_imports)]

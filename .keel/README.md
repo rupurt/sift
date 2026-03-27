@@ -78,7 +78,7 @@
 
 | Voyage | Status |
 |--------|--------|
-| [Define Turn Model and Emission Contract](epics/VF1VhxmqI/voyages/VF1Vt0WCT/) | planned |
+| [Define Turn Model and Emission Contract](epics/VF1VhxmqI/voyages/VF1Vt0WCT/) | in-progress |
 
 ### [Local Multi-Turn Search Controller](epics/VF1Vhy2qJ/) (active)
 

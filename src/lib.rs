@@ -2,7 +2,8 @@
 //!
 //! Supported embedded API:
 //! - [`Sift`] and [`SiftBuilder`] for constructing a search engine instance
-//! - [`SearchInput`] and [`SearchOptions`] for issuing searches
+//! - [`SearchInput`] and [`SearchOptions`] for issuing direct searches
+//! - [`SearchTurnRequest`], [`SearchTurnResponse`], and [`SearchEmissionMode`] for turn-aware search control
 //! - [`Retriever`], [`Fusion`], and [`Reranking`] for supported strategy overrides
 //! - [`SearchResponse`], [`SearchHit`], and [`ScoreConfidence`] for results
 //!
@@ -27,7 +28,12 @@ pub use crate::facade::{
     Conversation, Fusion, GenerativeModel, Reranking, Retriever, SearchInput, SearchOptions, Sift,
     SiftBuilder,
 };
-pub use crate::search::{ScoreConfidence, SearchHit, SearchResponse};
+pub use crate::search::{
+    LatentSearchEmission, LatentSearchHit, ProtocolSearchEmission, RetainedEvidence,
+    ScoreConfidence, SearchControllerAction, SearchControllerDecision, SearchEmission,
+    SearchEmissionMode, SearchHit, SearchResponse, SearchTrace, SearchTurn, SearchTurnRequest,
+    SearchTurnResponse, SearchTurnTrace,
+};
 
 #[doc(hidden)]
 pub mod internal {

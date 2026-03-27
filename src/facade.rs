@@ -10,8 +10,11 @@ use crate::search::adapters::gemma::GemmaModelSpec;
 use crate::search::adapters::qwen::QwenModelSpec;
 pub use crate::search::domain::{Conversation, GenerativeModel};
 use crate::search::{
-    Embedder, FusionPolicy, LocalFileCorpusRepository, QueryEmbeddingCache, RerankingPolicy,
-    RetrieverPolicy, SearchRequest, SearchResponse, StrategyPresetRegistry, run_search,
+    Embedder, FusionPolicy, LatentSearchEmission, LatentSearchHit, LocalFileCorpusRepository,
+    ProtocolSearchEmission, QueryEmbeddingCache, RerankingPolicy, RetrieverPolicy,
+    SearchControllerAction, SearchControllerDecision, SearchEmission, SearchEmissionMode,
+    SearchRequest, SearchResponse, SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse,
+    SearchTurnTrace, StrategyPresetRegistry, run_search,
 };
 use crate::system::Telemetry;
 
@@ -208,6 +211,125 @@ impl Sift {
             &LocalFileCorpusRepository,
             embedder,
         )
+    }
+
+    pub fn search_turn(&self, request: SearchTurnRequest) -> Result<SearchTurnResponse> {
+        let strategy = request
+            .strategy
+            .clone()
+            .unwrap_or_else(|| self.config.search.strategy.clone());
+        let limit = request.limit.unwrap_or(self.config.search.limit);
+        let shortlist = request.shortlist.unwrap_or(self.config.search.shortlist);
+
+        let options = SearchOptions::default()
+            .with_strategy(strategy.clone())
+            .with_limit(limit)
+            .with_shortlist(shortlist)
+            .with_verbose(request.verbose);
+
+        let mut input =
+            SearchInput::new(&request.path, request.query.clone()).with_options(options);
+        if let Some(intent) = &request.intent {
+            input = input.with_intent(intent.clone());
+        }
+
+        let response = self.search(input)?;
+
+        let mut decisions = vec![
+            SearchControllerDecision::new(SearchControllerAction::Retrieve).with_rationale(
+                format!(
+                    "executed {} strategy for turn {}",
+                    strategy, request.turn_id
+                ),
+            ),
+        ];
+
+        if !request.retained_evidence.is_empty() {
+            decisions.push(
+                SearchControllerDecision::new(SearchControllerAction::Retain).with_rationale(
+                    format!(
+                        "carried {} retained evidence item(s) into this turn",
+                        request.retained_evidence.len()
+                    ),
+                ),
+            );
+        }
+
+        decisions.push(
+            SearchControllerDecision::new(SearchControllerAction::Emit).with_rationale(format!(
+                "emitted {} result(s) as {:?}",
+                response.results.len(),
+                request.emission_mode
+            )),
+        );
+        decisions.push(
+            SearchControllerDecision::new(SearchControllerAction::Terminate)
+                .with_rationale("completed a direct single-turn search"),
+        );
+
+        let turn = SearchTurn {
+            session_id: request.session_id.clone(),
+            turn_id: request.turn_id.clone(),
+            parent_turn_id: request.parent_turn_id.clone(),
+            sequence: request.sequence,
+            path: request.path.display().to_string(),
+            query: request.query.clone(),
+            intent: request.intent.clone(),
+            strategy: strategy.clone(),
+            limit,
+            shortlist,
+            emission_mode: request.emission_mode,
+            result_count: response.results.len(),
+            retained_evidence: request.retained_evidence.clone(),
+        };
+
+        let trace = SearchTrace {
+            session_id: request.session_id.clone(),
+            turns: vec![SearchTurnTrace {
+                turn_id: request.turn_id.clone(),
+                sequence: request.sequence,
+                query: request.query.clone(),
+                strategy: strategy.clone(),
+                emission_mode: request.emission_mode,
+                result_count: response.results.len(),
+                retained_evidence: request.retained_evidence.clone(),
+                decisions,
+            }],
+            completed: true,
+            termination_reason: Some("single-turn search emitted a terminal response".to_string()),
+        };
+
+        let emission = match request.emission_mode {
+            SearchEmissionMode::View => SearchEmission::View(response.clone()),
+            SearchEmissionMode::Protocol => SearchEmission::Protocol(ProtocolSearchEmission {
+                turn_id: request.turn_id.clone(),
+                session_id: request.session_id.clone(),
+                strategy,
+                root: response.root.clone(),
+                hits: response.results.clone(),
+            }),
+            SearchEmissionMode::Latent => SearchEmission::Latent(LatentSearchEmission {
+                turn_id: request.turn_id.clone(),
+                session_id: request.session_id.clone(),
+                feature_space: "ranking-score".to_string(),
+                hits: response
+                    .results
+                    .iter()
+                    .map(|hit| LatentSearchHit {
+                        path: hit.path.clone(),
+                        score: hit.score,
+                        confidence: hit.confidence,
+                        location: hit.location.clone(),
+                    })
+                    .collect(),
+            }),
+        };
+
+        Ok(SearchTurnResponse {
+            turn,
+            trace,
+            emission,
+        })
     }
 
     pub fn generative(&self, options: SearchOptions) -> Result<Arc<dyn GenerativeModel>> {

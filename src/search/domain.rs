@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 pub use crate::internal::config::Ignore;
@@ -158,6 +158,253 @@ pub struct SearchHit {
     pub confidence: ScoreConfidence,
     pub location: Option<String>,
     pub snippet: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SearchEmissionMode {
+    View,
+    Protocol,
+    Latent,
+}
+
+impl Default for SearchEmissionMode {
+    fn default() -> Self {
+        Self::View
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RetainedEvidence {
+    pub path: String,
+    pub location: Option<String>,
+    pub snippet: Option<String>,
+    pub rationale: Option<String>,
+}
+
+impl RetainedEvidence {
+    pub fn new(path: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            location: None,
+            snippet: None,
+            rationale: None,
+        }
+    }
+
+    pub fn with_location(mut self, location: impl Into<String>) -> Self {
+        self.location = Some(location.into());
+        self
+    }
+
+    pub fn with_snippet(mut self, snippet: impl Into<String>) -> Self {
+        self.snippet = Some(snippet.into());
+        self
+    }
+
+    pub fn with_rationale(mut self, rationale: impl Into<String>) -> Self {
+        self.rationale = Some(rationale.into());
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SearchTurnRequest {
+    pub session_id: Option<String>,
+    pub turn_id: String,
+    pub parent_turn_id: Option<String>,
+    pub sequence: usize,
+    pub path: PathBuf,
+    pub query: String,
+    pub intent: Option<String>,
+    pub strategy: Option<String>,
+    pub limit: Option<usize>,
+    pub shortlist: Option<usize>,
+    pub verbose: u8,
+    pub emission_mode: SearchEmissionMode,
+    pub retained_evidence: Vec<RetainedEvidence>,
+}
+
+impl SearchTurnRequest {
+    pub fn new(path: impl AsRef<Path>, query: impl Into<String>) -> Self {
+        Self {
+            session_id: None,
+            turn_id: "turn-1".to_string(),
+            parent_turn_id: None,
+            sequence: 1,
+            path: path.as_ref().to_path_buf(),
+            query: query.into(),
+            intent: None,
+            strategy: None,
+            limit: None,
+            shortlist: None,
+            verbose: 0,
+            emission_mode: SearchEmissionMode::View,
+            retained_evidence: Vec::new(),
+        }
+    }
+
+    pub fn with_session_id(mut self, session_id: impl Into<String>) -> Self {
+        self.session_id = Some(session_id.into());
+        self
+    }
+
+    pub fn with_turn_id(mut self, turn_id: impl Into<String>) -> Self {
+        self.turn_id = turn_id.into();
+        self
+    }
+
+    pub fn with_parent_turn_id(mut self, parent_turn_id: impl Into<String>) -> Self {
+        self.parent_turn_id = Some(parent_turn_id.into());
+        self
+    }
+
+    pub fn with_sequence(mut self, sequence: usize) -> Self {
+        self.sequence = sequence;
+        self
+    }
+
+    pub fn with_intent(mut self, intent: impl Into<String>) -> Self {
+        self.intent = Some(intent.into());
+        self
+    }
+
+    pub fn with_strategy(mut self, strategy: impl Into<String>) -> Self {
+        self.strategy = Some(strategy.into());
+        self
+    }
+
+    pub fn with_limit(mut self, limit: usize) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn with_shortlist(mut self, shortlist: usize) -> Self {
+        self.shortlist = Some(shortlist);
+        self
+    }
+
+    pub fn with_verbose(mut self, verbose: u8) -> Self {
+        self.verbose = verbose;
+        self
+    }
+
+    pub fn with_emission_mode(mut self, emission_mode: SearchEmissionMode) -> Self {
+        self.emission_mode = emission_mode;
+        self
+    }
+
+    pub fn with_retained_evidence(mut self, retained_evidence: Vec<RetainedEvidence>) -> Self {
+        self.retained_evidence = retained_evidence;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SearchControllerAction {
+    Retrieve,
+    Retain,
+    Emit,
+    Continue,
+    Terminate,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SearchControllerDecision {
+    pub action: SearchControllerAction,
+    pub rationale: Option<String>,
+}
+
+impl SearchControllerDecision {
+    pub fn new(action: SearchControllerAction) -> Self {
+        Self {
+            action,
+            rationale: None,
+        }
+    }
+
+    pub fn with_rationale(mut self, rationale: impl Into<String>) -> Self {
+        self.rationale = Some(rationale.into());
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SearchTurn {
+    pub session_id: Option<String>,
+    pub turn_id: String,
+    pub parent_turn_id: Option<String>,
+    pub sequence: usize,
+    pub path: String,
+    pub query: String,
+    pub intent: Option<String>,
+    pub strategy: String,
+    pub limit: usize,
+    pub shortlist: usize,
+    pub emission_mode: SearchEmissionMode,
+    pub result_count: usize,
+    pub retained_evidence: Vec<RetainedEvidence>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SearchTurnTrace {
+    pub turn_id: String,
+    pub sequence: usize,
+    pub query: String,
+    pub strategy: String,
+    pub emission_mode: SearchEmissionMode,
+    pub result_count: usize,
+    pub retained_evidence: Vec<RetainedEvidence>,
+    pub decisions: Vec<SearchControllerDecision>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SearchTrace {
+    pub session_id: Option<String>,
+    pub turns: Vec<SearchTurnTrace>,
+    pub completed: bool,
+    pub termination_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ProtocolSearchEmission {
+    pub turn_id: String,
+    pub session_id: Option<String>,
+    pub strategy: String,
+    pub root: String,
+    pub hits: Vec<SearchHit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LatentSearchHit {
+    pub path: String,
+    pub score: f64,
+    pub confidence: ScoreConfidence,
+    pub location: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LatentSearchEmission {
+    pub turn_id: String,
+    pub session_id: Option<String>,
+    pub feature_space: String,
+    pub hits: Vec<LatentSearchHit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "payload", rename_all = "kebab-case")]
+pub enum SearchEmission {
+    View(SearchResponse),
+    Protocol(ProtocolSearchEmission),
+    Latent(LatentSearchEmission),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchTurnResponse {
+    pub turn: SearchTurn,
+    pub trace: SearchTrace,
+    pub emission: SearchEmission,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -648,9 +895,7 @@ pub enum OutputFormat {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        QueryExpansionPolicy, RerankingPolicy, RetrieverPolicy, StrategyPresetRegistry,
-    };
+    use super::{QueryExpansionPolicy, RerankingPolicy, RetrieverPolicy, StrategyPresetRegistry};
 
     #[test]
     fn default_registry_includes_vector_strategy() {

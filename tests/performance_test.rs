@@ -43,7 +43,10 @@ fn test_query_embedding_cache_avoids_redundant_calls() {
     let count2 = call_count.load(std::sync::atomic::Ordering::SeqCst);
 
     assert_eq!(first, second);
-    assert_eq!(count1, 1, "first embed should reach the inner embedder once");
+    assert_eq!(
+        count1, 1,
+        "first embed should reach the inner embedder once"
+    );
     assert_eq!(
         count1, count2,
         "Call count should not increase on second embed due to query caching"
