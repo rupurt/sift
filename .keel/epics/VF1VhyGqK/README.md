@@ -20,8 +20,8 @@ mission: VF1UOlGfX
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 1/3 stories done
+**Progress:** 0/1 voyages complete, 2/3 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Add Turn Traces and Agentic Evaluation](voyages/VF1Vt0sCV/) | in-progress | 1/3 |
+| [Add Turn Traces and Agentic Evaluation](voyages/VF1Vt0sCV/) | in-progress | 2/3 |
 <!-- END GENERATED -->

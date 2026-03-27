@@ -25,11 +25,11 @@ started_at: 2026-03-26T19:04:32
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 1/3 stories complete
+**Progress:** 2/3 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
 | [Emit Inspectable Turn Traces And Context Actions](../../../../stories/VF1Vxv5U1/README.md) | feat | done |
-| [Add Multi-Hop Agentic Evaluation Fixtures And Harness](../../../../stories/VF1VxvFU2/README.md) | feat | needs-human-verification |
+| [Add Multi-Hop Agentic Evaluation Fixtures And Harness](../../../../stories/VF1VxvFU2/README.md) | feat | done |
 | [Benchmark Agentic Search Against The Hybrid Champion](../../../../stories/VF1VxvOU3/README.md) | feat | icebox |
 <!-- END GENERATED -->
