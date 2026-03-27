@@ -69,14 +69,18 @@ build-static:
     fi
 
 sift *args:
-    @set -eu; \
-    set -- {{args}}; \
-    cargo_args="--release"; \
-    if [ "${1:-}" = "--cuda" ]; then \
-        shift; \
-        cargo_args="$cargo_args --features cuda"; \
-    fi; \
-    cargo run $cargo_args -- "$@"
+    @bash -eu -c '\
+        cargo_args=(--release); \
+        sift_args=(); \
+        for arg in "$@"; do \
+            if [ "$arg" = "--cuda" ]; then \
+                cargo_args+=(--features cuda); \
+            else \
+                sift_args+=("$arg"); \
+            fi; \
+        done; \
+        cargo run "${cargo_args[@]}" -- "${sift_args[@]}" \
+    ' -- {{args}}
 
 embed-build:
     @set -eu; \
