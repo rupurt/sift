@@ -11,13 +11,14 @@ use crate::search::adapters::qwen::QwenModelSpec;
 pub use crate::search::domain::{Conversation, GenerativeModel};
 use crate::search::engine::SearchEngine;
 use crate::search::{
-    Bm25Index, Embedder, FusionPolicy, LatentSearchEmission, LatentSearchHit,
-    LocalFileCorpusRepository, ProtocolSearchEmission, QueryEmbeddingCache, RerankingPolicy,
-    RetrieverPolicy, SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
+    Bm25Index, ContextAssemblyBudget, ContextAssemblyRequest, ContextAssemblyResponse, Embedder,
+    FusionPolicy, LatentSearchEmission, LatentSearchHit, LocalFileCorpusRepository,
+    ProtocolSearchEmission, QueryEmbeddingCache, RerankingPolicy, RetrieverPolicy,
+    SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
     SearchControllerResponse, SearchEmission, SearchEmissionMode, SearchEnvironment, SearchPlan,
     SearchRequest, SearchResponse, SearchServiceBuilder, SearchTrace, SearchTurn,
     SearchTurnRequest, SearchTurnResponse, SearchTurnTrace, StrategyPresetRegistry,
-    load_search_corpus, run_search, run_search_with_plan,
+    load_search_corpus, run_search_with_plan,
 };
 use crate::system::Telemetry;
 
@@ -156,8 +157,8 @@ pub struct Sift {
 }
 
 #[derive(Debug, Clone)]
-struct BoundedRetainedEvidence {
-    retained: Vec<crate::search::RetainedEvidence>,
+struct BoundedRetainedArtifacts {
+    retained: Vec<crate::search::RetainedArtifact>,
     pruned: usize,
 }
 
@@ -167,6 +168,28 @@ impl Sift {
     }
 
     pub fn search(&self, input: SearchInput) -> Result<SearchResponse> {
+        let search_request = self.build_search_request(input)?;
+        let dense_model = search_request.dense_model.clone();
+        let plan = self.resolve_search_plan(&search_request)?;
+        let embedder = self.resolve_embedder_for_plan(&plan, &dense_model)?;
+
+        run_search_with_plan(
+            &plan,
+            &search_request,
+            self.ignore.as_ref(),
+            &LocalFileCorpusRepository,
+            embedder,
+        )
+    }
+
+    pub fn assemble_context(
+        &self,
+        request: ContextAssemblyRequest,
+    ) -> Result<ContextAssemblyResponse> {
+        self.assemble_context_with_plan(request, None, "assembly", None)
+    }
+
+    fn build_search_request(&self, input: SearchInput) -> Result<SearchRequest> {
         let strategy = input
             .options
             .strategy
@@ -191,49 +214,50 @@ impl Sift {
         });
         let rerank_model = self.resolve_rerank_model(&strategy, &input.options);
         let gemma_model = self.resolve_gemma_model(&strategy, &input.options);
-        let embedder = self.resolve_embedder(&strategy, &input.options, &dense_model)?;
-
-        run_search(
-            &SearchRequest {
-                strategy,
-                query: input.query,
-                intent,
-                path: input.path,
-                limit,
-                shortlist,
-                dense_model,
-                rerank_model,
-                gemma_model,
-                prompts: Some(self.config.prompts.clone()),
-                verbose: input.options.verbose,
-                retrievers: input
-                    .options
-                    .retrievers
-                    .map(|retrievers| retrievers.into_iter().map(Into::into).collect()),
-                fusion: input.options.fusion.map(Into::into),
-                reranking: input.options.reranking.map(Into::into),
-                telemetry: self.telemetry.clone(),
-                cache_dir: input.options.cache_dir.or_else(|| self.cache_dir.clone()),
-                query_cache: Some(self.query_cache.clone()),
-            },
-            self.ignore.as_ref(),
-            &LocalFileCorpusRepository,
-            embedder,
-        )
+        Ok(SearchRequest {
+            strategy,
+            query: input.query,
+            intent,
+            path: input.path,
+            limit,
+            shortlist,
+            dense_model,
+            rerank_model,
+            gemma_model,
+            prompts: Some(self.config.prompts.clone()),
+            verbose: input.options.verbose,
+            retrievers: input
+                .options
+                .retrievers
+                .map(|retrievers| retrievers.into_iter().map(Into::into).collect()),
+            fusion: input.options.fusion.map(Into::into),
+            reranking: input.options.reranking.map(Into::into),
+            telemetry: self.telemetry.clone(),
+            cache_dir: input.options.cache_dir.or_else(|| self.cache_dir.clone()),
+            query_cache: Some(self.query_cache.clone()),
+            local_context: input.options.local_context.clone(),
+        })
     }
 
     pub fn search_turn(&self, request: SearchTurnRequest) -> Result<SearchTurnResponse> {
         let plan = self.resolve_turn_plan(&request)?;
-        let search_request = self.build_turn_search_request(&request, &plan);
-        let dense_model = search_request.dense_model.clone();
-        let embedder = self.resolve_embedder_for_plan(&plan, &dense_model)?;
-        let response = run_search_with_plan(
-            &plan,
-            &search_request,
-            self.ignore.as_ref(),
-            &LocalFileCorpusRepository,
-            embedder,
+        let assembly = self.assemble_context_with_plan(
+            ContextAssemblyRequest::new(&request.path, request.query.clone())
+                .with_strategy(plan.name.clone())
+                .with_intent_opt(request.intent.clone())
+                .with_limit(request.limit.unwrap_or(self.config.search.limit))
+                .with_shortlist(request.shortlist.unwrap_or(self.config.search.shortlist))
+                .with_emission_mode(request.emission_mode)
+                .with_local_context(request.local_context.clone())
+                .with_retained_artifacts(request.retained_artifacts.clone())
+                .with_budget(ContextAssemblyBudget::new(
+                    request.limit.unwrap_or(self.config.search.limit).max(1),
+                )),
+            Some(plan.clone()),
+            &request.turn_id,
+            request.session_id.clone(),
         )?;
+        let response = assembly.response.clone();
 
         let mut decisions = vec![
             SearchControllerDecision::new(SearchControllerAction::Retrieve).with_rationale(
@@ -241,12 +265,12 @@ impl Sift {
             ),
         ];
 
-        if !request.retained_evidence.is_empty() {
+        if !request.retained_artifacts.is_empty() {
             decisions.push(
                 SearchControllerDecision::new(SearchControllerAction::Retain).with_rationale(
                     format!(
                         "carried {} retained evidence item(s) into this turn",
-                        request.retained_evidence.len()
+                        request.retained_artifacts.len()
                     ),
                 ),
             );
@@ -255,7 +279,7 @@ impl Sift {
         decisions.push(
             SearchControllerDecision::new(SearchControllerAction::Emit).with_rationale(format!(
                 "emitted {} result(s) as {:?}",
-                response.results.len(),
+                response.hits.len(),
                 request.emission_mode
             )),
         );
@@ -267,8 +291,7 @@ impl Sift {
         Ok(self.build_turn_response(
             &request,
             &plan,
-            response,
-            request.retained_evidence.clone(),
+            assembly,
             decisions,
             true,
             Some("single-turn search emitted a terminal response".to_string()),
@@ -315,6 +338,14 @@ impl Sift {
             }
         }
 
+        let merged_local_context = Self::merge_local_context_sources(
+            request
+                .turns
+                .iter()
+                .take(turn_limit)
+                .flat_map(|turn| turn.local_context.clone())
+                .collect(),
+        );
         let env_request = self.build_turn_search_request(first_turn, &request.plan);
         let dense_model = env_request.dense_model.clone();
         let embedder = self.resolve_embedder_for_plan(&request.plan, &dense_model)?;
@@ -324,9 +355,10 @@ impl Sift {
             first_turn.verbose,
             embedder.as_deref(),
             &self.telemetry,
+            &merged_local_context,
             self.cache_dir.as_deref(),
         )?;
-        let index = Bm25Index::build(&corpus.documents);
+        let index = Bm25Index::build(&corpus.artifacts);
         let llm_reranker = SearchServiceBuilder::load_llm_reranker(&request.plan, &env_request)?;
         let env = SearchEnvironment::new_with_plan(
             &env_request,
@@ -357,19 +389,19 @@ impl Sift {
             turn_request.sequence = idx + 1;
             turn_request.strategy = Some(request.plan.name.clone());
             turn_request.plan = Some(request.plan.clone());
-            let carried_evidence = Self::merge_retained_evidence(
-                &turn_request.retained_evidence,
-                &state.retained_evidence,
-                request.retained_evidence_limit,
+            let carried_evidence = Self::merge_retained_artifacts(
+                &turn_request.retained_artifacts,
+                &state.retained_artifacts,
+                request.retained_artifact_limit,
             );
-            turn_request.retained_evidence = carried_evidence.retained.clone();
+            turn_request.retained_artifacts = carried_evidence.retained.clone();
 
             let search_request = self.build_turn_search_request(&turn_request, &request.plan);
             let response = env.search(&search_request)?;
-            let updated_retained = self.derive_retained_evidence(
+            let updated_retained = Self::derive_retained_artifacts(
                 &response,
                 &carried_evidence.retained,
-                request.retained_evidence_limit,
+                request.retained_artifact_limit,
             );
             let continue_more = idx + 1 < turn_limit;
 
@@ -409,7 +441,7 @@ impl Sift {
                 SearchControllerDecision::new(SearchControllerAction::Emit).with_rationale(
                     format!(
                         "emitted {} result(s) for this controller turn",
-                        response.results.len()
+                        response.hits.len()
                     ),
                 ),
             );
@@ -426,11 +458,22 @@ impl Sift {
                 }),
             );
 
+            let assembly = ContextAssemblyResponse {
+                response: response.clone(),
+                emission: build_search_emission(
+                    &response,
+                    turn_request.emission_mode,
+                    &turn_request.turn_id,
+                    turn_request.session_id.clone(),
+                ),
+                retained_artifacts: updated_retained.retained.clone(),
+                pruned_artifacts: pruned,
+            };
+
             let turn_response = self.build_turn_response(
                 &turn_request,
                 &request.plan,
-                response,
-                updated_retained.retained.clone(),
+                assembly,
                 decisions,
                 !continue_more,
                 if continue_more {
@@ -441,7 +484,7 @@ impl Sift {
             );
 
             previous_turn_id = Some(turn_response.turn.turn_id.clone());
-            state.retained_evidence = updated_retained.retained;
+            state.retained_artifacts = updated_retained.retained;
             state.next_turn = idx + 1;
             state.completed = !continue_more;
             trace_turns.push(turn_response.trace.turns[0].clone());
@@ -499,6 +542,22 @@ impl Sift {
         StrategyPresetRegistry::default_registry().resolve(strategy)
     }
 
+    fn resolve_search_plan(&self, request: &SearchRequest) -> Result<SearchPlan> {
+        let mut plan = StrategyPresetRegistry::default_registry().resolve(&request.strategy)?;
+
+        if let Some(retrievers) = &request.retrievers {
+            plan.retrievers = retrievers.clone();
+        }
+        if let Some(fusion) = request.fusion {
+            plan.fusion = fusion;
+        }
+        if let Some(reranking) = request.reranking {
+            plan.reranking = reranking;
+        }
+
+        Ok(plan)
+    }
+
     fn build_turn_search_request(
         &self,
         request: &SearchTurnRequest,
@@ -522,7 +581,75 @@ impl Sift {
             cache_dir: self.cache_dir.clone(),
             telemetry: self.telemetry.clone(),
             prompts: Some(self.config.prompts.clone()),
+            local_context: request.local_context.clone(),
         }
+    }
+
+    fn build_context_search_request(
+        &self,
+        request: &ContextAssemblyRequest,
+        plan: &SearchPlan,
+    ) -> SearchRequest {
+        SearchRequest {
+            query: request.query.clone(),
+            intent: request.intent.clone(),
+            path: request.path.clone(),
+            strategy: plan.name.clone(),
+            limit: request.limit.unwrap_or(self.config.search.limit),
+            shortlist: request.shortlist.unwrap_or(self.config.search.shortlist),
+            verbose: 0,
+            retrievers: None,
+            fusion: None,
+            reranking: None,
+            dense_model: self.default_dense_model(),
+            rerank_model: self.resolve_rerank_model_for_plan(plan),
+            gemma_model: self.resolve_gemma_model_for_plan(plan),
+            query_cache: Some(self.query_cache.clone()),
+            cache_dir: self.cache_dir.clone(),
+            telemetry: self.telemetry.clone(),
+            prompts: Some(self.config.prompts.clone()),
+            local_context: request.local_context.clone(),
+        }
+    }
+
+    fn assemble_context_with_plan(
+        &self,
+        request: ContextAssemblyRequest,
+        explicit_plan: Option<SearchPlan>,
+        turn_id: &str,
+        session_id: Option<String>,
+    ) -> Result<ContextAssemblyResponse> {
+        let plan = if let Some(plan) = explicit_plan.or_else(|| request.plan.clone()) {
+            plan
+        } else {
+            let strategy = request
+                .strategy
+                .clone()
+                .unwrap_or_else(|| self.config.search.strategy.clone());
+            StrategyPresetRegistry::default_registry().resolve(&strategy)?
+        };
+        let search_request = self.build_context_search_request(&request, &plan);
+        let dense_model = search_request.dense_model.clone();
+        let embedder = self.resolve_embedder_for_plan(&plan, &dense_model)?;
+        let response = run_search_with_plan(
+            &plan,
+            &search_request,
+            self.ignore.as_ref(),
+            &LocalFileCorpusRepository,
+            embedder,
+        )?;
+        let retained_artifacts = Self::derive_retained_artifacts(
+            &response,
+            &request.retained_artifacts,
+            request.budget.max_retained_artifacts,
+        );
+
+        Ok(ContextAssemblyResponse {
+            response: response.clone(),
+            emission: build_search_emission(&response, request.emission_mode, turn_id, session_id),
+            retained_artifacts: retained_artifacts.retained,
+            pruned_artifacts: retained_artifacts.pruned,
+        })
     }
 
     fn resolve_embedder_for_plan(
@@ -547,12 +674,12 @@ impl Sift {
         &self,
         request: &SearchTurnRequest,
         plan: &SearchPlan,
-        response: SearchResponse,
-        retained_evidence: Vec<crate::search::RetainedEvidence>,
+        assembly: ContextAssemblyResponse,
         decisions: Vec<SearchControllerDecision>,
         completed: bool,
         termination_reason: Option<String>,
     ) -> SearchTurnResponse {
+        let response = assembly.response.clone();
         let turn = SearchTurn {
             session_id: request.session_id.clone(),
             turn_id: request.turn_id.clone(),
@@ -565,8 +692,8 @@ impl Sift {
             limit: request.limit.unwrap_or(self.config.search.limit),
             shortlist: request.shortlist.unwrap_or(self.config.search.shortlist),
             emission_mode: request.emission_mode,
-            result_count: response.results.len(),
-            retained_evidence: retained_evidence.clone(),
+            result_count: response.hits.len(),
+            retained_artifacts: assembly.retained_artifacts.clone(),
         };
 
         let trace_turn = SearchTurnTrace {
@@ -576,7 +703,7 @@ impl Sift {
             strategy: turn.strategy.clone(),
             emission_mode: turn.emission_mode,
             result_count: turn.result_count,
-            retained_evidence: retained_evidence.clone(),
+            retained_artifacts: assembly.retained_artifacts.clone(),
             decisions,
         };
 
@@ -587,44 +714,24 @@ impl Sift {
             termination_reason,
         };
 
-        let emission = match request.emission_mode {
-            SearchEmissionMode::View => SearchEmission::View(response),
-            SearchEmissionMode::Protocol => SearchEmission::Protocol(ProtocolSearchEmission {
-                turn_id: request.turn_id.clone(),
-                session_id: request.session_id.clone(),
-                strategy: plan.name.clone(),
-                root: response.root.clone(),
-                hits: response.results.clone(),
-            }),
-            SearchEmissionMode::Latent => SearchEmission::Latent(LatentSearchEmission {
-                turn_id: request.turn_id.clone(),
-                session_id: request.session_id.clone(),
-                feature_space: "ranking-score".to_string(),
-                hits: response
-                    .results
-                    .iter()
-                    .map(|hit| LatentSearchHit {
-                        path: hit.path.clone(),
-                        score: hit.score,
-                        confidence: hit.confidence,
-                        location: hit.location.clone(),
-                    })
-                    .collect(),
-            }),
-        };
-
         SearchTurnResponse {
             turn,
+            assembly,
             trace,
-            emission,
+            emission: build_search_emission(
+                &response,
+                request.emission_mode,
+                &request.turn_id,
+                request.session_id.clone(),
+            ),
         }
     }
 
-    fn merge_retained_evidence(
-        primary: &[crate::search::RetainedEvidence],
-        secondary: &[crate::search::RetainedEvidence],
+    fn merge_retained_artifacts(
+        primary: &[crate::search::RetainedArtifact],
+        secondary: &[crate::search::RetainedArtifact],
         limit: usize,
-    ) -> BoundedRetainedEvidence {
+    ) -> BoundedRetainedArtifacts {
         let mut unique = Vec::new();
         let mut seen = HashSet::new();
 
@@ -642,24 +749,46 @@ impl Sift {
 
         let pruned = unique.len().saturating_sub(limit);
 
-        BoundedRetainedEvidence {
+        BoundedRetainedArtifacts {
             retained: unique.into_iter().take(limit).collect(),
             pruned,
         }
     }
 
-    fn derive_retained_evidence(
-        &self,
+    fn merge_local_context_sources(
+        sources: Vec<crate::search::LocalContextSource>,
+    ) -> Vec<crate::search::LocalContextSource> {
+        let mut unique = Vec::new();
+        let mut seen = HashSet::new();
+
+        for source in sources {
+            let key = serde_json::to_string(&source).unwrap_or_default();
+            if seen.insert(key) {
+                unique.push(source);
+            }
+        }
+
+        unique
+    }
+
+    fn derive_retained_artifacts(
         response: &SearchResponse,
-        prior: &[crate::search::RetainedEvidence],
+        prior: &[crate::search::RetainedArtifact],
         limit: usize,
-    ) -> BoundedRetainedEvidence {
+    ) -> BoundedRetainedArtifacts {
         let fresh: Vec<_> = response
-            .results
+            .hits
             .iter()
             .take(limit)
             .map(|hit| {
-                let mut evidence = crate::search::RetainedEvidence::new(hit.path.clone());
+                let mut evidence = crate::search::RetainedArtifact::new(
+                    hit.artifact_id.clone(),
+                    hit.artifact_kind,
+                    hit.path.clone(),
+                    hit.provenance.clone(),
+                    hit.freshness.clone(),
+                    hit.budget.clone(),
+                );
                 if let Some(location) = &hit.location {
                     evidence = evidence.with_location(location.clone());
                 }
@@ -673,7 +802,7 @@ impl Sift {
             })
             .collect();
 
-        Self::merge_retained_evidence(&fresh, prior, limit)
+        Self::merge_retained_artifacts(&fresh, prior, limit)
     }
 
     fn default_dense_model(&self) -> DenseModelSpec {
@@ -716,16 +845,6 @@ impl Sift {
         None
     }
 
-    fn resolve_embedder(
-        &self,
-        strategy: &str,
-        options: &SearchOptions,
-        dense_model: &DenseModelSpec,
-    ) -> Result<Option<Arc<dyn Embedder>>> {
-        let plan = resolve_plan(strategy, options)?;
-        self.resolve_embedder_for_plan(&plan, dense_model)
-    }
-
     fn resolve_rerank_model(
         &self,
         strategy: &str,
@@ -758,6 +877,40 @@ impl Sift {
         };
 
         self.resolve_gemma_model_for_plan(&plan)
+    }
+}
+
+fn build_search_emission(
+    response: &SearchResponse,
+    emission_mode: SearchEmissionMode,
+    turn_id: &str,
+    session_id: Option<String>,
+) -> SearchEmission {
+    match emission_mode {
+        SearchEmissionMode::View => SearchEmission::View(response.clone()),
+        SearchEmissionMode::Protocol => SearchEmission::Protocol(ProtocolSearchEmission {
+            turn_id: turn_id.to_string(),
+            session_id,
+            strategy: response.strategy.clone(),
+            root: response.root.clone(),
+            hits: response.hits.clone(),
+        }),
+        SearchEmissionMode::Latent => SearchEmission::Latent(LatentSearchEmission {
+            turn_id: turn_id.to_string(),
+            session_id,
+            feature_space: "ranking-score".to_string(),
+            hits: response
+                .hits
+                .iter()
+                .map(|hit| LatentSearchHit {
+                    artifact_id: hit.artifact_id.clone(),
+                    path: hit.path.clone(),
+                    score: hit.score,
+                    confidence: hit.confidence,
+                    location: hit.location.clone(),
+                })
+                .collect(),
+        }),
     }
 }
 
@@ -804,6 +957,7 @@ pub struct SearchOptions {
     fusion: Option<Fusion>,
     reranking: Option<Reranking>,
     cache_dir: Option<PathBuf>,
+    local_context: Vec<crate::search::LocalContextSource>,
 }
 
 impl SearchOptions {
@@ -864,6 +1018,14 @@ impl SearchOptions {
 
     pub fn with_cache_dir(mut self, cache_dir: impl Into<PathBuf>) -> Self {
         self.cache_dir = Some(cache_dir.into());
+        self
+    }
+
+    pub fn with_local_context(
+        mut self,
+        local_context: Vec<crate::search::LocalContextSource>,
+    ) -> Self {
+        self.local_context = local_context;
         self
     }
 }

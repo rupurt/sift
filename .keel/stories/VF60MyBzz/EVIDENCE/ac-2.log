@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:10.232829137-07:00
+mode: manual
+---
+Supported runtime surfaces operate over ContextArtifact, SearchHit, and RetainedArtifact rather than a Document compatibility sidecar.

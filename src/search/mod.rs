@@ -13,15 +13,18 @@ pub use application::{
 };
 pub use corpus::load_search_corpus;
 pub use domain::{
-    Bm25Index, CachedEmbedder, Candidate, CandidateList, ContributorScore, Conversation,
-    CorpusRepository, Document, Embedder, Expander, Fuser, FusionPolicy, GenerativeModel,
-    LatentSearchEmission, LatentSearchHit, LoadedCorpus, OutputFormat, PreparedCorpus,
-    ProtocolSearchEmission, QueryEmbeddingCache, QueryExpansionPolicy, QueryVariant, Reranker,
-    RerankingPolicy, RetainedEvidence, Retriever, RetrieverPolicy, ScoreConfidence,
-    SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
-    SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode, SearchHit,
-    SearchPlan, SearchRequest, SearchResponse, SearchTelemetry, SearchTrace, SearchTurn,
-    SearchTurnRequest, SearchTurnResponse, SearchTurnTrace, StrategyPresetRegistry, tokenize,
+    AcquisitionAdapterKind, AgentTurnInput, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
+    Bm25Index, CachedEmbedder, Candidate, CandidateList, ContextArtifact, ContextArtifactKind,
+    ContextAssemblyBudget, ContextAssemblyRequest, ContextAssemblyResponse, ContributorScore,
+    Conversation, CorpusLoadRequest, CorpusRepository, Embedder, EnvironmentFactInput, Expander,
+    Fuser, FusionPolicy, GenerativeModel, LatentSearchEmission, LatentSearchHit, LoadedCorpus,
+    LocalContextSource, OutputFormat, PreparedCorpus, ProtocolSearchEmission, QueryEmbeddingCache,
+    QueryExpansionPolicy, QueryVariant, Reranker, RerankingPolicy, RetainedArtifact, Retriever,
+    RetrieverPolicy, ScoreConfidence, SearchControllerAction, SearchControllerDecision,
+    SearchControllerRequest, SearchControllerResponse, SearchControllerState, SearchEmission,
+    SearchEmissionMode, SearchHit, SearchPlan, SearchRequest, SearchResponse, SearchTelemetry,
+    SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse, SearchTurnTrace,
+    StrategyPresetRegistry, ToolOutputInput, tokenize,
 };
 pub use engine::{SearchEngine, SearchEnvironment};
 #[allow(unused_imports)]

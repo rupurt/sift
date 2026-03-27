@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:10.070842385-07:00
+mode: manual
+---
+Runtime-record artifacts share the same artifact normalization, cache/artifacts blob path, and BM25/segment indexing flow as file-backed artifacts; embedded_facade_searches_environment_tool_and_turn_context_as_artifacts passes.

@@ -6,7 +6,7 @@ use crate::extract::SourceKind;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Segment {
     pub id: String,
-    pub doc_id: String,
+    pub artifact_id: String,
     pub path: PathBuf,
     pub source_kind: SourceKind,
     pub ordinal: usize,
@@ -22,7 +22,7 @@ struct SegmentSeed {
 }
 
 pub fn build_segments(
-    document_id: &str,
+    artifact_id: &str,
     path: &Path,
     source_kind: SourceKind,
     text: &str,
@@ -48,8 +48,8 @@ pub fn build_segments(
         .into_iter()
         .enumerate()
         .map(|(index, seed)| Segment {
-            id: format!("{document_id}::segment:{:04}", index + 1),
-            doc_id: document_id.to_string(),
+            id: format!("{artifact_id}::segment:{:04}", index + 1),
+            artifact_id: artifact_id.to_string(),
             path: path.to_path_buf(),
             source_kind,
             ordinal: index + 1,

@@ -311,10 +311,14 @@ impl Retriever for Bm25Retriever {
             let scores = score_bm25_terms(index, &term_weights);
             let mut results: Vec<_> = scores
                 .into_iter()
-                .map(|(doc_id, score)| {
-                    let doc = corpus.documents.iter().find(|d| d.id == doc_id).unwrap();
+                .map(|(artifact_id, score)| {
+                    let doc = corpus
+                        .artifacts
+                        .iter()
+                        .find(|d| d.id == artifact_id)
+                        .unwrap();
                     Candidate {
-                        id: doc_id,
+                        id: artifact_id,
                         path: doc.path.clone(),
                         score,
                         contributors: vec![ContributorScore {
@@ -348,7 +352,7 @@ impl Retriever for PhraseRetriever {
     ) -> Result<CandidateList> {
         let mut results = Vec::new();
 
-        for document in corpus.documents {
+        for document in corpus.artifacts {
             let mut best_score = 0.0;
             let mut best_snippet = None;
             let mut best_location = None;
@@ -403,12 +407,12 @@ impl Retriever for SegmentVectorRetriever {
         limit: usize,
         _verbose: u8,
     ) -> Result<CandidateList> {
-        if query.is_empty() || corpus.documents.is_empty() {
+        if query.is_empty() || corpus.artifacts.is_empty() {
             return Ok(CandidateList { results: vec![] });
         }
 
         let segments = corpus
-            .documents
+            .artifacts
             .iter()
             .flat_map(|document| document.segments.iter().cloned())
             .collect::<Vec<_>>();
@@ -418,7 +422,8 @@ impl Retriever for SegmentVectorRetriever {
 
         let mut combined_hits = Vec::new();
         for variant in query {
-            let mut hits = score_segments_manually(self.embedder.as_ref(), &variant.text, &segments)?;
+            let mut hits =
+                score_segments_manually(self.embedder.as_ref(), &variant.text, &segments)?;
             for hit in &mut hits {
                 hit.score *= variant.weight;
             }
@@ -480,15 +485,15 @@ fn score_bm25_terms(index: &Bm25Index, term_weights: &HashMap<String, f64>) -> V
         };
         let idf = ((index.num_docs as f64 - df as f64 + 0.5) / (df as f64 + 0.5) + 1.0).ln();
 
-        for (doc_id, terms) in &index.term_freqs {
+        for (artifact_id, terms) in &index.term_freqs {
             let Some(&tf) = terms.get(term) else {
                 continue;
             };
-            let doc_len = *index.doc_lengths.get(doc_id).unwrap_or(&0) as f64;
+            let doc_len = *index.doc_lengths.get(artifact_id).unwrap_or(&0) as f64;
             let tf = tf as f64;
-            let base_score = idf * (tf * (k1 + 1.0))
-                / (tf + k1 * (1.0 - b + b * doc_len / index.avg_doc_len));
-            *scores.entry(doc_id.clone()).or_insert(0.0) += base_score * query_weight;
+            let base_score =
+                idf * (tf * (k1 + 1.0)) / (tf + k1 * (1.0 - b + b * doc_len / index.avg_doc_len));
+            *scores.entry(artifact_id.clone()).or_insert(0.0) += base_score * query_weight;
         }
     }
 
@@ -596,10 +601,12 @@ mod tests {
 
     #[test]
     fn llm_expander_keeps_the_original_query_when_generation_is_empty() {
-        let expander = LlmExpander::new(Box::new(SpladeStrategy { custom_prompt: None }))
-            .with_llm(Arc::new(StaticGenerativeModel {
-                output: String::new(),
-            }));
+        let expander = LlmExpander::new(Box::new(SpladeStrategy {
+            custom_prompt: None,
+        }))
+        .with_llm(Arc::new(StaticGenerativeModel {
+            output: String::new(),
+        }));
 
         let variants = expander.expand("alpha query");
 
@@ -609,10 +616,12 @@ mod tests {
 
     #[test]
     fn llm_expander_keeps_the_original_query_when_generation_is_non_empty() {
-        let expander = LlmExpander::new(Box::new(SpladeStrategy { custom_prompt: None }))
-            .with_llm(Arc::new(StaticGenerativeModel {
-                output: "alpha biomaterial keywords".to_string(),
-            }));
+        let expander = LlmExpander::new(Box::new(SpladeStrategy {
+            custom_prompt: None,
+        }))
+        .with_llm(Arc::new(StaticGenerativeModel {
+            output: "alpha biomaterial keywords".to_string(),
+        }));
 
         let variants = expander.expand("alpha query");
 
@@ -642,10 +651,10 @@ mod tests {
 
     #[test]
     fn bm25_retriever_respects_variant_weights() {
-        let documents = sample_corpus().documents.to_vec();
-        let index = Bm25Index::build(&documents);
+        let artifacts = sample_corpus().artifacts.to_vec();
+        let index = Bm25Index::build(&artifacts);
         let prepared = PreparedCorpus {
-            documents: Box::leak(documents.into_boxed_slice()),
+            artifacts: Box::leak(artifacts.into_boxed_slice()),
             bm25_index: Some(Box::leak(Box::new(index))),
         };
         let retriever = Bm25Retriever;
@@ -672,9 +681,10 @@ mod tests {
     }
 
     fn sample_corpus() -> PreparedCorpus<'static> {
-        let documents = vec![
-            Document {
+        let artifacts = vec![
+            ContextArtifact {
                 id: "doc-alpha".to_string(),
+                kind: ContextArtifactKind::File,
                 path: "alpha.txt".into(),
                 source_kind: SourceKind::Text,
                 length: 2,
@@ -682,7 +692,7 @@ mod tests {
                 text: "alpha body".to_string(),
                 segments: vec![Segment {
                     id: "doc-alpha::segment:0001".to_string(),
-                    doc_id: "doc-alpha".to_string(),
+                    artifact_id: "doc-alpha".to_string(),
                     path: "alpha.txt".into(),
                     source_kind: SourceKind::Text,
                     ordinal: 1,
@@ -690,9 +700,20 @@ mod tests {
                     text: "alpha body".to_string(),
                     embedding: Some(vec![1.0, 0.0]),
                 }],
+                provenance: ArtifactProvenance {
+                    adapter: AcquisitionAdapterKind::FileSystem,
+                    source: "alpha.txt".to_string(),
+                    synthetic: false,
+                },
+                freshness: ArtifactFreshness {
+                    observed_unix_secs: 0,
+                    modified_unix_secs: None,
+                },
+                budget: ArtifactBudget::from_text("alpha body", 1),
             },
-            Document {
+            ContextArtifact {
                 id: "doc-beta".to_string(),
+                kind: ContextArtifactKind::File,
                 path: "beta.txt".into(),
                 source_kind: SourceKind::Text,
                 length: 2,
@@ -700,7 +721,7 @@ mod tests {
                 text: "beta body".to_string(),
                 segments: vec![Segment {
                     id: "doc-beta::segment:0001".to_string(),
-                    doc_id: "doc-beta".to_string(),
+                    artifact_id: "doc-beta".to_string(),
                     path: "beta.txt".into(),
                     source_kind: SourceKind::Text,
                     ordinal: 1,
@@ -708,11 +729,21 @@ mod tests {
                     text: "beta body".to_string(),
                     embedding: Some(vec![0.0, 1.0]),
                 }],
+                provenance: ArtifactProvenance {
+                    adapter: AcquisitionAdapterKind::FileSystem,
+                    source: "beta.txt".to_string(),
+                    synthetic: false,
+                },
+                freshness: ArtifactFreshness {
+                    observed_unix_secs: 0,
+                    modified_unix_secs: None,
+                },
+                budget: ArtifactBudget::from_text("beta body", 1),
             },
         ];
-        let leaked = Box::leak(documents.into_boxed_slice());
+        let leaked = Box::leak(artifacts.into_boxed_slice());
         PreparedCorpus {
-            documents: leaked,
+            artifacts: leaked,
             bm25_index: None,
         }
     }

@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:10.117692030-07:00
+mode: manual
+---
+File and runtime-record artifacts use one shared build_artifact plus cache/artifacts manifest/blob path and one BM25/segment preparation flow; no second cache or indexing pipeline was introduced.

@@ -6,7 +6,7 @@
 //! - [`SearchTurnRequest`], [`SearchTurnResponse`], and [`SearchEmissionMode`] for turn-aware search control
 //! - [`SearchControllerRequest`] and [`SearchControllerResponse`] for deterministic multi-turn control
 //! - [`Retriever`], [`Fusion`], and [`Reranking`] for supported strategy overrides
-//! - [`SearchResponse`], [`SearchHit`], and [`ScoreConfidence`] for results
+//! - [`SearchResponse`], [`SearchHit`], [`ContextArtifact`], and [`ScoreConfidence`] for results and artifact metadata
 //!
 //! Everything under [`internal`] exists to support the bundled executable,
 //! benchmarks, and repository-internal tests. It is not part of the supported
@@ -30,12 +30,15 @@ pub use crate::facade::{
     SiftBuilder,
 };
 pub use crate::search::{
-    FusionPolicy, LatentSearchEmission, LatentSearchHit, ProtocolSearchEmission,
-    QueryExpansionPolicy, RerankingPolicy, RetainedEvidence, RetrieverPolicy, ScoreConfidence,
+    AcquisitionAdapterKind, AgentTurnInput, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
+    ContextArtifact, ContextArtifactKind, ContextAssemblyBudget, ContextAssemblyRequest,
+    ContextAssemblyResponse, CorpusLoadRequest, EnvironmentFactInput, FusionPolicy,
+    LatentSearchEmission, LatentSearchHit, LocalContextSource, ProtocolSearchEmission,
+    QueryExpansionPolicy, RerankingPolicy, RetainedArtifact, RetrieverPolicy, ScoreConfidence,
     SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
     SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode, SearchHit,
     SearchPlan, SearchResponse, SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse,
-    SearchTurnTrace,
+    SearchTurnTrace, ToolOutputInput,
 };
 
 #[doc(hidden)]

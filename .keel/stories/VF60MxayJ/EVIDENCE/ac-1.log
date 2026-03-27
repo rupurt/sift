@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:10.134512726-07:00
+mode: manual
+---
+ContextAssemblyRequest, ContextAssemblyBudget, and ContextAssemblyResponse are now first-class artifact-based contracts in the public search domain and facade.

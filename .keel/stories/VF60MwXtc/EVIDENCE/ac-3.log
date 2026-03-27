@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:09.944856499-07:00
+mode: manual
+---
+The cutover stayed within the existing search/corpus/runtime seams and did not introduce new SearchGraph or Reactor abstractions.

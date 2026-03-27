@@ -1,7 +1,9 @@
 use sift::{
-    Fusion, FusionPolicy, QueryExpansionPolicy, Reranking, RerankingPolicy, Retriever,
-    RetrieverPolicy, SearchControllerAction, SearchControllerRequest, SearchEmission,
-    SearchEmissionMode, SearchInput, SearchOptions, SearchPlan, SearchTurnRequest, Sift,
+    AcquisitionAdapterKind, AgentTurnInput, ContextArtifactKind, ContextAssemblyBudget,
+    ContextAssemblyRequest, EnvironmentFactInput, Fusion, FusionPolicy, QueryExpansionPolicy,
+    Reranking, RerankingPolicy, Retriever, RetrieverPolicy, SearchControllerAction,
+    SearchControllerRequest, SearchEmission, SearchEmissionMode, SearchInput, SearchOptions,
+    SearchPlan, SearchTurnRequest, Sift, ToolOutputInput,
 };
 
 fn custom_lexical_plan(name: &str) -> SearchPlan {
@@ -38,8 +40,46 @@ fn embedded_facade_runs_a_basic_bm25_search() {
         )
         .expect("search through facade");
 
-    assert_eq!(response.results.len(), 1);
-    assert!(response.results[0].path.ends_with("guide.txt"));
+    assert_eq!(response.hits.len(), 1);
+    assert!(response.hits[0].path.ends_with("guide.txt"));
+}
+
+#[test]
+fn embedded_facade_searches_environment_tool_and_turn_context_as_artifacts() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(corpus.path().join("guide.txt"), "filesystem guide content")
+        .expect("write corpus file");
+
+    let engine = Sift::builder().build();
+    let response = engine
+        .search(SearchInput::new(corpus.path(), "telemetry").with_options(
+            SearchOptions::default().with_local_context(vec![
+                    sift::LocalContextSource::EnvironmentFact(EnvironmentFactInput::new(
+                        "cwd",
+                        "/repo",
+                    )),
+                    sift::LocalContextSource::ToolOutput(ToolOutputInput::new(
+                        "rg",
+                        "call-1",
+                        "telemetry span waterfall",
+                    )),
+                    sift::LocalContextSource::AgentTurn(
+                        AgentTurnInput::new("turn-1", "assistant", "retain the telemetry result")
+                            .with_session_id("session-ctx"),
+                    ),
+                ]),
+        ))
+        .expect("search with synthetic local context");
+
+    assert_eq!(response.indexed_artifacts, 4);
+    assert!(
+        response
+            .hits
+            .iter()
+            .any(|hit| hit.artifact_kind == ContextArtifactKind::ToolOutput
+                && hit.provenance.adapter == AcquisitionAdapterKind::ToolOutput
+                && hit.provenance.synthetic)
+    );
 }
 
 #[test]
@@ -67,6 +107,8 @@ fn embedded_facade_projects_search_into_protocol_turns() {
     assert_eq!(response.turn.turn_id, "turn-1");
     assert_eq!(response.turn.sequence, 1);
     assert_eq!(response.turn.result_count, 1);
+    assert_eq!(response.assembly.response.hits.len(), 1);
+    assert_eq!(response.assembly.pruned_artifacts, 0);
     assert_eq!(response.trace.turns.len(), 1);
     assert!(response.trace.completed);
     assert_eq!(
@@ -83,6 +125,89 @@ fn embedded_facade_projects_search_into_protocol_turns() {
             assert_eq!(protocol.turn_id, "turn-1");
             assert_eq!(protocol.hits.len(), 1);
             assert!(protocol.hits[0].path.ends_with("guide.txt"));
+        }
+        other => panic!("expected protocol emission, got {:?}", other),
+    }
+}
+
+#[test]
+fn embedded_facade_exposes_context_assembly_surface() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(
+        corpus.path().join("guide.txt"),
+        "canonical assembly surface",
+    )
+    .expect("write corpus file");
+
+    let engine = Sift::builder().build();
+    let response = engine
+        .assemble_context(
+            ContextAssemblyRequest::new(corpus.path(), "telemetry")
+                .with_strategy("bm25")
+                .with_limit(2)
+                .with_budget(ContextAssemblyBudget::new(1))
+                .with_local_context(vec![sift::LocalContextSource::ToolOutput(
+                    ToolOutputInput::new("rg", "call-assembly", "telemetry assembly contract"),
+                )])
+                .with_emission_mode(SearchEmissionMode::Protocol),
+        )
+        .expect("context assembly");
+
+    assert_eq!(response.response.indexed_artifacts, 2);
+    assert_eq!(response.response.hits.len(), 1);
+    assert_eq!(response.retained_artifacts.len(), 1);
+    assert_eq!(
+        response.retained_artifacts[0].artifact_kind,
+        ContextArtifactKind::ToolOutput
+    );
+
+    match response.emission {
+        SearchEmission::Protocol(protocol) => {
+            assert_eq!(protocol.turn_id, "assembly");
+            assert_eq!(protocol.hits.len(), 1);
+            assert_eq!(
+                protocol.hits[0].artifact_kind,
+                ContextArtifactKind::ToolOutput
+            );
+        }
+        other => panic!("expected protocol emission, got {:?}", other),
+    }
+}
+
+#[test]
+fn turn_search_emits_synthetic_agent_turn_hits_through_protocol_mode() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(corpus.path().join("guide.txt"), "filesystem guide content")
+        .expect("write corpus file");
+
+    let engine = Sift::builder().build();
+    let response = engine
+        .search_turn(
+            SearchTurnRequest::new(corpus.path(), "refactor")
+                .with_turn_id("turn-local-context")
+                .with_strategy("bm25")
+                .with_limit(1)
+                .with_shortlist(1)
+                .with_local_context(vec![sift::LocalContextSource::AgentTurn(
+                    AgentTurnInput::new("turn-1", "assistant", "refactor the adapter layer")
+                        .with_session_id("session-local"),
+                )])
+                .with_emission_mode(SearchEmissionMode::Protocol),
+        )
+        .expect("protocol turn search with local context");
+
+    match response.emission {
+        SearchEmission::Protocol(protocol) => {
+            assert_eq!(protocol.hits.len(), 1);
+            assert_eq!(
+                protocol.hits[0].artifact_kind,
+                ContextArtifactKind::AgentTurn
+            );
+            assert_eq!(
+                protocol.hits[0].provenance.adapter,
+                AcquisitionAdapterKind::AgentTurn
+            );
+            assert!(protocol.hits[0].path.contains(".sift/context/agent-turn"));
         }
         other => panic!("expected protocol emission, got {:?}", other),
     }
@@ -201,7 +326,7 @@ fn embedded_facade_accepts_explicit_turn_plans_without_registry_lookup() {
     match response.emission {
         SearchEmission::View(view) => {
             assert_eq!(view.strategy, "custom-lexical");
-            assert!(view.results[0].path.ends_with("guide.txt"));
+            assert!(view.hits[0].path.ends_with("guide.txt"));
         }
         other => panic!("expected view emission, got {:?}", other),
     }
@@ -241,7 +366,7 @@ fn embedded_facade_runs_controller_turns_from_explicit_plan_state() {
                 ],
             )
             .with_session_id("session-1")
-            .with_retained_evidence_limit(2),
+            .with_retained_artifact_limit(2),
         )
         .expect("controller search with explicit plan");
 
@@ -250,10 +375,10 @@ fn embedded_facade_runs_controller_turns_from_explicit_plan_state() {
     assert_eq!(response.trace.turns.len(), 2);
     assert!(response.state.completed);
     assert_eq!(response.state.next_turn, 2);
-    assert!(response.state.retained_evidence.len() <= 2);
+    assert!(response.state.retained_artifacts.len() <= 2);
     assert_eq!(response.turns[0].turn.strategy, "controller-lexical");
     assert_eq!(response.turns[1].turn.strategy, "controller-lexical");
-    assert!(!response.turns[1].turn.retained_evidence.is_empty());
+    assert!(!response.turns[1].turn.retained_artifacts.is_empty());
     assert_eq!(
         response.trace.turns[0]
             .decisions
@@ -303,13 +428,13 @@ fn controller_records_pruning_when_context_budget_is_exceeded() {
                         .with_shortlist(1),
                 ],
             )
-            .with_retained_evidence_limit(1),
+            .with_retained_artifact_limit(1),
         )
         .expect("bounded controller search");
 
-    assert_eq!(response.state.retained_evidence.len(), 1);
+    assert_eq!(response.state.retained_artifacts.len(), 1);
     assert!(
-        response.state.retained_evidence[0]
+        response.state.retained_artifacts[0]
             .path
             .ends_with("beta.txt"),
         "fresh evidence should displace stale context under the budget"

@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:10.197434251-07:00
+mode: manual
+---
+Output, budget, and emission artifacts remain replayable and serializable; emission_contracts_round_trip_through_serde passes.

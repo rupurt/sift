@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:10.102150413-07:00
+mode: manual
+---
+The first adapter slice is still strictly local: only filesystem/project-doc and local context sources are implemented; no remote, web, or MCP adapters were added.

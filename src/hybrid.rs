@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
-use crate::vector::SemanticDocumentHit;
+use crate::vector::SemanticArtifactHit;
 
 const RRF_K: usize = 60;
 
@@ -37,7 +37,7 @@ struct HybridAccumulator {
 
 pub fn fuse_rankings(
     bm25: &[Bm25DocumentHit],
-    semantic: &[SemanticDocumentHit],
+    semantic: &[SemanticArtifactHit],
     limit: usize,
 ) -> Result<Vec<HybridDocumentHit>> {
     let mut documents = HashMap::<String, HybridAccumulator>::new();
@@ -105,7 +105,7 @@ fn reciprocal_rank(rank: usize) -> f64 {
 mod rrf {
     use std::path::PathBuf;
 
-    use crate::vector::SemanticDocumentHit;
+    use crate::vector::SemanticArtifactHit;
 
     use super::{Bm25DocumentHit, fuse_rankings};
 
@@ -125,7 +125,7 @@ mod rrf {
                 },
             ],
             &[
-                SemanticDocumentHit {
+                SemanticArtifactHit {
                     id: "doc-b".to_string(),
                     path: PathBuf::from("beta.txt"),
                     score: 0.9,
@@ -135,7 +135,7 @@ mod rrf {
                     best_segment_score: 0.9,
                     segment_hits: 1,
                 },
-                SemanticDocumentHit {
+                SemanticArtifactHit {
                     id: "doc-c".to_string(),
                     path: PathBuf::from("gamma.txt"),
                     score: 0.8,

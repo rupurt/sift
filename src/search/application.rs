@@ -256,17 +256,18 @@ pub fn run_search_with_plan(
     let verbose = request.verbose;
 
     let corpus_start = std::time::Instant::now();
-    let corpus = repository.load(
-        &request.path,
+    let corpus = repository.load(&crate::search::CorpusLoadRequest {
+        path: &request.path,
         ignore,
         verbose,
-        embedder.as_deref(),
-        &request.telemetry,
-        request.cache_dir.as_deref(),
-    )?;
+        embedder: embedder.as_deref(),
+        telemetry: &request.telemetry,
+        local_context: &request.local_context,
+        cache_dir: request.cache_dir.as_deref(),
+    })?;
     tracing::info!(
-        "corpus loaded ({} files) in {:.2?}",
-        corpus.indexed_files,
+        "corpus loaded ({} artifacts) in {:.2?}",
+        corpus.indexed_artifacts,
         corpus_start.elapsed()
     );
 
@@ -281,31 +282,39 @@ pub fn run_search_with_plan(
     );
 
     let index_start = std::time::Instant::now();
-    let index = Bm25Index::build(&corpus.documents);
+    let index = Bm25Index::build(&corpus.artifacts);
     tracing::info!("built bm25 index in {:.2?}", index_start.elapsed());
     let prepared = PreparedCorpus {
-        documents: &corpus.documents,
+        artifacts: &corpus.artifacts,
         bm25_index: Some(&index),
     };
 
-    let candidates = service.execute(&plan, request, &prepared)?;
+    let candidates = service.execute(plan, request, &prepared)?;
 
-    let results = candidates
+    let hits = candidates
         .results
         .into_iter()
         .enumerate()
         .map(|(index, result)| {
+            let artifact = corpus
+                .artifact_by_id(&result.id)
+                .expect("candidate artifact should exist in loaded corpus");
             let mut path = result.path.display().to_string();
             if path.starts_with("./") {
                 path = path.chars().skip(2).collect();
             }
             SearchHit {
+                artifact_id: artifact.id.clone(),
+                artifact_kind: artifact.kind,
                 path,
                 rank: index + 1,
                 score: result.score,
                 confidence: plan.categorize_score(result.score),
                 location: result.snippet_location.clone(),
                 snippet: resolve_snippet_from_candidate(&corpus, &result, &request.query),
+                provenance: artifact.provenance.clone(),
+                freshness: artifact.freshness.clone(),
+                budget: artifact.budget.clone(),
             }
         })
         .collect();
@@ -313,9 +322,9 @@ pub fn run_search_with_plan(
     Ok(SearchResponse {
         strategy: plan.name.clone(),
         root: request.path.display().to_string(),
-        indexed_files: corpus.indexed_files,
-        skipped_files: corpus.skipped_files,
-        results,
+        indexed_artifacts: corpus.indexed_artifacts,
+        skipped_artifacts: corpus.skipped_artifacts,
+        hits,
     })
 }
 
@@ -328,8 +337,8 @@ pub fn resolve_snippet_from_candidate(
         return super::presentation::build_snippet(snippet, query);
     }
 
-    let document = match corpus.document_by_id(&candidate.id) {
-        Some(doc) => doc,
+    let artifact = match corpus.artifact_by_id(&candidate.id) {
+        Some(artifact) => artifact,
         None => return String::new(),
     };
 
@@ -337,7 +346,7 @@ pub fn resolve_snippet_from_candidate(
     let mut best_snippet = String::new();
     let mut max_matches = 0;
 
-    for segment in &document.segments {
+    for segment in &artifact.segments {
         let text = &segment.text;
         let matches = terms
             .iter()
@@ -350,12 +359,12 @@ pub fn resolve_snippet_from_candidate(
         }
     }
 
-    if best_snippet.is_empty() && !document.segments.is_empty() {
-        best_snippet = document.segments[0].text.to_string();
+    if best_snippet.is_empty() && !artifact.segments.is_empty() {
+        best_snippet = artifact.segments[0].text.to_string();
     }
 
     if best_snippet.is_empty() {
-        super::presentation::build_snippet(document.text(), query)
+        super::presentation::build_snippet(artifact.text(), query)
     } else {
         super::presentation::build_snippet(&best_snippet, query)
     }
@@ -364,17 +373,15 @@ pub fn resolve_snippet_from_candidate(
 pub struct LocalFileCorpusRepository;
 
 impl CorpusRepository for LocalFileCorpusRepository {
-    fn load(
-        &self,
-        path: &std::path::Path,
-        ignore: Option<&Ignore>,
-        verbose: u8,
-        embedder: Option<&dyn Embedder>,
-        telemetry: &crate::system::Telemetry,
-        cache_dir: Option<&std::path::Path>,
-    ) -> Result<LoadedCorpus> {
+    fn load(&self, request: &crate::search::CorpusLoadRequest<'_>) -> Result<LoadedCorpus> {
         crate::internal::search::corpus::load_search_corpus(
-            path, ignore, verbose, embedder, telemetry, cache_dir,
+            request.path,
+            request.ignore,
+            request.verbose,
+            request.embedder,
+            request.telemetry,
+            request.local_context,
+            request.cache_dir,
         )
     }
 }

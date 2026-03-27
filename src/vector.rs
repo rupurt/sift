@@ -9,7 +9,7 @@ use crate::segment::Segment;
 #[derive(Debug, Clone, PartialEq)]
 pub struct SegmentHit {
     pub segment_id: String,
-    pub doc_id: String,
+    pub artifact_id: String,
     pub path: PathBuf,
     pub label: String,
     pub text: String,
@@ -17,7 +17,7 @@ pub struct SegmentHit {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SemanticDocumentHit {
+pub struct SemanticArtifactHit {
     pub id: String,
     pub path: PathBuf,
     pub score: f64,
@@ -53,7 +53,7 @@ pub fn score_segments_manually(
             let score = dot_product(query_vec, doc_vec);
             hits.push(SegmentHit {
                 segment_id: segment.id.clone(),
-                doc_id: segment.doc_id.clone(),
+                artifact_id: segment.artifact_id.clone(),
                 path: segment.path.clone(),
                 label: segment.label.clone(),
                 text: segment.text.clone(),
@@ -74,7 +74,7 @@ pub fn score_segments_manually(
             let score = dot_product(query_vec, doc_vec);
             hits.push(SegmentHit {
                 segment_id: segment.id.clone(),
-                doc_id: segment.doc_id.clone(),
+                artifact_id: segment.artifact_id.clone(),
                 path: segment.path.clone(),
                 label: segment.label.clone(),
                 text: segment.text.clone(),
@@ -115,12 +115,12 @@ pub trait SegmentScorer {
     fn score_segments(&self, query: &str, segments: &[Segment]) -> Result<Vec<SegmentHit>>;
 }
 
-pub fn retrieve_semantic_documents<S: SegmentScorer>(
+pub fn retrieve_semantic_artifacts<S: SegmentScorer>(
     scorer: &S,
     query: &str,
     segments: &[Segment],
     limit: usize,
-) -> Result<Vec<SemanticDocumentHit>> {
+) -> Result<Vec<SemanticArtifactHit>> {
     if segments.is_empty() {
         return Ok(Vec::new());
     }
@@ -139,7 +139,7 @@ pub fn retrieve_semantic_documents<S: SegmentScorer>(
         .collect())
 }
 
-pub fn aggregate_segment_hits(hits: &[SegmentHit]) -> Vec<SemanticDocumentHit> {
+pub fn aggregate_segment_hits(hits: &[SegmentHit]) -> Vec<SemanticArtifactHit> {
     #[derive(Debug, Clone)]
     struct DocAccumulator<'a> {
         id: &'a str,
@@ -149,20 +149,22 @@ pub fn aggregate_segment_hits(hits: &[SegmentHit]) -> Vec<SemanticDocumentHit> {
         best_segment: &'a SegmentHit,
     }
 
-    let mut documents = HashMap::<&str, DocAccumulator>::with_capacity(hits.len());
+    let mut artifacts = HashMap::<&str, DocAccumulator>::with_capacity(hits.len());
 
     for hit in hits {
-        let mut doc_id = hit.doc_id.as_str();
-        if doc_id.starts_with("./") {
-            doc_id = &doc_id[2..];
+        let mut artifact_id = hit.artifact_id.as_str();
+        if artifact_id.starts_with("./") {
+            artifact_id = &artifact_id[2..];
         }
-        let entry = documents.entry(doc_id).or_insert_with(|| DocAccumulator {
-            id: doc_id,
-            path: &hit.path,
-            total_score: 0.0,
-            segment_hits: 0,
-            best_segment: hit,
-        });
+        let entry = artifacts
+            .entry(artifact_id)
+            .or_insert_with(|| DocAccumulator {
+                id: artifact_id,
+                path: &hit.path,
+                total_score: 0.0,
+                segment_hits: 0,
+                best_segment: hit,
+            });
         entry.total_score += hit.score;
         entry.segment_hits += 1;
 
@@ -174,17 +176,17 @@ pub fn aggregate_segment_hits(hits: &[SegmentHit]) -> Vec<SemanticDocumentHit> {
         }
     }
 
-    let mut ranked = Vec::with_capacity(documents.len());
-    for document in documents.into_values() {
-        ranked.push(SemanticDocumentHit {
-            id: document.id.to_string(),
-            path: document.path.to_path_buf(),
-            score: document.total_score / ((document.segment_hits as f64 + 1.0).sqrt()),
-            best_segment_id: document.best_segment.segment_id.clone(),
-            best_segment_label: document.best_segment.label.clone(),
-            best_segment_text: document.best_segment.text.clone(),
-            best_segment_score: document.best_segment.score,
-            segment_hits: document.segment_hits,
+    let mut ranked = Vec::with_capacity(artifacts.len());
+    for artifact in artifacts.into_values() {
+        ranked.push(SemanticArtifactHit {
+            id: artifact.id.to_string(),
+            path: artifact.path.to_path_buf(),
+            score: artifact.total_score / ((artifact.segment_hits as f64 + 1.0).sqrt()),
+            best_segment_id: artifact.best_segment.segment_id.clone(),
+            best_segment_label: artifact.best_segment.label.clone(),
+            best_segment_text: artifact.best_segment.text.clone(),
+            best_segment_score: artifact.best_segment.score,
+            segment_hits: artifact.segment_hits,
         });
     }
 
@@ -206,7 +208,7 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::{SegmentHit, SegmentScorer, aggregate_segment_hits, retrieve_semantic_documents};
+    use super::{SegmentHit, SegmentScorer, aggregate_segment_hits, retrieve_semantic_artifacts};
     use crate::extract::SourceKind;
     use crate::segment::Segment;
 
@@ -237,7 +239,7 @@ mod tests {
                 };
 
                 let ranked =
-                    retrieve_semantic_documents(&scorer, "semantic retrieval", &segments, 10)
+                    retrieve_semantic_artifacts(&scorer, "semantic retrieval", &segments, 10)
                         .expect("semantic ranking");
 
                 assert_eq!(*scorer.seen_segment_ids.borrow(), expected_ids);
@@ -286,7 +288,7 @@ mod tests {
                 .iter()
                 .map(|segment| SegmentHit {
                     segment_id: segment.id.clone(),
-                    doc_id: segment.doc_id.clone(),
+                    artifact_id: segment.artifact_id.clone(),
                     path: segment.path.clone(),
                     label: segment.label.clone(),
                     text: segment.text.clone(),
@@ -296,10 +298,10 @@ mod tests {
         }
     }
 
-    fn sample_segment(id: &str, doc_id: &str, file_name: &str, text: &str) -> Segment {
+    fn sample_segment(id: &str, artifact_id: &str, file_name: &str, text: &str) -> Segment {
         Segment {
             id: id.to_string(),
-            doc_id: doc_id.to_string(),
+            artifact_id: artifact_id.to_string(),
             path: PathBuf::from(file_name),
             source_kind: SourceKind::Text,
             ordinal: 1,
@@ -309,10 +311,10 @@ mod tests {
         }
     }
 
-    fn sample_hit(segment_id: &str, doc_id: &str, file_name: &str, score: f64) -> SegmentHit {
+    fn sample_hit(segment_id: &str, artifact_id: &str, file_name: &str, score: f64) -> SegmentHit {
         SegmentHit {
             segment_id: segment_id.to_string(),
-            doc_id: doc_id.to_string(),
+            artifact_id: artifact_id.to_string(),
             path: PathBuf::from(file_name),
             label: "section 1".to_string(),
             text: format!("sample text for {segment_id}"),

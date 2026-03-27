@@ -79,12 +79,12 @@ fn main() -> Result<()> {
 }
 
 fn print_response(response: &SearchResponse) {
-    if response.results.is_empty() {
-        println!("no matching results");
+    if response.hits.is_empty() {
+        println!("no matching hits");
         return;
     }
 
-    for hit in &response.results {
+    for hit in &response.hits {
         println!("{}. {}", hit.rank, hit.path);
         if let Some(location) = &hit.location {
             println!("   location: {location}");

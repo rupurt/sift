@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:09.960323622-07:00
+mode: manual
+---
+Artifact IDs are derived from path plus content hash, segments use artifact_id, and cache manifests/blobs now store ContextArtifact records under artifact semantics.

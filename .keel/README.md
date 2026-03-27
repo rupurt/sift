@@ -92,6 +92,24 @@
 |--------|--------|
 | [Add Turn Traces and Agentic Evaluation](epics/VF1VhyGqK/voyages/VF1Vt0sCV/) | in-progress |
 
+### [Context Artifact Model And Corpus Substrate](epics/VF53stqXt/) (done)
+
+| Voyage | Status |
+|--------|--------|
+| [Hard-Cut Core Search Domain To Context Artifacts](epics/VF53stqXt/voyages/VF60I0r0f/) | done |
+
+### [Acquisition Adapters And Shared Artifact Pipeline](epics/VF53su1Xu/) (done)
+
+| Voyage | Status |
+|--------|--------|
+| [Prove Local Acquisition Adapters On The Shared Pipeline](epics/VF53su1Xu/voyages/VF60I100k/) | done |
+
+### [Simplified Context Assembly Runtime And API](epics/VF53suDXv/) (done)
+
+| Voyage | Status |
+|--------|--------|
+| [Expose Artifact-Based Context Assembly And Emissions](epics/VF53suDXv/voyages/VF60I1J0l/) | done |
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |

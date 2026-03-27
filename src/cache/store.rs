@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use fs2::FileExt;
 
 use crate::cache::model::{CacheEntry, Manifest};
-use crate::search::domain::Document;
+use crate::search::domain::ContextArtifact;
 
 pub fn hash_file(path: &Path) -> Result<String> {
     let mut file =
@@ -126,7 +126,7 @@ impl Manifest {
     }
 }
 
-pub fn save_blob(blobs_dir: &Path, hash: &str, document: &Document) -> Result<()> {
+pub fn save_blob(blobs_dir: &Path, hash: &str, document: &ContextArtifact) -> Result<()> {
     fs::create_dir_all(blobs_dir).context("failed to create blobs directory")?;
     let path = blobs_dir.join(hash);
 
@@ -148,13 +148,13 @@ pub fn save_blob(blobs_dir: &Path, hash: &str, document: &Document) -> Result<()
     Ok(())
 }
 
-pub fn load_blob(blobs_dir: &Path, hash: &str) -> Result<Document> {
+pub fn load_blob(blobs_dir: &Path, hash: &str) -> Result<ContextArtifact> {
     let path = blobs_dir.join(hash);
     let file =
         File::open(&path).with_context(|| format!("failed to open blob {}", path.display()))?;
 
     // Attempt mmap loading, fallback to standard I/O if it fails (e.g. empty file or OS restriction)
-    let document: Document = match unsafe { memmap2::Mmap::map(&file) } {
+    let document: ContextArtifact = match unsafe { memmap2::Mmap::map(&file) } {
         Ok(mmap) => bincode::deserialize(&mmap).with_context(|| {
             format!(
                 "failed to deserialize document blob from mmap {}",

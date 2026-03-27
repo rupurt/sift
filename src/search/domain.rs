@@ -62,6 +62,128 @@ pub enum ScoreConfidence {
     Low,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ContextArtifactKind {
+    File,
+    ProjectDocument,
+    EnvironmentFact,
+    ToolOutput,
+    AgentTurn,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AcquisitionAdapterKind {
+    FileSystem,
+    ProjectDocument,
+    EnvironmentContext,
+    ToolOutput,
+    AgentTurn,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ArtifactProvenance {
+    pub adapter: AcquisitionAdapterKind,
+    pub source: String,
+    pub synthetic: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ArtifactFreshness {
+    pub observed_unix_secs: i64,
+    pub modified_unix_secs: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ArtifactBudget {
+    pub bytes: usize,
+    pub token_estimate: usize,
+    pub segment_count: usize,
+}
+
+impl ArtifactBudget {
+    pub fn from_text(text: &str, segment_count: usize) -> Self {
+        Self {
+            bytes: text.len(),
+            token_estimate: tokenize(text).len(),
+            segment_count,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EnvironmentFactInput {
+    pub key: String,
+    pub value: String,
+}
+
+impl EnvironmentFactInput {
+    pub fn new(key: impl Into<String>, value: impl Into<String>) -> Self {
+        Self {
+            key: key.into(),
+            value: value.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ToolOutputInput {
+    pub tool_name: String,
+    pub call_id: String,
+    pub content: String,
+}
+
+impl ToolOutputInput {
+    pub fn new(
+        tool_name: impl Into<String>,
+        call_id: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
+        Self {
+            tool_name: tool_name.into(),
+            call_id: call_id.into(),
+            content: content.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AgentTurnInput {
+    pub session_id: Option<String>,
+    pub turn_id: String,
+    pub role: String,
+    pub content: String,
+}
+
+impl AgentTurnInput {
+    pub fn new(
+        turn_id: impl Into<String>,
+        role: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
+        Self {
+            session_id: None,
+            turn_id: turn_id.into(),
+            role: role.into(),
+            content: content.into(),
+        }
+    }
+
+    pub fn with_session_id(mut self, session_id: impl Into<String>) -> Self {
+        self.session_id = Some(session_id.into());
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", content = "payload", rename_all = "kebab-case")]
+pub enum LocalContextSource {
+    EnvironmentFact(EnvironmentFactInput),
+    ToolOutput(ToolOutputInput),
+    AgentTurn(AgentTurnInput),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
 #[serde(rename_all = "lowercase")]
 pub enum QueryExpansionPolicy {
@@ -115,6 +237,7 @@ pub struct SearchRequest {
     pub cache_dir: Option<PathBuf>,
     pub telemetry: std::sync::Arc<crate::system::Telemetry>,
     pub prompts: Option<crate::config::PromptsConfig>,
+    pub local_context: Vec<LocalContextSource>,
 }
 
 impl SearchRequest {
@@ -137,6 +260,7 @@ impl SearchRequest {
             cache_dir: None,
             telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
             prompts: None,
+            local_context: Vec::new(),
         }
     }
 }
@@ -145,50 +269,67 @@ impl SearchRequest {
 pub struct SearchResponse {
     pub strategy: String,
     pub root: String,
-    pub indexed_files: usize,
-    pub skipped_files: usize,
-    pub results: Vec<SearchHit>,
+    pub indexed_artifacts: usize,
+    pub skipped_artifacts: usize,
+    pub hits: Vec<SearchHit>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SearchHit {
+    pub artifact_id: String,
+    pub artifact_kind: ContextArtifactKind,
     pub path: String,
     pub rank: usize,
     pub score: f64,
     pub confidence: ScoreConfidence,
     pub location: Option<String>,
     pub snippet: String,
+    pub provenance: ArtifactProvenance,
+    pub freshness: ArtifactFreshness,
+    pub budget: ArtifactBudget,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SearchEmissionMode {
+    #[default]
     View,
     Protocol,
     Latent,
 }
 
-impl Default for SearchEmissionMode {
-    fn default() -> Self {
-        Self::View
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct RetainedEvidence {
+pub struct RetainedArtifact {
+    pub artifact_id: String,
+    pub artifact_kind: ContextArtifactKind,
     pub path: String,
     pub location: Option<String>,
     pub snippet: Option<String>,
     pub rationale: Option<String>,
+    pub provenance: ArtifactProvenance,
+    pub freshness: ArtifactFreshness,
+    pub budget: ArtifactBudget,
 }
 
-impl RetainedEvidence {
-    pub fn new(path: impl Into<String>) -> Self {
+impl RetainedArtifact {
+    pub fn new(
+        artifact_id: impl Into<String>,
+        artifact_kind: ContextArtifactKind,
+        path: impl Into<String>,
+        provenance: ArtifactProvenance,
+        freshness: ArtifactFreshness,
+        budget: ArtifactBudget,
+    ) -> Self {
         Self {
+            artifact_id: artifact_id.into(),
+            artifact_kind,
             path: path.into(),
             location: None,
             snippet: None,
             rationale: None,
+            provenance,
+            freshness,
+            budget,
         }
     }
 
@@ -223,7 +364,8 @@ pub struct SearchTurnRequest {
     pub shortlist: Option<usize>,
     pub verbose: u8,
     pub emission_mode: SearchEmissionMode,
-    pub retained_evidence: Vec<RetainedEvidence>,
+    pub retained_artifacts: Vec<RetainedArtifact>,
+    pub local_context: Vec<LocalContextSource>,
 }
 
 impl SearchTurnRequest {
@@ -242,7 +384,8 @@ impl SearchTurnRequest {
             shortlist: None,
             verbose: 0,
             emission_mode: SearchEmissionMode::View,
-            retained_evidence: Vec::new(),
+            retained_artifacts: Vec::new(),
+            local_context: Vec::new(),
         }
     }
 
@@ -268,6 +411,11 @@ impl SearchTurnRequest {
 
     pub fn with_intent(mut self, intent: impl Into<String>) -> Self {
         self.intent = Some(intent.into());
+        self
+    }
+
+    pub fn with_intent_opt(mut self, intent: Option<String>) -> Self {
+        self.intent = intent;
         self
     }
 
@@ -301,8 +449,13 @@ impl SearchTurnRequest {
         self
     }
 
-    pub fn with_retained_evidence(mut self, retained_evidence: Vec<RetainedEvidence>) -> Self {
-        self.retained_evidence = retained_evidence;
+    pub fn with_retained_artifacts(mut self, retained_artifacts: Vec<RetainedArtifact>) -> Self {
+        self.retained_artifacts = retained_artifacts;
+        self
+    }
+
+    pub fn with_local_context(mut self, local_context: Vec<LocalContextSource>) -> Self {
+        self.local_context = local_context;
         self
     }
 }
@@ -311,7 +464,7 @@ impl SearchTurnRequest {
 pub struct SearchControllerState {
     pub next_turn: usize,
     pub turn_limit: usize,
-    pub retained_evidence: Vec<RetainedEvidence>,
+    pub retained_artifacts: Vec<RetainedArtifact>,
     pub completed: bool,
 }
 
@@ -320,7 +473,7 @@ impl SearchControllerState {
         Self {
             next_turn: 0,
             turn_limit,
-            retained_evidence: Vec::new(),
+            retained_artifacts: Vec::new(),
             completed: false,
         }
     }
@@ -335,8 +488,8 @@ impl SearchControllerState {
         self
     }
 
-    pub fn with_retained_evidence(mut self, retained_evidence: Vec<RetainedEvidence>) -> Self {
-        self.retained_evidence = retained_evidence;
+    pub fn with_retained_artifacts(mut self, retained_artifacts: Vec<RetainedArtifact>) -> Self {
+        self.retained_artifacts = retained_artifacts;
         self
     }
 }
@@ -347,7 +500,7 @@ pub struct SearchControllerRequest {
     pub plan: SearchPlan,
     pub turns: Vec<SearchTurnRequest>,
     pub state: SearchControllerState,
-    pub retained_evidence_limit: usize,
+    pub retained_artifact_limit: usize,
 }
 
 impl SearchControllerRequest {
@@ -358,7 +511,7 @@ impl SearchControllerRequest {
             plan,
             turns,
             state: SearchControllerState::new(turn_limit),
-            retained_evidence_limit: 5,
+            retained_artifact_limit: 5,
         }
     }
 
@@ -372,8 +525,8 @@ impl SearchControllerRequest {
         self
     }
 
-    pub fn with_retained_evidence_limit(mut self, retained_evidence_limit: usize) -> Self {
-        self.retained_evidence_limit = retained_evidence_limit;
+    pub fn with_retained_artifact_limit(mut self, retained_artifact_limit: usize) -> Self {
+        self.retained_artifact_limit = retained_artifact_limit;
         self
     }
 }
@@ -423,7 +576,7 @@ pub struct SearchTurn {
     pub shortlist: usize,
     pub emission_mode: SearchEmissionMode,
     pub result_count: usize,
-    pub retained_evidence: Vec<RetainedEvidence>,
+    pub retained_artifacts: Vec<RetainedArtifact>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -434,7 +587,7 @@ pub struct SearchTurnTrace {
     pub strategy: String,
     pub emission_mode: SearchEmissionMode,
     pub result_count: usize,
-    pub retained_evidence: Vec<RetainedEvidence>,
+    pub retained_artifacts: Vec<RetainedArtifact>,
     pub decisions: Vec<SearchControllerDecision>,
 }
 
@@ -457,6 +610,7 @@ pub struct ProtocolSearchEmission {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LatentSearchHit {
+    pub artifact_id: String,
     pub path: String,
     pub score: f64,
     pub confidence: ScoreConfidence,
@@ -482,6 +636,7 @@ pub enum SearchEmission {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SearchTurnResponse {
     pub turn: SearchTurn,
+    pub assembly: ContextAssemblyResponse,
     pub trace: SearchTrace,
     pub emission: SearchEmission,
 }
@@ -494,32 +649,140 @@ pub struct SearchControllerResponse {
     pub trace: SearchTrace,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LoadedCorpus {
-    pub documents: Vec<Document>,
-    pub total_bytes: u64,
-    pub indexed_files: usize,
-    pub skipped_files: usize,
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ContextAssemblyBudget {
+    pub max_retained_artifacts: usize,
 }
 
-impl LoadedCorpus {
-    pub fn document_by_id(&self, id: &str) -> Option<&Document> {
-        self.documents.iter().find(|document| document.id == id)
+impl ContextAssemblyBudget {
+    pub fn new(max_retained_artifacts: usize) -> Self {
+        Self {
+            max_retained_artifacts,
+        }
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ContextAssemblyRequest {
+    pub path: PathBuf,
+    pub query: String,
+    pub strategy: Option<String>,
+    pub plan: Option<SearchPlan>,
+    pub intent: Option<String>,
+    pub limit: Option<usize>,
+    pub shortlist: Option<usize>,
+    pub emission_mode: SearchEmissionMode,
+    pub local_context: Vec<LocalContextSource>,
+    pub retained_artifacts: Vec<RetainedArtifact>,
+    pub budget: ContextAssemblyBudget,
+}
+
+impl ContextAssemblyRequest {
+    pub fn new(path: impl AsRef<Path>, query: impl Into<String>) -> Self {
+        Self {
+            path: path.as_ref().to_path_buf(),
+            query: query.into(),
+            strategy: None,
+            plan: None,
+            intent: None,
+            limit: None,
+            shortlist: None,
+            emission_mode: SearchEmissionMode::View,
+            local_context: Vec::new(),
+            retained_artifacts: Vec::new(),
+            budget: ContextAssemblyBudget::new(5),
+        }
+    }
+
+    pub fn with_strategy(mut self, strategy: impl Into<String>) -> Self {
+        self.strategy = Some(strategy.into());
+        self
+    }
+
+    pub fn with_plan(mut self, plan: SearchPlan) -> Self {
+        self.plan = Some(plan);
+        self
+    }
+
+    pub fn with_intent(mut self, intent: impl Into<String>) -> Self {
+        self.intent = Some(intent.into());
+        self
+    }
+
+    pub fn with_intent_opt(mut self, intent: Option<String>) -> Self {
+        self.intent = intent;
+        self
+    }
+
+    pub fn with_limit(mut self, limit: usize) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn with_shortlist(mut self, shortlist: usize) -> Self {
+        self.shortlist = Some(shortlist);
+        self
+    }
+
+    pub fn with_emission_mode(mut self, emission_mode: SearchEmissionMode) -> Self {
+        self.emission_mode = emission_mode;
+        self
+    }
+
+    pub fn with_local_context(mut self, local_context: Vec<LocalContextSource>) -> Self {
+        self.local_context = local_context;
+        self
+    }
+
+    pub fn with_retained_artifacts(mut self, retained_artifacts: Vec<RetainedArtifact>) -> Self {
+        self.retained_artifacts = retained_artifacts;
+        self
+    }
+
+    pub fn with_budget(mut self, budget: ContextAssemblyBudget) -> Self {
+        self.budget = budget;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ContextAssemblyResponse {
+    pub response: SearchResponse,
+    pub emission: SearchEmission,
+    pub retained_artifacts: Vec<RetainedArtifact>,
+    pub pruned_artifacts: usize,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Document {
+pub struct LoadedCorpus {
+    pub artifacts: Vec<ContextArtifact>,
+    pub total_bytes: u64,
+    pub indexed_artifacts: usize,
+    pub skipped_artifacts: usize,
+}
+
+impl LoadedCorpus {
+    pub fn artifact_by_id(&self, id: &str) -> Option<&ContextArtifact> {
+        self.artifacts.iter().find(|artifact| artifact.id == id)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ContextArtifact {
     pub id: String,
+    pub kind: ContextArtifactKind,
     pub path: PathBuf,
     pub source_kind: SourceKind,
     pub length: usize,
     pub terms: HashMap<String, usize>,
     pub text: String,
     pub segments: Vec<Segment>,
+    pub provenance: ArtifactProvenance,
+    pub freshness: ArtifactFreshness,
+    pub budget: ArtifactBudget,
 }
 
-impl Document {
+impl ContextArtifact {
     pub fn text(&self) -> &str {
         &self.text
     }
@@ -538,13 +801,13 @@ pub struct Bm25Index {
 }
 
 impl Bm25Index {
-    pub fn build(documents: &[Document]) -> Self {
+    pub fn build(artifacts: &[ContextArtifact]) -> Self {
         let mut doc_freq = HashMap::new();
         let mut term_freqs = HashMap::new();
         let mut doc_lengths = HashMap::new();
         let mut total_len = 0;
 
-        for doc in documents {
+        for doc in artifacts {
             let terms: HashSet<_> = doc.terms.keys().collect();
             term_freqs.insert(doc.id.clone(), doc.terms.clone());
             doc_lengths.insert(doc.id.clone(), doc.length);
@@ -555,10 +818,10 @@ impl Bm25Index {
             }
         }
 
-        let avg_doc_len = if documents.is_empty() {
+        let avg_doc_len = if artifacts.is_empty() {
             0.0
         } else {
-            total_len as f64 / documents.len() as f64
+            total_len as f64 / artifacts.len() as f64
         };
 
         Self {
@@ -566,7 +829,7 @@ impl Bm25Index {
             term_freqs,
             doc_lengths,
             avg_doc_len,
-            num_docs: documents.len(),
+            num_docs: artifacts.len(),
         }
     }
 
@@ -578,15 +841,15 @@ impl Bm25Index {
         for term in query {
             if let Some(&df) = self.doc_freq.get(term) {
                 let idf = ((self.num_docs as f64 - df as f64 + 0.5) / (df as f64 + 0.5) + 1.0).ln();
-                for (doc_id, terms) in &self.term_freqs {
+                for (artifact_id, terms) in &self.term_freqs {
                     let Some(&tf) = terms.get(term) else {
                         continue;
                     };
-                    let doc_len = *self.doc_lengths.get(doc_id).unwrap_or(&0) as f64;
+                    let doc_len = *self.doc_lengths.get(artifact_id).unwrap_or(&0) as f64;
                     let tf = tf as f64;
                     let score = idf * (tf * (k1 + 1.0))
                         / (tf + k1 * (1.0 - b + b * doc_len / self.avg_doc_len));
-                    *scores.entry(doc_id.clone()).or_insert(0.0) += score;
+                    *scores.entry(artifact_id.clone()).or_insert(0.0) += score;
                 }
             }
         }
@@ -933,16 +1196,18 @@ impl Embedder for CachedEmbedder {
 
 pub type QueryEmbeddingCache = Arc<std::sync::RwLock<HashMap<String, Vec<f32>>>>;
 
+pub struct CorpusLoadRequest<'a> {
+    pub path: &'a std::path::Path,
+    pub ignore: Option<&'a Ignore>,
+    pub verbose: u8,
+    pub embedder: Option<&'a dyn Embedder>,
+    pub telemetry: &'a crate::system::Telemetry,
+    pub local_context: &'a [LocalContextSource],
+    pub cache_dir: Option<&'a std::path::Path>,
+}
+
 pub trait CorpusRepository: Send + Sync {
-    fn load(
-        &self,
-        path: &std::path::Path,
-        ignore: Option<&Ignore>,
-        verbose: u8,
-        embedder: Option<&dyn Embedder>,
-        telemetry: &crate::system::Telemetry,
-        cache_dir: Option<&std::path::Path>,
-    ) -> Result<LoadedCorpus>;
+    fn load(&self, request: &CorpusLoadRequest<'_>) -> Result<LoadedCorpus>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -961,7 +1226,7 @@ pub struct QueryVariant {
 }
 
 pub struct PreparedCorpus<'a> {
-    pub documents: &'a [Document],
+    pub artifacts: &'a [ContextArtifact],
     pub bm25_index: Option<&'a Bm25Index>,
 }
 

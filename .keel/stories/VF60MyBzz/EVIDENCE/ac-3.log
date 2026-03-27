@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:10.248710680-07:00
+mode: manual
+---
+The existing single-turn hybrid UX remains intact; embedded_facade_runs_a_basic_bm25_search, legacy CLI tests, cargo test --lib, and just check all pass.

@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:09.976496167-07:00
+mode: manual
+---
+Corpus and storage contracts persist ContextArtifact blobs and artifact IDs without leaving a supported Document compatibility sidecar; cargo check and just check pass.

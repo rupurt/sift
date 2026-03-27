@@ -29,7 +29,7 @@ pub struct DownloadSummary {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MaterializationSummary {
     pub dataset: String,
-    pub documents: usize,
+    pub artifacts: usize,
     pub test_queries: usize,
     pub output_dir: String,
 }
@@ -85,7 +85,7 @@ pub fn materialize_scifact_dir(
     let corpus_records = read_jsonl_gz::<CorpusRecord>(&source_dir.join("corpus.jsonl.gz"))?;
     let queries = read_jsonl_gz::<QueryRecord>(&source_dir.join("queries.jsonl.gz"))?;
 
-    let mut documents = 0;
+    let mut artifacts = 0;
     for record in corpus_records {
         let filename = out_dir.join(format!("{}.txt", sanitize_doc_id(&record.id)));
         let mut body = String::new();
@@ -101,7 +101,7 @@ pub fn materialize_scifact_dir(
 
         fs::write(&filename, body)
             .with_context(|| format!("write materialized document {}", filename.display()))?;
-        documents += 1;
+        artifacts += 1;
     }
 
     let mut query_file = fs::File::create(out_dir.join("test-queries.tsv")).with_context(|| {
@@ -136,7 +136,7 @@ pub fn materialize_scifact_dir(
 
     Ok(MaterializationSummary {
         dataset: "scifact".to_string(),
-        documents,
+        artifacts,
         test_queries,
         output_dir: out_dir.display().to_string(),
     })
@@ -310,7 +310,7 @@ pub struct LatencyEvaluationReport {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ComparativeEvaluationReport {
     pub metadata: Vec<EvaluationMetadata>,
-    pub results: Vec<StrategyComparison>,
+    pub hits: Vec<StrategyComparison>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -415,7 +415,7 @@ pub struct AgenticEvaluationRequest {
     pub fixtures_path: PathBuf,
     pub shortlist: usize,
     pub dense_model: DenseModelSpec,
-    pub retained_evidence_limit: usize,
+    pub retained_artifact_limit: usize,
     pub verbose: u8,
     pub prompts: Option<crate::config::PromptsConfig>,
 }
@@ -440,11 +440,12 @@ pub fn run_quality_evaluation(
             request.verbose,
             Some(dense_for_load.as_ref()),
             &telemetry_for_load,
+            &[],
             None,
         )?,
         &[queries_path.clone(), request.qrels_path.clone()],
     );
-    let index = crate::search::Bm25Index::build(&corpus.documents);
+    let index = crate::search::Bm25Index::build(&corpus.artifacts);
     let queries = load_queries(&queries_path)?;
     let qrels = load_qrels(&request.qrels_path)?;
     let _prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
@@ -609,11 +610,12 @@ pub fn run_latency_evaluation(
             request.verbose,
             Some(dense_for_load.as_ref()),
             &telemetry_for_load,
+            &[],
             None,
         )?,
         std::slice::from_ref(&request.queries_path),
     );
-    let index = crate::search::Bm25Index::build(&corpus.documents);
+    let index = crate::search::Bm25Index::build(&corpus.artifacts);
     let queries = load_queries(&request.queries_path)?;
     let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
 
@@ -715,6 +717,7 @@ pub fn run_agentic_evaluation(
             request.verbose,
             None,
             &metadata_telemetry,
+            &[],
             None,
         )?,
         std::slice::from_ref(&request.fixtures_path),
@@ -771,7 +774,7 @@ pub fn run_agentic_evaluation(
         let response = engine.search_controller(
             crate::search::SearchControllerRequest::new(plan.clone(), turns)
                 .with_session_id(task.id.clone())
-                .with_retained_evidence_limit(request.retained_evidence_limit),
+                .with_retained_artifact_limit(request.retained_artifact_limit),
         )?;
         if response.turns.len() != task.turns.len() {
             bail!(
@@ -803,7 +806,7 @@ pub fn run_agentic_evaluation(
                     .map(|hit| search_path_to_document_id(&hit.path))
                     .collect::<Vec<_>>(),
                 crate::search::SearchEmission::View(view) => view
-                    .results
+                    .hits
                     .iter()
                     .map(|hit| search_path_to_document_id(&hit.path))
                     .collect::<Vec<_>>(),
@@ -836,7 +839,7 @@ pub fn run_agentic_evaluation(
 
         let final_documents: Vec<_> = response
             .state
-            .retained_evidence
+            .retained_artifacts
             .iter()
             .map(|evidence| search_path_to_document_id(&evidence.path))
             .collect();
@@ -893,7 +896,7 @@ pub fn run_comparative_evaluation(
 ) -> Result<ComparativeEvaluationReport> {
     let registry = crate::search::StrategyPresetRegistry::default_registry();
     let names = registry.names();
-    let mut results = Vec::new();
+    let mut hits = Vec::new();
     let mut metadata = Vec::new();
 
     let prepare_started = Instant::now();
@@ -912,11 +915,12 @@ pub fn run_comparative_evaluation(
             request.verbose,
             Some(dense_for_load.as_ref()),
             &telemetry_for_load,
+            &[],
             None,
         )?,
         &[queries_path.clone(), request.qrels_path.clone()],
     );
-    let index = crate::search::Bm25Index::build(&corpus.documents);
+    let index = crate::search::Bm25Index::build(&corpus.artifacts);
     let queries = load_queries(&queries_path)?;
     let qrels = load_qrels(&request.qrels_path)?;
     let _prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
@@ -1009,7 +1013,7 @@ pub fn run_comparative_evaluation(
             max_over_target_ms: over_target_ms(timings.last().copied().unwrap_or(0.0)),
         };
 
-        results.push(StrategyComparison {
+        hits.push(StrategyComparison {
             strategy: name.clone(),
             expansion: format!("{:?}", env.ir.plan.query_expansion),
             quality,
@@ -1034,19 +1038,19 @@ pub fn run_comparative_evaluation(
     }
 
     // Calculate signal gain against bm25 baseline
-    let baseline_ndcg = results
+    let baseline_ndcg = hits
         .iter()
         .find(|r| r.strategy == "bm25")
         .map(|r| r.quality.ndcg_at_10)
         .unwrap_or(0.0);
 
-    for res in &mut results {
+    for res in &mut hits {
         if let Some(rm) = &mut res.reactor_metrics {
             rm.signal_gain = res.quality.ndcg_at_10 - baseline_ndcg;
         }
     }
 
-    Ok(ComparativeEvaluationReport { metadata, results })
+    Ok(ComparativeEvaluationReport { metadata, hits })
 }
 
 fn is_gated_model_error(error: &anyhow::Error) -> bool {
@@ -1089,20 +1093,12 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
     )
     .unwrap();
 
-    let ndcgs: Vec<f64> = report
-        .results
-        .iter()
-        .map(|r| r.quality.ndcg_at_10)
-        .collect();
-    let mrrs: Vec<f64> = report.results.iter().map(|r| r.quality.mrr_at_10).collect();
-    let recalls: Vec<f64> = report
-        .results
-        .iter()
-        .map(|r| r.quality.recall_at_10)
-        .collect();
-    let latencies: Vec<f64> = report.results.iter().map(|r| r.latency.p50_ms).collect();
+    let ndcgs: Vec<f64> = report.hits.iter().map(|r| r.quality.ndcg_at_10).collect();
+    let mrrs: Vec<f64> = report.hits.iter().map(|r| r.quality.mrr_at_10).collect();
+    let recalls: Vec<f64> = report.hits.iter().map(|r| r.quality.recall_at_10).collect();
+    let latencies: Vec<f64> = report.hits.iter().map(|r| r.latency.p50_ms).collect();
     let gains: Vec<f64> = report
-        .results
+        .hits
         .iter()
         .map(|r| {
             r.reactor_metrics
@@ -1112,7 +1108,7 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
         })
         .collect();
 
-    for res in &report.results {
+    for res in &report.hits {
         let bar = render_bar(res.quality.ndcg_at_10, 10);
         let hits = if let Some(t) = &res.telemetry {
             format!(
@@ -1173,7 +1169,7 @@ pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String
         writeln!(out, "  CPU:      {}", meta.hardware.cpu_brand).unwrap();
         writeln!(
             out,
-            "  Corpus:   {} documents, {} bytes",
+            "  Corpus:   {} artifacts, {} bytes",
             meta.corpus_documents, meta.corpus_bytes
         )
         .unwrap();
@@ -1259,11 +1255,11 @@ fn build_metadata(
         champion_strategy,
         command: command.to_string(),
         git_sha: Some(current_git_sha()),
-        corpus_documents: corpus.documents.len(),
+        corpus_documents: corpus.artifacts.len(),
         corpus_bytes: corpus.total_bytes,
         segment_strategy: "structure-aware".to_string(),
         segment_count: corpus
-            .documents
+            .artifacts
             .iter()
             .map(|document| document.segments().len())
             .sum(),
@@ -1315,7 +1311,7 @@ fn evaluate_quality(
         let response = env.search(&turn_req)?;
 
         let ranked_ids: Vec<String> = response
-            .results
+            .hits
             .iter()
             .map(|hit| {
                 Path::new(&hit.path)
@@ -1459,14 +1455,14 @@ fn filter_evaluation_helper_documents(
         return corpus;
     }
 
-    let original_indexed = corpus.indexed_files;
-    let original_skipped = corpus.skipped_files;
-    let documents: Vec<_> = corpus
-        .documents
+    let original_indexed = corpus.indexed_artifacts;
+    let original_skipped = corpus.skipped_artifacts;
+    let artifacts: Vec<_> = corpus
+        .artifacts
         .into_iter()
         .filter(|document| !excluded.contains(&document.path))
         .collect();
-    let removed = original_indexed.saturating_sub(documents.len());
+    let removed = original_indexed.saturating_sub(artifacts.len());
 
     if removed > 0 {
         tracing::info!(
@@ -1475,16 +1471,16 @@ fn filter_evaluation_helper_documents(
         );
     }
 
-    let total_bytes = documents
+    let total_bytes = artifacts
         .iter()
         .map(|document| document.length as u64)
         .sum();
 
     LoadedCorpus {
-        indexed_files: documents.len(),
+        indexed_artifacts: artifacts.len(),
         total_bytes,
-        documents,
-        skipped_files: original_skipped + removed,
+        artifacts,
+        skipped_artifacts: original_skipped + removed,
     }
 }
 
@@ -1514,7 +1510,7 @@ fn expected_documents_satisfied(expected: &[String], actual: &[String]) -> bool 
         .all(|expected_id| actual.contains(expected_id.as_str()))
 }
 
-fn recall_against_expected(results: &[String], expected: &[String]) -> f64 {
+fn recall_against_expected(hits: &[String], expected: &[String]) -> f64 {
     if expected.is_empty() {
         return 1.0;
     }
@@ -1523,25 +1519,24 @@ fn recall_against_expected(results: &[String], expected: &[String]) -> f64 {
         .iter()
         .map(|document_id| (document_id.clone(), 1_u32))
         .collect();
-    recall_at_10(results, &relevant)
+    recall_at_10(hits, &relevant)
 }
 
-fn mrr_at_10(results: &[String], relevances: &HashMap<String, u32>) -> f64 {
-    results
-        .iter()
+fn mrr_at_10(hits: &[String], relevances: &HashMap<String, u32>) -> f64 {
+    hits.iter()
         .enumerate()
         .find(|(_, id)| relevances.get(*id).copied().unwrap_or(0) > 0)
         .map(|(index, _)| 1.0 / (index as f64 + 1.0))
         .unwrap_or(0.0)
 }
 
-fn recall_at_10(results: &[String], relevances: &HashMap<String, u32>) -> f64 {
+fn recall_at_10(hits: &[String], relevances: &HashMap<String, u32>) -> f64 {
     let relevant_total = relevances.values().filter(|score| **score > 0).count();
     if relevant_total == 0 {
         return 0.0;
     }
 
-    let hits = results
+    let hits = hits
         .iter()
         .filter(|id| relevances.get(*id).copied().unwrap_or(0) > 0)
         .count();
@@ -1549,8 +1544,8 @@ fn recall_at_10(results: &[String], relevances: &HashMap<String, u32>) -> f64 {
     hits as f64 / relevant_total as f64
 }
 
-fn ndcg_at_10(results: &[String], relevances: &HashMap<String, u32>) -> f64 {
-    let dcg = results
+fn ndcg_at_10(hits: &[String], relevances: &HashMap<String, u32>) -> f64 {
+    let dcg = hits
         .iter()
         .enumerate()
         .map(|(index, id)| discounted_gain(index, relevances.get(id).copied().unwrap_or(0)))
@@ -1615,36 +1610,47 @@ mod tests {
         let queries_path = PathBuf::from("/tmp/eval-corpus/test-queries.tsv");
         let qrels_path = PathBuf::from("/tmp/eval-corpus/qrels/test.tsv");
         let corpus = LoadedCorpus {
-            documents: vec![
+            artifacts: vec![
                 test_document(&doc_path, "real document"),
                 test_document(&queries_path, "helper queries"),
                 test_document(&qrels_path, "helper qrels"),
             ],
             total_bytes: ("real document".len() + "helper queries".len() + "helper qrels".len())
                 as u64,
-            indexed_files: 3,
-            skipped_files: 1,
+            indexed_artifacts: 3,
+            skipped_artifacts: 1,
         };
 
         let filtered =
             filter_evaluation_helper_documents(corpus, &[queries_path.clone(), qrels_path.clone()]);
 
-        assert_eq!(filtered.documents.len(), 1);
-        assert_eq!(filtered.documents[0].path, doc_path);
-        assert_eq!(filtered.indexed_files, 1);
-        assert_eq!(filtered.skipped_files, 3);
+        assert_eq!(filtered.artifacts.len(), 1);
+        assert_eq!(filtered.artifacts[0].path, doc_path);
+        assert_eq!(filtered.indexed_artifacts, 1);
+        assert_eq!(filtered.skipped_artifacts, 3);
         assert_eq!(filtered.total_bytes, "real document".len() as u64);
     }
 
-    fn test_document(path: &Path, text: &str) -> crate::search::Document {
-        crate::search::Document {
+    fn test_document(path: &Path, text: &str) -> crate::search::ContextArtifact {
+        crate::search::ContextArtifact {
             id: path.display().to_string(),
+            kind: crate::search::ContextArtifactKind::File,
             path: path.to_path_buf(),
             source_kind: SourceKind::Text,
             length: text.len(),
             terms: std::collections::HashMap::new(),
             text: text.to_string(),
             segments: Vec::new(),
+            provenance: crate::search::ArtifactProvenance {
+                adapter: crate::search::AcquisitionAdapterKind::FileSystem,
+                source: path.display().to_string(),
+                synthetic: false,
+            },
+            freshness: crate::search::ArtifactFreshness {
+                observed_unix_secs: 0,
+                modified_unix_secs: None,
+            },
+            budget: crate::search::ArtifactBudget::from_text(text, 0),
         }
     }
 }

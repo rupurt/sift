@@ -401,7 +401,7 @@ enum EvalCommands {
         #[arg(long)]
         shortlist: Option<usize>,
         #[arg(long)]
-        retained_evidence_limit: Option<usize>,
+        retained_artifact_limit: Option<usize>,
         #[arg(long)]
         model_id: Option<String>,
         #[arg(long)]
@@ -662,7 +662,7 @@ fn main() -> Result<()> {
                 corpus,
                 fixtures,
                 shortlist,
-                retained_evidence_limit,
+                retained_artifact_limit,
                 model_id,
                 model_revision,
                 max_length,
@@ -684,7 +684,7 @@ fn main() -> Result<()> {
                                 .or(Some(config.embedding.model_revision.clone())),
                             max_length.or(Some(config.embedding.max_length)),
                         ),
-                        retained_evidence_limit: retained_evidence_limit.unwrap_or(1),
+                        retained_artifact_limit: retained_artifact_limit.unwrap_or(1),
                         verbose,
                         prompts: Some(config.prompts.clone()),
                     },

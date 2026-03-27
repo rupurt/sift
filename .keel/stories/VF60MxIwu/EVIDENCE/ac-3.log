@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:10.087003408-07:00
+mode: manual
+---
+Runtime-record artifacts carry provenance, freshness, and budget metadata and remain inspectable through SearchHit, RetainedArtifact, and SearchEmission contracts.

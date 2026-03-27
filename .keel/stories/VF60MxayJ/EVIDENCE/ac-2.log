@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:10.150377797-07:00
+mode: manual
+---
+Assembly contracts now expose explicit retained_artifacts inputs plus retained/pruned outcomes in the response.

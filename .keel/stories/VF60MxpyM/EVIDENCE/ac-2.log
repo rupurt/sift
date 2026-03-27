@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:10.181955566-07:00
+mode: manual
+---
+Latent output is a lightweight projection from SearchHit via build_search_emission with no extra model work; just check and nextest pass.

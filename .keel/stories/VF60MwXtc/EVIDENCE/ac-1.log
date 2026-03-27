@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:09.915752815-07:00
+mode: manual
+---
+Introduced ContextArtifact and ContextArtifactKind plus LocalContextSource variants for file, project-doc, environment-fact, tool-output, and agent-turn records; cargo check, cargo test --lib, cargo test --test library_facade_test, and just check all pass.

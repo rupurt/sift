@@ -288,28 +288,36 @@ impl SearchExecution for PipelineExecution {
         let corpus = storage.corpus();
         let index = storage.bm25_index();
         let prepared = PreparedCorpus {
-            documents: &corpus.documents,
+            artifacts: &corpus.artifacts,
             bm25_index: Some(index),
         };
 
-        let results = self.service.execute(plan, request, &prepared)?;
+        let candidates = self.service.execute(plan, request, &prepared)?;
 
-        let hits = results
+        let hits = candidates
             .results
             .into_iter()
             .enumerate()
             .map(|(idx, res)| {
+                let artifact = corpus
+                    .artifact_by_id(&res.id)
+                    .expect("candidate artifact should exist in loaded corpus");
                 let mut path = res.path.display().to_string();
                 if path.starts_with("./") {
                     path = path.chars().skip(2).collect();
                 }
                 SearchHit {
+                    artifact_id: artifact.id.clone(),
+                    artifact_kind: artifact.kind,
                     path,
                     rank: idx + 1,
                     score: res.score,
                     confidence: plan.categorize_score(res.score),
                     location: res.snippet_location.clone(),
                     snippet: resolve_snippet_from_candidate(corpus, &res, &request.query),
+                    provenance: artifact.provenance.clone(),
+                    freshness: artifact.freshness.clone(),
+                    budget: artifact.budget.clone(),
                 }
             })
             .collect();
@@ -317,9 +325,9 @@ impl SearchExecution for PipelineExecution {
         Ok(SearchResponse {
             strategy: plan.name.clone(),
             root: request.path.display().to_string(),
-            indexed_files: corpus.indexed_files,
-            skipped_files: corpus.skipped_files,
-            results: hits,
+            indexed_artifacts: corpus.indexed_artifacts,
+            skipped_artifacts: corpus.skipped_artifacts,
+            hits,
         })
     }
 }

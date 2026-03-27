@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:09.930439202-07:00
+mode: manual
+---
+Replaced Document-centric corpus and retrieval surfaces with ContextArtifact/artifacts across domain, corpus, engine, facade, cache, and tests; no supported parallel Document primary type remains.

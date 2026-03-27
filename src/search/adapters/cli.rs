@@ -13,11 +13,11 @@ pub fn render_search_response(response: &SearchResponse, format: OutputFormat) -
 fn render_text_response(response: &SearchResponse) -> Result<String> {
     let mut output = String::new();
 
-    if response.results.is_empty() {
-        return Ok("no matching results".to_string());
+    if response.hits.is_empty() {
+        return Ok("no matching hits".to_string());
     }
 
-    for hit in &response.results {
+    for hit in &response.hits {
         writeln!(&mut output, "{}. \x1b[1;32m{}\x1b[0m", hit.rank, hit.path)?;
         if let Some(location) = &hit.location {
             writeln!(&mut output, "   location: \x1b[36m{}\x1b[0m", location)?;

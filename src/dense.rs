@@ -324,7 +324,7 @@ impl SegmentScorer for DenseReranker {
                 let segment_embedding = embeddings.get(index)?;
                 hits.push(SegmentHit {
                     segment_id: segment.id.clone(),
-                    doc_id: segment.doc_id.clone(),
+                    artifact_id: segment.artifact_id.clone(),
                     path: segment.path.clone(),
                     label: segment.label.clone(),
                     text: segment.text.clone(),

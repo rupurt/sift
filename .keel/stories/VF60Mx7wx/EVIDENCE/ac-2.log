@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:10.039080702-07:00
+mode: manual
+---
+The acquisition refactor remains strictly local-first and zero-daemon; just check passes without any remote or hosted dependency.

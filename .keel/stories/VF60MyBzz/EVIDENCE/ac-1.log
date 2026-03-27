@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:10.215273623-07:00
+mode: manual
+---
+Sift::search, Sift::assemble_context, Sift::search_turn, and Sift::search_controller expose the simplified artifact runtime without graph or Reactor concepts.

@@ -53,11 +53,11 @@ mod tests {
             )
             .expect("search response");
 
-            assert_eq!(response.indexed_files, 3);
-            assert_eq!(response.skipped_files, 1);
-            assert_eq!(response.results[0].rank, 1);
-            assert!(response.results[0].path.ends_with("nested/alpha.txt"));
-            assert!(response.results[0].score > response.results[1].score);
+            assert_eq!(response.indexed_artifacts, 3);
+            assert_eq!(response.skipped_artifacts, 1);
+            assert_eq!(response.hits[0].rank, 1);
+            assert!(response.hits[0].path.ends_with("nested/alpha.txt"));
+            assert!(response.hits[0].score > response.hits[1].score);
         }
     }
 
@@ -78,7 +78,7 @@ mod tests {
             let output =
                 render_search_response(&response, OutputFormat::Json).expect("json rendering");
             let parsed = serde_json::from_str::<serde_json::Value>(&output).expect("parse json");
-            let first = &parsed["results"][0];
+            let first = &parsed["hits"][0];
 
             assert!(first.get("path").is_some());
             assert!(first.get("rank").is_some());
@@ -103,11 +103,12 @@ mod tests {
                     0,
                     None,
                     &crate::system::Telemetry::new(),
+                    &[],
                     Some(env.cache.path()),
                 )
                 .expect("loaded corpus");
                 let document = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("docs/service.html"))
                     .expect("html document");
@@ -163,9 +164,9 @@ mod tests {
             )
             .expect("second search");
 
-            assert_eq!(first.indexed_files, 3);
-            assert_eq!(first.skipped_files, 1);
-            assert_eq!(first.results, second.results);
+            assert_eq!(first.indexed_artifacts, 3);
+            assert_eq!(first.skipped_artifacts, 1);
+            assert_eq!(first.hits, second.hits);
         }
     }
 
@@ -185,15 +186,16 @@ mod tests {
                     0,
                     None,
                     &crate::system::Telemetry::new(),
+                    &[],
                     Some(env.cache.path()),
                 )
                 .expect("loaded corpus");
 
-                assert_eq!(loaded.indexed_files, 2);
-                assert_eq!(loaded.skipped_files, 1);
+                assert_eq!(loaded.indexed_artifacts, 2);
+                assert_eq!(loaded.skipped_artifacts, 1);
 
                 let html = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("docs/service.html"))
                     .expect("html document");
@@ -202,7 +204,7 @@ mod tests {
                 assert!(html.text().contains("Service Catalog"));
 
                 let text = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("notes.txt"))
                     .expect("text document");
@@ -224,6 +226,7 @@ mod tests {
                     0,
                     None,
                     &crate::system::Telemetry::new(),
+                    &[],
                     Some(env.cache.path()),
                 )
                 .expect("first corpus load");
@@ -233,15 +236,16 @@ mod tests {
                     0,
                     None,
                     &crate::system::Telemetry::new(),
+                    &[],
                     Some(env.cache.path()),
                 )
                 .expect("second corpus load");
 
-                assert_eq!(first.indexed_files, 6);
-                assert_eq!(second.indexed_files, 6);
+                assert_eq!(first.indexed_artifacts, 6);
+                assert_eq!(second.indexed_artifacts, 6);
 
                 let first_segments = first
-                    .documents
+                    .artifacts
                     .iter()
                     .map(|document| {
                         assert!(
@@ -261,7 +265,7 @@ mod tests {
                     })
                     .collect::<Vec<_>>();
                 let second_segments = second
-                    .documents
+                    .artifacts
                     .iter()
                     .map(|document| {
                         (
@@ -288,12 +292,13 @@ mod tests {
                     0,
                     None,
                     &crate::system::Telemetry::new(),
+                    &[],
                     Some(env.cache.path()),
                 )
                 .expect("loaded corpus");
 
                 let html = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("docs/service.html"))
                     .expect("html document");
@@ -304,28 +309,28 @@ mod tests {
                 );
 
                 let pdf = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("docs/architecture.pdf"))
                     .expect("pdf document");
                 assert!(pdf.segments()[0].label.starts_with("page "));
 
                 let docx = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("docs/roadmap-docx.docx"))
                     .expect("docx document");
                 assert!(docx.segments()[0].label.starts_with("section "));
 
                 let xlsx = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("docs/roadmap-sheet.xlsx"))
                     .expect("xlsx document");
                 assert!(xlsx.segments()[0].label.starts_with("sheet "));
 
                 let pptx = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("docs/roadmap-slides.pptx"))
                     .expect("pptx document");
@@ -341,12 +346,13 @@ mod tests {
                     0,
                     None,
                     &crate::system::Telemetry::new(),
+                    &[],
                     Some(env.cache.path()),
                 )
                 .expect("loaded corpus");
 
                 let html = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("docs/service.html"))
                     .expect("html document");
@@ -357,7 +363,7 @@ mod tests {
                 }));
 
                 let text = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("notes.txt"))
                     .expect("text document");
@@ -368,7 +374,7 @@ mod tests {
                 }));
 
                 let pdf = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("docs/architecture.pdf"))
                     .expect("pdf document");
@@ -380,7 +386,7 @@ mod tests {
                 }));
 
                 let docx = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("docs/roadmap-docx.docx"))
                     .expect("docx document");
@@ -391,7 +397,7 @@ mod tests {
                 );
 
                 let xlsx = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("docs/roadmap-sheet.xlsx"))
                     .expect("xlsx document");
@@ -402,7 +408,7 @@ mod tests {
                 );
 
                 let pptx = loaded
-                    .documents
+                    .artifacts
                     .iter()
                     .find(|document| document.path.ends_with("docs/roadmap-slides.pptx"))
                     .expect("pptx document");
@@ -428,16 +434,11 @@ mod tests {
                 )
                 .expect("search response");
 
-                assert_eq!(response.results[0].rank, 1);
-                assert!(response.results[0].path.ends_with("docs/service.html"));
+                assert_eq!(response.hits[0].rank, 1);
+                assert!(response.hits[0].path.ends_with("docs/service.html"));
                 // The snippet is highlighted, so we check for substring or strip codes.
-                assert!(response.results[0].snippet.to_lowercase().contains("html"));
-                assert!(
-                    response.results[0]
-                        .snippet
-                        .to_lowercase()
-                        .contains("heading")
-                );
+                assert!(response.hits[0].snippet.to_lowercase().contains("html"));
+                assert!(response.hits[0].snippet.to_lowercase().contains("heading"));
             }
         }
 
@@ -456,20 +457,15 @@ mod tests {
                 )
                 .expect("search response");
 
-                assert_eq!(response.results[0].rank, 1);
-                assert!(response.results[0].path.ends_with("docs/architecture.pdf"));
+                assert_eq!(response.hits[0].rank, 1);
+                assert!(response.hits[0].path.ends_with("docs/architecture.pdf"));
                 assert!(
-                    response.results[0]
+                    response.hits[0]
                         .snippet
                         .to_lowercase()
                         .contains("architecture")
                 );
-                assert!(
-                    response.results[0]
-                        .snippet
-                        .to_lowercase()
-                        .contains("decision")
-                );
+                assert!(response.hits[0].snippet.to_lowercase().contains("decision"));
             }
         }
 
@@ -489,7 +485,7 @@ mod tests {
                 .expect("search response");
 
                 let paths = response
-                    .results
+                    .hits
                     .iter()
                     .map(|hit| hit.path.as_str())
                     .collect::<Vec<_>>();
@@ -535,9 +531,9 @@ mod tests {
                 )
                 .expect("second search");
 
-                assert_eq!(first.indexed_files, second.indexed_files);
-                assert_eq!(first.skipped_files, second.skipped_files);
-                assert_eq!(first.results, second.results);
+                assert_eq!(first.indexed_artifacts, second.indexed_artifacts);
+                assert_eq!(first.skipped_artifacts, second.skipped_artifacts);
+                assert_eq!(first.hits, second.hits);
             }
         }
 
@@ -563,9 +559,9 @@ mod tests {
                 )
                 .expect("second search");
 
-                assert_eq!(first.indexed_files, 2);
-                assert_eq!(first.skipped_files, 1);
-                assert_eq!(first.results, second.results);
+                assert_eq!(first.indexed_artifacts, 2);
+                assert_eq!(first.skipped_artifacts, 1);
+                assert_eq!(first.hits, second.hits);
             }
         }
     }

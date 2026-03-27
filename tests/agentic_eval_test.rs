@@ -23,7 +23,7 @@ fn agentic_harness_runs_planned_multi_turn_fixtures_from_repo_local_files() {
             fixtures_path: root.join("fixtures.json"),
             shortlist: 2,
             dense_model: DenseModelSpec::default(),
-            retained_evidence_limit: 1,
+            retained_artifact_limit: 1,
             verbose: 0,
             prompts: None,
         },

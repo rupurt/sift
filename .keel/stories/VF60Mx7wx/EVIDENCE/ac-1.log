@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T13:20:10.022374968-07:00
+mode: manual
+---
+File-backed content and root project docs are classified and acquired through the shared local corpus acquisition flow instead of a separate privileged path; legacy rich-document tests pass.
