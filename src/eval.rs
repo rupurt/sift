@@ -429,19 +429,22 @@ pub fn run_quality_evaluation(
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
     let query_cache = std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
-    let corpus = load_search_corpus(
-        &request.corpus_dir,
-        ignore,
-        request.verbose,
-        Some(dense_for_load.as_ref()),
-        &telemetry_for_load,
-        None,
-    )?;
-    let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
         .clone()
         .unwrap_or_else(|| request.corpus_dir.join("test-queries.tsv"));
+    let corpus = filter_evaluation_helper_documents(
+        load_search_corpus(
+            &request.corpus_dir,
+            ignore,
+            request.verbose,
+            Some(dense_for_load.as_ref()),
+            &telemetry_for_load,
+            None,
+        )?,
+        &[queries_path.clone(), request.qrels_path.clone()],
+    );
+    let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries = load_queries(&queries_path)?;
     let qrels = load_qrels(&request.qrels_path)?;
     let _prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
@@ -599,14 +602,17 @@ pub fn run_latency_evaluation(
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
     let query_cache = std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
-    let corpus = load_search_corpus(
-        &request.corpus_dir,
-        ignore,
-        request.verbose,
-        Some(dense_for_load.as_ref()),
-        &telemetry_for_load,
-        None,
-    )?;
+    let corpus = filter_evaluation_helper_documents(
+        load_search_corpus(
+            &request.corpus_dir,
+            ignore,
+            request.verbose,
+            Some(dense_for_load.as_ref()),
+            &telemetry_for_load,
+            None,
+        )?,
+        std::slice::from_ref(&request.queries_path),
+    );
     let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries = load_queries(&request.queries_path)?;
     let prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
@@ -702,14 +708,17 @@ pub fn run_agentic_evaluation(
     let plan = registry.resolve(&request.strategy)?;
 
     let metadata_telemetry = std::sync::Arc::new(crate::system::Telemetry::new());
-    let corpus = load_search_corpus(
-        &request.corpus_dir,
-        ignore,
-        request.verbose,
-        None,
-        &metadata_telemetry,
-        None,
-    )?;
+    let corpus = filter_evaluation_helper_documents(
+        load_search_corpus(
+            &request.corpus_dir,
+            ignore,
+            request.verbose,
+            None,
+            &metadata_telemetry,
+            None,
+        )?,
+        std::slice::from_ref(&request.fixtures_path),
+    );
 
     let mut config = crate::config::Config::default();
     config.search.strategy = request.strategy.clone();
@@ -892,19 +901,22 @@ pub fn run_comparative_evaluation(
     let dense_for_load = std::sync::Arc::new(DenseReranker::load(request.dense_model.clone())?);
     let telemetry_for_load = std::sync::Arc::new(crate::system::Telemetry::new());
     let query_cache = std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
-    let corpus = load_search_corpus(
-        &request.corpus_dir,
-        ignore,
-        request.verbose,
-        Some(dense_for_load.as_ref()),
-        &telemetry_for_load,
-        None,
-    )?;
-    let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries_path = request
         .queries_path
         .clone()
         .unwrap_or_else(|| request.corpus_dir.join("test-queries.tsv"));
+    let corpus = filter_evaluation_helper_documents(
+        load_search_corpus(
+            &request.corpus_dir,
+            ignore,
+            request.verbose,
+            Some(dense_for_load.as_ref()),
+            &telemetry_for_load,
+            None,
+        )?,
+        &[queries_path.clone(), request.qrels_path.clone()],
+    );
+    let index = crate::search::Bm25Index::build(&corpus.documents);
     let queries = load_queries(&queries_path)?;
     let qrels = load_qrels(&request.qrels_path)?;
     let _prepare_ms = prepare_started.elapsed().as_secs_f64() * 1000.0;
@@ -927,21 +939,19 @@ pub fn run_comparative_evaluation(
         comp_req.prompts = request.prompts.clone();
 
         let comp_plan = registry.resolve(name)?;
-        let comp_llm = match crate::search::SearchServiceBuilder::load_llm_reranker(
-            &comp_plan,
-            &comp_req,
-        ) {
-            Ok(llm) => llm,
-            Err(err) if is_gated_model_error(&err) => {
-                tracing::warn!(
-                    "skipping evaluation strategy {} due to gated model access: {:#}",
-                    name,
-                    err
-                );
-                continue;
-            }
-            Err(err) => return Err(err),
-        };
+        let comp_llm =
+            match crate::search::SearchServiceBuilder::load_llm_reranker(&comp_plan, &comp_req) {
+                Ok(llm) => llm,
+                Err(err) if is_gated_model_error(&err) => {
+                    tracing::warn!(
+                        "skipping evaluation strategy {} due to gated model access: {:#}",
+                        name,
+                        err
+                    );
+                    continue;
+                }
+                Err(err) => return Err(err),
+            };
 
         let env = crate::search::SearchEnvironment::new(
             &comp_req,
@@ -1436,6 +1446,48 @@ fn load_qrels(path: &Path) -> Result<HashMap<String, HashMap<String, u32>>> {
     Ok(qrels)
 }
 
+fn filter_evaluation_helper_documents(
+    corpus: LoadedCorpus,
+    helper_paths: &[PathBuf],
+) -> LoadedCorpus {
+    let excluded: HashSet<_> = helper_paths
+        .iter()
+        .filter(|path| !path.as_os_str().is_empty())
+        .cloned()
+        .collect();
+    if excluded.is_empty() {
+        return corpus;
+    }
+
+    let original_indexed = corpus.indexed_files;
+    let original_skipped = corpus.skipped_files;
+    let documents: Vec<_> = corpus
+        .documents
+        .into_iter()
+        .filter(|document| !excluded.contains(&document.path))
+        .collect();
+    let removed = original_indexed.saturating_sub(documents.len());
+
+    if removed > 0 {
+        tracing::info!(
+            "→ excluding {} evaluation helper file(s) from corpus",
+            removed
+        );
+    }
+
+    let total_bytes = documents
+        .iter()
+        .map(|document| document.length as u64)
+        .sum();
+
+    LoadedCorpus {
+        indexed_files: documents.len(),
+        total_bytes,
+        documents,
+        skipped_files: original_skipped + removed,
+    }
+}
+
 fn load_agentic_fixture_set(path: &Path) -> Result<AgenticFixtureSet> {
     let contents = fs::read_to_string(path)
         .with_context(|| format!("failed to read agentic fixtures {}", path.display()))?;
@@ -1538,9 +1590,13 @@ fn percentile(values: &[f64], quantile: f64) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use std::path::{Path, PathBuf};
+
     use anyhow::anyhow;
 
-    use super::is_gated_model_error;
+    use super::{filter_evaluation_helper_documents, is_gated_model_error};
+    use crate::extract::SourceKind;
+    use crate::search::LoadedCorpus;
 
     #[test]
     fn detects_gated_model_http_status_errors() {
@@ -1551,5 +1607,44 @@ mod tests {
     #[test]
     fn ignores_non_authentication_errors() {
         assert!(!is_gated_model_error(&anyhow!("failed to parse config")));
+    }
+
+    #[test]
+    fn filters_eval_helper_documents_from_loaded_corpus() {
+        let doc_path = PathBuf::from("/tmp/eval-corpus/doc.txt");
+        let queries_path = PathBuf::from("/tmp/eval-corpus/test-queries.tsv");
+        let qrels_path = PathBuf::from("/tmp/eval-corpus/qrels/test.tsv");
+        let corpus = LoadedCorpus {
+            documents: vec![
+                test_document(&doc_path, "real document"),
+                test_document(&queries_path, "helper queries"),
+                test_document(&qrels_path, "helper qrels"),
+            ],
+            total_bytes: ("real document".len() + "helper queries".len() + "helper qrels".len())
+                as u64,
+            indexed_files: 3,
+            skipped_files: 1,
+        };
+
+        let filtered =
+            filter_evaluation_helper_documents(corpus, &[queries_path.clone(), qrels_path.clone()]);
+
+        assert_eq!(filtered.documents.len(), 1);
+        assert_eq!(filtered.documents[0].path, doc_path);
+        assert_eq!(filtered.indexed_files, 1);
+        assert_eq!(filtered.skipped_files, 3);
+        assert_eq!(filtered.total_bytes, "real document".len() as u64);
+    }
+
+    fn test_document(path: &Path, text: &str) -> crate::search::Document {
+        crate::search::Document {
+            id: path.display().to_string(),
+            path: path.to_path_buf(),
+            source_kind: SourceKind::Text,
+            length: text.len(),
+            terms: std::collections::HashMap::new(),
+            text: text.to_string(),
+            segments: Vec::new(),
+        }
     }
 }
