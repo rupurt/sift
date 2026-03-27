@@ -1,7 +1,11 @@
-# Research: Graph IR and Execution Engine
+# Research: Graph IR and Agentic Execution Engine
 
 ## Abstract
-This document explores the refactoring of `sift` from a structured search pipeline into a modular **Graph IR and Execution Engine**. By elevating **IR**, **Execution**, and **Storage** to formal traits, we transform `sift` from a local CLI tool into a generic retrieval framework suitable for diverse embedding environments.
+This document explores the refactoring of `sift` from a structured search
+pipeline into a modular **Graph IR and Agentic Execution Engine**. By elevating
+**IR**, **Execution**, and **Storage** to formal traits, we transform `sift`
+from a local CLI tool into a hybrid and agentic search framework suitable for
+diverse embedding environments and local search-controller runtimes.
 
 ## The Three Pillars
 
@@ -27,9 +31,11 @@ pub trait SearchEngine {
 ```
 
 ### 2. SearchIR (The Graph Compiler)
-The **Intermediate Representation (IR)** is no longer a static `SearchPlan` struct. It is a trait that "compiles" a user query into an executable **Graph of Operations**.
+The **Intermediate Representation (IR)** should evolve beyond a static
+`SearchPlan` struct. It becomes a trait that "compiles" a user query into an
+executable **Graph of Operations**.
 
-- **Node:** Represents a discrete operation (e.g., `LexicalRetrieval`, `VectorRetrieval`, `Expansion`).
+- **Node:** Represents a discrete operation (e.g., `LexicalRetrieval`, `VectorRetrieval`, `Expansion`, `DecomposeQuery`, `PruneContext`, `EmitTurn`).
 - **Edge:** Represents the data flow and dependencies (e.g., `CandidateList`).
 
 ```rust
@@ -46,7 +52,10 @@ pub trait SearchIR {
 ```
 
 ### 3. SearchExecution (The Runtime)
-The `SearchExecution` trait is responsible for traversing the IR graph. It defines *how* the search runs—whether it's a simple sequential walk, a high-concurrency parallel execution, or an asynchronous task graph.
+The `SearchExecution` trait is responsible for traversing the IR graph. It
+defines *how* the search runs, whether that is a simple sequential walk, a
+high-concurrency parallel execution, or a turn-based search controller that
+iteratively calls the retrieval substrate.
 
 ```rust
 pub trait SearchExecution<I: SearchIR> {
@@ -70,8 +79,18 @@ pub trait SearchStorage: Send + Sync {
 ## Strategic Implications
 
 1. **Universal Retrieval:** Consumers can implement `SearchStorage` for cloud backends (S3, Snowflake) while reusing `sift`'s expansion and fusion logic.
-2. **Dynamic IR:** Users can create custom IR compilers that generate complex branching search strategies based on query classification.
-3. **Execution Profiling:** By making `Execution` a trait, we can swap in a `TracingExecutor` that records sub-millisecond spans for every node in the graph without polluting the domain logic.
+2. **Dynamic IR:** Users can create custom IR compilers that generate branching or iterative search strategies based on query classification and accumulated evidence.
+3. **Agentic Search:** A controller can treat retrieval as a reusable subgraph, decompose multi-hop queries, prune context, and emit structured turns without introducing a separate search stack.
+4. **Execution Profiling:** By making `Execution` a trait, we can swap in a `TracingExecutor` that records sub-millisecond spans for every node in the graph without polluting the domain logic.
 
 ## Current State vs. Vision
-Currently, `sift` uses a semi-rigid `SearchPlan` and a hardcoded `execute` loop in `SearchService`. This research proposes transitioning these internal patterns into the public trait-based "Engine" framework to support embedding `sift` as a library across diverse technical stacks.
+Currently, `sift` uses a semi-rigid `SearchPlan` and a mostly single-pass
+`execute` loop in `SearchService`. The codebase already has useful scaffolding
+for the next step, including trait-based engine boundaries and local
+`GenerativeModel` / `Conversation` support, but it does not yet have a
+first-class multi-turn search harness, `AgentTurn` domain model, or self-editing
+context loop.
+
+This research proposes transitioning those internal patterns into a public
+trait-based engine framework that can formally support hybrid retrieval and
+agentic search in the same local runtime.

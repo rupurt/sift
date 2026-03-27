@@ -1,6 +1,9 @@
 # Configuration Guide
 
-Sift is designed to be zero-config by default, but it can be customized via a `sift.toml` file or environment variables.
+Sift is designed to be zero-config by default, but it can be customized via a
+`sift.toml` file or environment variables. The current configuration surface
+primarily controls the hybrid retrieval core; agentic orchestration is still a
+library/runtime concern rather than a first-class `sift.toml` section.
 
 ## Configuration Locations
 
@@ -64,7 +67,11 @@ Before retrieval, Sift can expand your query to improve recall.
 | `splade` | **Sparse Lexical and Expansion.** Predicts technical terms semantically related to the query. |
 | `classified` | Identifies technical intent (e.g., BUGFIX) and adds category-specific keywords. |
 
-#### Available Strategies
+#### Current Built-In Strategies
+These presets define the current single-turn retrieval core. Agentic search will
+orchestrate these same primitives over multiple turns rather than replacing
+them.
+
 - **`page-index-hybrid`** (default): Our champion strategy. Combines BM25, Phrase matching, and Vector search, followed by Position-Aware reranking. Defaults to **SPLADE** expansion.
 - **`page-index-llm`**: Combines BM25, Phrase matching, and Vector search, followed by a **Qwen-based LLM reranker**. Defaults to **HyDE** expansion.
 - **`page-index-jina`**: Uses the specialized **Jina Reranker v3** for high-precision ranking. Defaults to **SPLADE** expansion.
@@ -85,13 +92,18 @@ The table below details exactly how each built-in strategy is configured across 
 | `page-index-llm` | `hyde` | `bm25, phrase, vector` | `rrf` | `llm` |
 | `page-index-jina` | `splade` | `bm25, phrase, vector` | `rrf` | `jina` |
 | `page-index-gemma` | `splade` | `bm25, phrase, vector` | `rrf` | `gemma` |
-| `page-index-splade` | `splade" | `bm25, phrase, vector` | `rrf` | `position-aware` |
+| `page-index-splade` | `splade` | `bm25, phrase, vector` | `rrf` | `position-aware` |
 | `page-index-classified` | `classified` | `bm25, phrase, vector` | `rrf` | `position-aware` |
 | `page-index` | `none` | `bm25, phrase` | `rrf` | `position-aware` |
 | `bm25` | `none` | `bm25` | `rrf` | `none` |
 | `vector` | `none` | `vector` | `rrf` | `none` |
 | `legacy-hybrid` | `none` | `bm25, vector` | `rrf` | `none` |
 | `page-index-qwen` | `none` | `bm25, phrase, vector` | `rrf` | `llm` |
+
+#### Agentic Execution Status
+- There is no first-class `agentic` strategy or controller section in configuration yet.
+- Current agentic-adjacent controls are the existing intent, retriever, fusion, reranking, and model overrides.
+- Future agentic controllers should reuse these presets as their retrieval substrate rather than introducing a separate hardcoded search stack.
 
 ---
 

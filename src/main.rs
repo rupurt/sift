@@ -34,7 +34,7 @@ const CLI_VERSION: &str = env!("SIFT_CLI_VERSION");
 
 #[derive(Parser)]
 #[command(name = "sift")]
-#[command(about = "Indexless hybrid search for local retrieval workflows", long_about = None)]
+#[command(about = "Hybrid and agentic local search for retrieval workflows", long_about = None)]
 #[command(version = CLI_VERSION)]
 struct Cli {
     #[command(subcommand)]

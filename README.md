@@ -4,14 +4,16 @@
 [![Planning Board](https://img.shields.io/badge/Keel-Board-blue)](.keel/README.md)
 [![Release Process](https://img.shields.io/badge/Release-Process-green)](RELEASE.md)
 
-`sift` is a standalone Rust CLI and **Hybrid Information Retrieval (IR) system** for local document retrieval in agentic
-workflows. It searches raw local corpora without a long-running daemon, uses a 
-composable search strategy architecture, and employs a Zig-style heuristic 
-caching system for near-instant repeated queries.
+`sift` is a standalone Rust CLI and library for **Hybrid and Agentic Search**
+in local development workflows. Today it ships a lightning-fast hybrid retrieval
+core for raw local corpora without a long-running daemon, plus the architectural
+seams needed to grow that core into a local search subagent.
 
 The core idea is simple: point `sift` at a directory, extract text on demand,
-and run a layered search pipeline (Expansion, Retrieval, Fusion, Reranking). 
-There is no external database, no daemon, and no background indexing service.
+and run a layered search pipeline (Expansion, Retrieval, Fusion, Reranking).
+That pipeline is the current execution core. The next layer is agentic
+orchestration: repeated turns over the same retrieval core with explicit context
+management, query decomposition, and richer emissions for other tools.
 
 For the project background and design rationale, read the introductory post:
 [`Sift: Local Hybrid Search Without the Infrastructure Tax`](https://www.alexdk.com/blog/introducing-sift).
@@ -22,14 +24,16 @@ For the project background and design rationale, read the introductory post:
 - **Pure-Rust Toolchain:** No C++ dependencies, enabling easy static binary distribution.
 - **High Performance:** SIMD-accelerated scoring and memory-mapped I/O for 
   ultra-fast retrieval on large corpora.
-- **Default Strategy:** Uses the `page-index-hybrid` champion preset (Lexical + Semantic).
+- **Default Retrieval Strategy:** Uses the `page-index-hybrid` champion preset (Lexical + Semantic).
 - **Layered Pipeline:** Query Expansion -> Retrieval -> Fusion -> Reranking.
+- **Execution Direction:** Single-turn search is shipped today; turn-based agentic orchestration is the next formal layer.
 - **Heuristic Incremental Caching:** Uses `mtime`, `inode`, and `size` to bypass 
   extraction and hashing for unchanged files.
 - **Fully Processed Assets:** Cache blobs contain text, term stats, and pre-computed
   dense vector embeddings, enabling search at dot-product speeds.
 - **Inference & Reranking:** Runs locally through Candle with support for 
   both dense embeddings and advanced LLM reranking (e.g., Qwen2.5).
+- **Agentic Scaffolding:** The library already exposes local `GenerativeModel` / `Conversation` hooks for turn-based controllers.
 - **Supported Inputs:** Text, HTML, PDF, and OOXML files (`.docx`, `.xlsx`, `.pptx`).
 
 ## Installation
@@ -84,7 +88,7 @@ just embed-search tests/fixtures/rich-docs "architecture decision"
 The embedded example supports the same shape directly:
 
 ```bash
-cargo run --manifest-path examples/sift-embed/Cargo.toml -- search "hybrid search"
+cargo run --manifest-path examples/sift-embed/Cargo.toml -- search "agentic search"
 cargo run --manifest-path examples/sift-embed/Cargo.toml -- search tests/fixtures/rich-docs "architecture decision"
 ```
 
@@ -118,7 +122,7 @@ fn main() -> anyhow::Result<()> {
     let sift = Sift::builder().build();
 
     let response = sift.search(
-        SearchInput::new("./docs", "hybrid search")
+        SearchInput::new("./docs", "agentic search")
             .with_options(
                 SearchOptions::default()
                     .with_strategy("bm25")
@@ -143,7 +147,9 @@ API.
 
 ## How Sift Works
 
-At runtime, `sift` orchestrates a high-performance asset pipeline:
+At runtime, `sift` orchestrates a high-performance asset pipeline and retrieval
+runtime that can be invoked directly or wrapped by a future turn-based search
+controller:
 
 ```mermaid
 flowchart TD
@@ -162,8 +168,11 @@ flowchart TD
   C4 --> D
   C5 --> D
 
-  subgraph Strategy ["Layered Search Strategy"]
-    D --> E{Expansion}
+  subgraph Strategy ["Hybrid Retrieval Core"]
+    D --> J{Execution Path}
+    J -->|Direct| E{Expansion}
+    J -->|Agentic Loop| A0[Plan Turn / Manage Context]
+    A0 --> E
     E -->|None| E1[Direct Query]
     E -->|HyDE| E2[LLM: Hypothetical Answer]
     E -->|SPLADE| E3[LLM: Generative Expansion]
@@ -188,11 +197,17 @@ flowchart TD
     G --> H{Reranking}
     H -->|Basic| H1[Position-Aware]
     H -->|Advanced| H2[LLM - Deep Semantic Pass]
+    H1 --> K{Emission}
+    H2 --> K
+    K -->|CLI| I[Colorized CLI Output]
+    K -->|Library| I2[Structured SearchResponse]
+    K -.->|Need More Evidence| A0
   end
-
-  H1 --> I[Colorized CLI Output]
-  H2 --> I
 ```
+
+Today the shipped CLI uses the direct path. The agentic loop in the diagram is
+the formal product direction and already has partial library/runtime scaffolding
+in the codebase.
 
 ## Performance & Scalability
 
@@ -233,7 +248,7 @@ Trace the pipeline and timings at different levels:
 
 - **[USER_GUIDE.md](USER_GUIDE.md):** The comprehensive guide to getting started and mastering Sift.
 - **[CONFIGURATION.md](CONFIGURATION.md):** Technical guide to `sift.toml`, available strategies, and environment variables.
-- **[EVALUATION.md](EVALUATION.md):** How to manage datasets and run quality/latency evaluations.
+- **[EVALUATIONS.md](EVALUATIONS.md):** How to manage datasets and run quality/latency evaluations.
 - **[ARCHITECTURE.md](ARCHITECTURE.md):** Deep dive into the hexagonal modular engine and asset pipeline.
 
 ## License

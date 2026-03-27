@@ -27,8 +27,9 @@ Search results and evaluations must be reproducible.
 
 ## 5. Composition over Monoliths
 Search is a pipeline, not a single algorithm.
-- We do not hardcode "hybrid" as a single function. We compose it via `Query Expansion -> Retrieval -> Fusion -> Reranking`.
+- We do not hardcode "hybrid" or "agentic" as single functions. We compose them via explicit plans, graphs, and turns over `Query Expansion -> Retrieval -> Fusion -> Reranking`.
 - Strategies are defined as data (Presets/Plans) and executed by an orchestrator, allowing for rapid experimentation and objective benchmarking.
+- Agentic controllers must remain inspectable and replayable; hidden background state is not an acceptable substitute for an explicit search trace.
 
 ## 6. Local First
 `sift` is built for local development and agentic workflows.
@@ -45,5 +46,12 @@ Implementation does not end at a clean compile.
 - Every functional change must be verified against a test, a benchmark, or an empirical CLI proof.
 - If a change degrades the benchmark quality against the BM25 baseline or the champion preset, the change must be justified with evidence.
 
-## 9. Intent-Driven Hybrid IR
-`sift` is built as a modern Hybrid Information Retrieval (IR) system that captures user **intent**, not just keyword matches. We use LLM-based re-ranking and multi-stage pipelines to bridge the vocabulary gap between a user's question and the technical implementation in the source code.
+## 9. Intent-Driven Hybrid And Agentic IR
+`sift` is built as a modern Hybrid and Agentic Information Retrieval (IR) system
+that captures user **intent**, not just keyword matches. The hybrid core uses
+lexical retrieval, semantic retrieval, and reranking to bridge the vocabulary
+gap between a user's question and the technical implementation in source code.
+
+The agentic layer decomposes search into explicit turns that can manage context,
+reuse local models, and emit results to humans or other tools without violating
+the local-first contract.

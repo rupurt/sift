@@ -1,10 +1,18 @@
 # User Guide
 
-Welcome to **Sift**, the lightning-fast, standalone hybrid search engine for local document retrieval. This guide will walk you through everything from your first search to mastering advanced retrieval strategies.
+Welcome to **Sift**, the lightning-fast, standalone hybrid and agentic search
+tool for local retrieval workflows. This guide walks through the current hybrid
+feature set and shows where the agentic direction fits.
 
 ## Introduction
 
-Sift was built to bridge the "vocabulary gap" in technical documentation and code. It combines the speed of traditional lexical search (BM25) with the deep understanding of semantic vector search and LLM-based reranking.
+Sift was built to bridge the "vocabulary gap" in technical documentation and
+code. It combines the speed of traditional lexical search (BM25) with the deep
+understanding of semantic vector search and LLM-based reranking.
+
+The shipped CLI is still a single-turn hybrid search experience. The agentic
+pivot is about making that retrieval core reusable inside a formal turn-based
+search runtime.
 
 ## Getting Started
 
@@ -39,6 +47,16 @@ Sift doesn't just look for exact words. It uses **Hybrid Information Retrieval (
 
 ### Intent-Driven Expansion
 Sift can use a local LLM to expand your query before searching. This helps find documents that don't share the same exact words as your query but do share the same meaning.
+
+### Agentic Direction
+The current building blocks for agentic search are already visible:
+
+1.  **Intent input:** `--intent` lets you attach task context explicitly.
+2.  **Generative expansion:** HyDE, SPLADE, and classified expansion create richer search variants.
+3.  **Embeddable runtime seams:** The engine traits are being shaped so a turn-based controller can reuse the same retrieval step.
+
+What is not yet formalized is a public multi-turn loop, turn-native storage, or
+protocol-style outputs.
 
 ## Advanced Usage
 
@@ -86,7 +104,9 @@ See the **[Configuration Guide](CONFIGURATION.md)** for full details.
 ## For Developers
 
 ### Embedding Sift
-Sift is designed to be embedded as a Rust library. It provides a formal **Reactor Architecture** with traits for configuration (IR), execution, and mass storage.
+Sift is designed to be embedded as a Rust library. It provides a formal
+**Reactor Architecture** with traits for configuration (IR), execution, and
+storage, and those seams are the intended basis for future agentic runtimes.
 
 -   **[WORLD.md](WORLD.md):** The conceptual world model and "physics" of Sift.
 -   **[ARCHITECTURE.md](ARCHITECTURE.md):** Detailed look at the internal design.

@@ -18,7 +18,7 @@ These define the binding constraints and workflow:
 - `CONSTITUTION.md` — repository operating principles and binding delivery rules.
 - `ARCHITECTURE.md` — current system architecture and component boundaries.
 - `CONFIGURATION.md` — runtime, build, and environment configuration guidance.
-- `EVALUATION.md` — evaluation datasets and methodology.
+- `EVALUATIONS.md` — evaluation datasets and methodology.
 - `RESEARCH.md` — strategic architecture research and vision.
 - `README.md` — repository intent and product positioning.
 - `flake.nix` — Nix development environment and shared tooling.
@@ -27,12 +27,13 @@ Use this order when interpreting constraints: ADRs, then `INSTRUCTIONS.md`, then
 
 ## Project Overview
 
-This repository is `sift` — a standalone **Hybrid Information Retrieval (IR) system** for fast
-document retrieval in agentic coding workflows.
+This repository is `sift` — a standalone **Hybrid and Agentic Search**
+tool for fast document retrieval in agentic coding workflows.
 
 Sift is intended to stay lightweight: a single Rust binary with no external
 database requirement, combining BM25 keyword ranking with vector-backed semantic
-search and LLM-based re-ranking to capture user **intent**.
+search and LLM-based re-ranking today, with turn-based search scaffolding ready
+to grow into a formal local search controller.
 
 ### Core Commands
 

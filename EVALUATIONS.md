@@ -1,12 +1,20 @@
 # Evaluation & Dataset Guide
 
-Sift includes a built-in evaluation harness to measure retrieval quality and latency. These evaluations are essential for validating architectural changes and strategy improvements.
+Sift includes a built-in evaluation harness to measure retrieval quality and
+latency. These evaluations are essential for validating architectural changes
+and strategy improvements.
+
+Today this harness measures the single-turn hybrid retrieval core. As Sift
+evolves into a hybrid and agentic search tool, these evaluations remain the
+ground-truth gauges for the retrieval substrate that an agentic controller will
+reuse.
 
 ## Concepts
 
 1.  **Raw Dataset:** The original dataset files (e.g., SciFact `corpus.jsonl`).
 2.  **Materialized Corpus:** A directory of individual text files derived from the raw dataset. This is what `sift` searches during evaluations to simulate a real-world local project structure.
 3.  **Qrels:** "Query Relevance" judgements. A file mapping query IDs to the correct document IDs.
+4.  **Trajectory (planned):** A multi-turn search trace for agentic evaluation, including query decomposition, retrieval turns, and context edits.
 
 ---
 
@@ -40,7 +48,8 @@ just sift dataset materialize scifact
 
 ## Running Evaluations
 
-The `eval` subcommand is used to measure search performance.
+The `eval` subcommand is used to measure search performance for the current
+retrieval runtime.
 
 ### 1. Comparative Evaluation (`eval all`)
 Runs all available strategies (BM25, Vector, Hybrid, etc.) and compares their metrics.
@@ -79,6 +88,16 @@ Sift allows you to compare different query expansion strategies to see which one
 - **`page-index-splade`**: Measures the quality of generative expansion terms.
 - **`page-index-classified`**: Measures the quality of intent-based classification.
 - **`page-index-llm`**: Measures the quality of full HyDE expansion combined with LLM reranking.
+
+### 6. Agentic Evaluation Gap
+The current harness does **not** yet evaluate a formal turn-based search agent.
+That future layer should add metrics such as:
+
+- End-to-end task success over multi-hop queries.
+- Turns to answer and tool calls per successful trajectory.
+- Context pruning precision / recall for retained evidence.
+- Evidence recall across turns, not just in a single final ranking.
+- Wall-clock latency for the full search trajectory, not just one retrieval pass.
 
 ---
 
