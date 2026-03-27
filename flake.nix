@@ -125,9 +125,25 @@
             export CUDA_ROOT="${cudaToolkit}"
             export CUDA_TOOLKIT_ROOT_DIR="${cudaToolkit}"
             export NVCC_PREPEND_FLAGS="-I${cudaToolkit}/include"
-            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ cudaToolkit ]}:''${LD_LIBRARY_PATH:-}"
-            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-fuse-ld=mold"
-            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-fuse-ld=mold"
+            cuda_driver_rpath=""
+            for candidate in \
+              /run/opengl-driver/lib \
+              /usr/lib/x86_64-linux-gnu \
+              /usr/lib/wsl/lib
+            do
+              if [ -f "$candidate/libcuda.so.1" ]; then
+                cuda_driver_rpath="$candidate"
+                break
+              fi
+            done
+
+            linux_link_args="-C link-arg=-fuse-ld=mold"
+            if [ -n "$cuda_driver_rpath" ]; then
+              linux_link_args="$linux_link_args -C link-arg=-Wl,-rpath,$cuda_driver_rpath"
+            fi
+
+            export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="''${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS:+$CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS }$linux_link_args"
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS="''${CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS:+$CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUSTFLAGS }$linux_link_args"
           '';
         };
       });

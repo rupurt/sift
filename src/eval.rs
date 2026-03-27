@@ -926,8 +926,21 @@ pub fn run_comparative_evaluation(
         comp_req.query_cache = Some(query_cache.clone());
 
         let comp_plan = registry.resolve(name)?;
-        let comp_llm =
-            crate::search::SearchServiceBuilder::load_llm_reranker(&comp_plan, &comp_req)?;
+        let comp_llm = match crate::search::SearchServiceBuilder::load_llm_reranker(
+            &comp_plan,
+            &comp_req,
+        ) {
+            Ok(llm) => llm,
+            Err(err) if is_gated_model_error(&err) => {
+                tracing::warn!(
+                    "skipping evaluation strategy {} due to gated model access: {:#}",
+                    name,
+                    err
+                );
+                continue;
+            }
+            Err(err) => return Err(err),
+        };
 
         let env = crate::search::SearchEnvironment::new(
             &comp_req,
@@ -1023,6 +1036,16 @@ pub fn run_comparative_evaluation(
     }
 
     Ok(ComparativeEvaluationReport { metadata, results })
+}
+
+fn is_gated_model_error(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        let message = cause.to_string().to_ascii_lowercase();
+        message.contains("http status: 401")
+            || message.contains("http status: 403")
+            || (message.contains("huggingface") && message.contains("unauthorized"))
+            || (message.contains("huggingface") && message.contains("forbidden"))
+    })
 }
 
 pub fn render_comparative_report(report: &ComparativeEvaluationReport) -> String {
@@ -1510,4 +1533,22 @@ fn percentile(values: &[f64], quantile: f64) -> f64 {
     let raw_index = (values.len() as f64 * quantile).ceil() as usize;
     let index = raw_index.saturating_sub(1).min(values.len() - 1);
     values[index]
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::anyhow;
+
+    use super::is_gated_model_error;
+
+    #[test]
+    fn detects_gated_model_http_status_errors() {
+        assert!(is_gated_model_error(&anyhow!("http status: 401")));
+        assert!(is_gated_model_error(&anyhow!("http status: 403")));
+    }
+
+    #[test]
+    fn ignores_non_authentication_errors() {
+        assert!(!is_gated_model_error(&anyhow!("failed to parse config")));
+    }
 }

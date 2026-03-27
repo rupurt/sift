@@ -203,4 +203,4 @@ Uses the **Gemma 3** family of models for semantic reranking. Similar to the Qwe
 | `SIFT_BLOBS_CACHE` | Specific override for the blob store. |
 | `SIFT_MANIFESTS_CACHE` | Specific override for the project manifests. |
 | `SIFT_MODELS_CACHE` | Specific override for downloaded ML models. |
-| `HF_TOKEN` | Hugging Face API token for downloading gated models (e.g., Jina Reranker v3). |
+| `HF_TOKEN` | Hugging Face API token for downloading gated models (e.g., Jina Reranker v3 and Gemma 3). |

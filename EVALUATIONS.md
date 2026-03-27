@@ -56,6 +56,8 @@ Runs all available strategies (BM25, Vector, Hybrid, etc.) and compares their me
 
 **Note:** Comparative evaluations are significantly accelerated by the **Query Embedding Cache**. Once a query is embedded for the first strategy, all subsequent strategies will reuse that embedding, reducing total runtime by hundreds of milliseconds per query.
 
+**Note:** Some comparison strategies rely on gated Hugging Face models. When those models are inaccessible because `HF_TOKEN` is unset or lacks access, `eval all` skips the affected strategies instead of aborting the entire benchmark run.
+
 ```bash
 just sift eval all --dataset scifact
 ```
