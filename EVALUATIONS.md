@@ -108,6 +108,16 @@ The agentic report captures:
 
 This harness is intentionally fixture-driven: it evaluates the current local controller and trace contracts, not an autonomous query-decomposition model. Comparative benchmarking against the hybrid champion remains a separate step.
 
+When you want GPU acceleration for Candle-backed models in the supported Nix environment, prepend `--cuda` to the `just sift` entrypoint so the binary is built with the CUDA feature enabled:
+
+```bash
+just sift --cuda eval agentic \
+  --corpus tests/fixtures/agentic-eval/corpus \
+  --fixtures tests/fixtures/agentic-eval/fixtures.json
+```
+
+This `--cuda` switch is handled by the `just` recipe, not by the `sift` CLI itself.
+
 ---
 
 ## Prompt Optimization

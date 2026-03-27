@@ -69,7 +69,14 @@ build-static:
     fi
 
 sift *args:
-    cargo run --release -- {{args}}
+    @set -eu; \
+    set -- {{args}}; \
+    cargo_args="--release"; \
+    if [ "${1:-}" = "--cuda" ]; then \
+        shift; \
+        cargo_args="$cargo_args --features cuda"; \
+    fi; \
+    cargo run $cargo_args -- "$@"
 
 embed-build:
     @set -eu; \
