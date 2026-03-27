@@ -71,15 +71,17 @@ build-static:
 sift *args:
     @bash -eu -c '\
         cargo_args=(--release); \
+        env_args=(); \
         sift_args=(); \
         for arg in "$@"; do \
             if [ "$arg" = "--cuda" ]; then \
                 cargo_args+=(--features cuda); \
+                env_args+=("SIFT_DENSE_DEVICE=${SIFT_DENSE_DEVICE:-cpu}"); \
             else \
                 sift_args+=("$arg"); \
             fi; \
         done; \
-        cargo run "${cargo_args[@]}" -- "${sift_args[@]}" \
+        env "${env_args[@]}" cargo run "${cargo_args[@]}" -- "${sift_args[@]}" \
     ' -- {{args}}
 
 embed-build:

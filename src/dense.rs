@@ -160,7 +160,22 @@ impl DenseReranker {
                 .with_context(|| format!("load tokenizer from {}", assets.vocab.display()))?;
 
         #[cfg(feature = "cuda")]
-        let device = Device::new_cuda(0).unwrap_or(Device::Cpu);
+        let device = match std::env::var("SIFT_DENSE_DEVICE") {
+            Ok(value) if value.eq_ignore_ascii_case("cuda") => match Device::new_cuda(0) {
+                Ok(device) => {
+                    tracing::info!("Using CUDA device 0 for dense embeddings");
+                    device
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        "Failed to initialize CUDA for dense embeddings, falling back to CPU: {:?}",
+                        err
+                    );
+                    Device::Cpu
+                }
+            },
+            _ => Device::Cpu,
+        };
         #[cfg(not(feature = "cuda"))]
         let device = Device::Cpu;
 

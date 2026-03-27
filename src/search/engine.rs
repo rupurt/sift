@@ -83,6 +83,7 @@ impl SearchEnvironment {
             embedder,
             request.query_cache.clone(),
             llm_reranker,
+            request.prompts.as_ref(),
         )?;
 
         // Downcast to concrete type
@@ -150,9 +151,10 @@ impl EngineFactory {
         embedder: Option<Arc<dyn Embedder>>,
         query_cache: Option<QueryEmbeddingCache>,
         llm_reranker: Option<Arc<dyn Reranker>>,
+        prompts: Option<&crate::config::PromptsConfig>,
     ) -> Result<Box<dyn SearchEngine>> {
         let plan = self.registry.resolve(strategy)?;
-        self.build_with_plan(plan, storage, embedder, query_cache, llm_reranker)
+        self.build_with_plan(plan, storage, embedder, query_cache, llm_reranker, prompts)
     }
 
     pub fn build_with_plan(
@@ -162,6 +164,7 @@ impl EngineFactory {
         embedder: Option<Arc<dyn Embedder>>,
         query_cache: Option<QueryEmbeddingCache>,
         llm_reranker: Option<Arc<dyn Reranker>>,
+        prompts: Option<&crate::config::PromptsConfig>,
     ) -> Result<Box<dyn SearchEngine>> {
         let mut service = SearchService::new();
         service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
@@ -169,13 +172,13 @@ impl EngineFactory {
         service.register_expander(QueryExpansionPolicy::Synonym, Box::new(SynonymExpander));
 
         let mut hyde = LlmExpander::new(Box::new(HydeStrategy {
-            custom_prompt: None,
+            custom_prompt: prompts.and_then(|p| p.hyde.clone()),
         }));
         let mut splade = LlmExpander::new(Box::new(SpladeStrategy {
-            custom_prompt: None,
+            custom_prompt: prompts.and_then(|p| p.splade.clone()),
         }));
         let mut classified = LlmExpander::new(Box::new(ClassifiedStrategy {
-            custom_prompt: None,
+            custom_prompt: prompts.and_then(|p| p.classified.clone()),
         }));
 
         if let Some(r) = &llm_reranker {

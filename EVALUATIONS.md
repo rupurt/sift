@@ -119,6 +119,7 @@ just sift --cuda eval agentic \
 ```
 
 This `--cuda` switch is handled by the `just` recipe, not by the `sift` CLI itself.
+By default, that recipe keeps the dense embedder on CPU (`SIFT_DENSE_DEVICE=cpu`) so local GPUs can be reserved for Qwen/Jina/Gemma during evals. If you want dense embeddings on CUDA too, override it explicitly with `SIFT_DENSE_DEVICE=cuda just sift --cuda ...`.
 
 ---
 

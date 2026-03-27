@@ -924,6 +924,7 @@ pub fn run_comparative_evaluation(
         comp_req.verbose = request.verbose;
         comp_req.telemetry = telemetry_for_load.clone();
         comp_req.query_cache = Some(query_cache.clone());
+        comp_req.prompts = request.prompts.clone();
 
         let comp_plan = registry.resolve(name)?;
         let comp_llm = match crate::search::SearchServiceBuilder::load_llm_reranker(
