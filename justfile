@@ -73,14 +73,23 @@ sift *args:
         cargo_args=(--release); \
         env_args=(); \
         sift_args=(); \
+        cuda_enabled=0; \
         for arg in "$@"; do \
             if [ "$arg" = "--cuda" ]; then \
+                cuda_enabled=1; \
                 cargo_args+=(--features cuda); \
                 env_args+=("SIFT_DENSE_DEVICE=${SIFT_DENSE_DEVICE:-cpu}"); \
             else \
                 sift_args+=("$arg"); \
             fi; \
         done; \
+        if [ "$cuda_enabled" -eq 1 ] \
+            && [ "${#sift_args[@]}" -ge 2 ] \
+            && [ "${sift_args[0]}" = "eval" ] \
+            && [ "${sift_args[1]}" = "all" ]; then \
+            env_args+=("SIFT_JINA_DEVICE=${SIFT_JINA_DEVICE:-cpu}"); \
+            env_args+=("SIFT_GEMMA_DEVICE=${SIFT_GEMMA_DEVICE:-cpu}"); \
+        fi; \
         env "${env_args[@]}" cargo run "${cargo_args[@]}" -- "${sift_args[@]}" \
     ' -- {{args}}
 

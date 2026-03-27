@@ -203,4 +203,9 @@ Uses the **Gemma 3** family of models for semantic reranking. Similar to the Qwe
 | `SIFT_BLOBS_CACHE` | Specific override for the blob store. |
 | `SIFT_MANIFESTS_CACHE` | Specific override for the project manifests. |
 | `SIFT_MODELS_CACHE` | Specific override for downloaded ML models. |
+| `SIFT_DENSE_DEVICE` | Dense embedding device override: `cpu` or `cuda`. |
+| `SIFT_LLM_DEVICE` | Default device override for Candle-backed LLM paths: `cpu` or `cuda`. |
+| `SIFT_QWEN_DEVICE` | Qwen-specific device override: `cpu` or `cuda`. |
+| `SIFT_JINA_DEVICE` | Jina-specific device override: `cpu` or `cuda`. |
+| `SIFT_GEMMA_DEVICE` | Gemma-specific device override: `cpu` or `cuda`. |
 | `HF_TOKEN` | Hugging Face API token for downloading gated models (e.g., Jina Reranker v3 and Gemma 3). |

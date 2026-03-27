@@ -95,7 +95,7 @@ impl JinaReranker {
         let tokenizer = Tokenizer::from_file(&tokenizer_path)
             .map_err(|m| anyhow!("failed to load tokenizer: {}", m))?;
 
-        let device = super::llm_utils::get_device()?;
+        let device = super::llm_utils::get_device_for("JINA")?;
         let vb = load_mmaped_safetensors_with_repair(
             &spec.model_id,
             &spec.revision,

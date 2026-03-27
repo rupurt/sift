@@ -172,15 +172,48 @@ pub fn load_mmaped_safetensors_with_repair(
 }
 
 pub fn get_device() -> Result<Device> {
+    get_device_for("LLM")
+}
+
+pub fn get_device_for(kind: &str) -> Result<Device> {
+    let specific_env = format!("SIFT_{}_DEVICE", kind);
+    let requested_device = match std::env::var(&specific_env) {
+        Ok(value) => Some((specific_env.clone(), value)),
+        Err(_) => std::env::var("SIFT_LLM_DEVICE")
+            .ok()
+            .map(|value| ("SIFT_LLM_DEVICE".to_string(), value)),
+    };
+
+    if let Some((source, value)) = requested_device {
+        match value.to_ascii_lowercase().as_str() {
+            "cpu" => {
+                tracing::info!("Using CPU for {} via {}", kind, source);
+                return Ok(Device::Cpu);
+            }
+            "cuda" => {}
+            other => {
+                bail!(
+                    "unsupported device override '{}' in {} (expected 'cpu' or 'cuda')",
+                    other,
+                    source
+                );
+            }
+        }
+    }
+
     #[cfg(feature = "cuda")]
     {
         match Device::new_cuda(0) {
             Ok(d) => {
-                tracing::info!("Using CUDA device 0");
+                tracing::info!("Using CUDA device 0 for {}", kind);
                 Ok(d)
             }
             Err(e) => {
-                tracing::warn!("Failed to initialize CUDA, falling back to CPU: {:?}", e);
+                tracing::warn!(
+                    "Failed to initialize CUDA for {}, falling back to CPU: {:?}",
+                    kind,
+                    e
+                );
                 Ok(Device::Cpu)
             }
         }
