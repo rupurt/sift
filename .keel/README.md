@@ -74,6 +74,24 @@
 |--------|--------|
 | [Configurable Prompts](epics/VE1xUOaxK/voyages/VE1xdk4hF/) | in-progress |
 
+### [Turn-Native Search Contract and Emissions](epics/VF1VhxmqI/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Define Turn Model and Emission Contract](epics/VF1VhxmqI/voyages/VF1Vt0WCT/) | planned |
+
+### [Local Multi-Turn Search Controller](epics/VF1Vhy2qJ/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Build Local Multi-Turn Loop Execution](epics/VF1Vhy2qJ/voyages/VF1Vt0iCU/) | planned |
+
+### [Agentic Traceability and Evaluation](epics/VF1VhyGqK/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Add Turn Traces and Agentic Evaluation](epics/VF1VhyGqK/voyages/VF1Vt0sCV/) | planned |
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |
