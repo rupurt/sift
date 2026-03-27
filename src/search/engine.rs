@@ -61,9 +61,21 @@ impl SearchEnvironment {
         embedder: Option<Arc<dyn Embedder>>,
         llm_reranker: Option<Arc<dyn Reranker>>,
     ) -> Result<Self> {
+        let plan = StrategyPresetRegistry::default_registry().resolve(&request.strategy)?;
+        Self::new_with_plan(request, plan, corpus, index, embedder, llm_reranker)
+    }
+
+    pub fn new_with_plan(
+        request: &SearchRequest,
+        plan: SearchPlan,
+        corpus: &LoadedCorpus,
+        index: &Bm25Index,
+        embedder: Option<Arc<dyn Embedder>>,
+        llm_reranker: Option<Arc<dyn Reranker>>,
+    ) -> Result<Self> {
         let factory = EngineFactory::default();
-        let engine = factory.build(
-            &request.strategy,
+        let engine = factory.build_with_plan(
+            plan,
             LocalCorpusStorage {
                 corpus: Arc::new(corpus.clone()),
                 index: Arc::new(index.clone()),
@@ -140,7 +152,17 @@ impl EngineFactory {
         llm_reranker: Option<Arc<dyn Reranker>>,
     ) -> Result<Box<dyn SearchEngine>> {
         let plan = self.registry.resolve(strategy)?;
+        self.build_with_plan(plan, storage, embedder, query_cache, llm_reranker)
+    }
 
+    pub fn build_with_plan(
+        &self,
+        plan: SearchPlan,
+        storage: LocalCorpusStorage,
+        embedder: Option<Arc<dyn Embedder>>,
+        query_cache: Option<QueryEmbeddingCache>,
+        llm_reranker: Option<Arc<dyn Reranker>>,
+    ) -> Result<Box<dyn SearchEngine>> {
         let mut service = SearchService::new();
         service.register_fuser(FusionPolicy::Rrf, Box::new(RrfFuser));
         service.register_expander(QueryExpansionPolicy::None, Box::new(NoExpander));
@@ -290,7 +312,7 @@ impl SearchExecution for PipelineExecution {
             .collect();
 
         Ok(SearchResponse {
-            strategy: request.strategy.clone(),
+            strategy: plan.name.clone(),
             root: request.path.display().to_string(),
             indexed_files: corpus.indexed_files,
             skipped_files: corpus.skipped_files,

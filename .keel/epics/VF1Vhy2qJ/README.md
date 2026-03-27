@@ -23,5 +23,5 @@ mission: VF1UOlGfX
 **Progress:** 0/1 voyages complete, 0/3 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Build Local Multi-Turn Loop Execution](voyages/VF1Vt0iCU/) | planned | 0/3 |
+| [Build Local Multi-Turn Loop Execution](voyages/VF1Vt0iCU/) | in-progress | 0/3 |
 <!-- END GENERATED -->

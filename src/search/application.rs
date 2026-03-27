@@ -229,9 +229,6 @@ pub fn run_search(
     repository: &dyn CorpusRepository,
     embedder: Option<Arc<dyn Embedder>>,
 ) -> Result<SearchResponse> {
-    let verbose = request.verbose;
-
-    // For SegmentVectorRetriever, we need to load the model if the plan requires it
     let registry = StrategyPresetRegistry::default_registry();
     let mut plan = registry.resolve(&request.strategy)?;
 
@@ -245,6 +242,18 @@ pub fn run_search(
     if let Some(reranking) = request.reranking {
         plan.reranking = reranking;
     }
+
+    run_search_with_plan(&plan, request, ignore, repository, embedder)
+}
+
+pub fn run_search_with_plan(
+    plan: &SearchPlan,
+    request: &SearchRequest,
+    ignore: Option<&Ignore>,
+    repository: &dyn CorpusRepository,
+    embedder: Option<Arc<dyn Embedder>>,
+) -> Result<SearchResponse> {
+    let verbose = request.verbose;
 
     let corpus_start = std::time::Instant::now();
     let corpus = repository.load(
@@ -261,10 +270,10 @@ pub fn run_search(
         corpus_start.elapsed()
     );
 
-    let llm_reranker = SearchServiceBuilder::load_llm_reranker(&plan, request)?;
+    let llm_reranker = SearchServiceBuilder::load_llm_reranker(plan, request)?;
 
     let service = SearchServiceBuilder::build(
-        &plan,
+        plan,
         embedder,
         request.query_cache.clone(),
         llm_reranker,
@@ -302,7 +311,7 @@ pub fn run_search(
         .collect();
 
     Ok(SearchResponse {
-        strategy: request.strategy.clone(),
+        strategy: plan.name.clone(),
         root: request.path.display().to_string(),
         indexed_files: corpus.indexed_files,
         skipped_files: corpus.skipped_files,

@@ -1,7 +1,18 @@
 use sift::{
-    Fusion, Reranking, Retriever, SearchControllerAction, SearchEmission, SearchEmissionMode,
-    SearchInput, SearchOptions, SearchTurnRequest, Sift,
+    Fusion, FusionPolicy, QueryExpansionPolicy, Reranking, RerankingPolicy, Retriever,
+    RetrieverPolicy, SearchControllerAction, SearchControllerRequest, SearchEmission,
+    SearchEmissionMode, SearchInput, SearchOptions, SearchPlan, SearchTurnRequest, Sift,
 };
+
+fn custom_lexical_plan(name: &str) -> SearchPlan {
+    SearchPlan {
+        name: name.to_string(),
+        query_expansion: QueryExpansionPolicy::None,
+        retrievers: vec![RetrieverPolicy::Bm25],
+        fusion: FusionPolicy::Rrf,
+        reranking: RerankingPolicy::None,
+    }
+}
 
 #[test]
 fn embedded_facade_runs_a_basic_bm25_search() {
@@ -107,4 +118,102 @@ fn embedded_facade_projects_search_into_latent_emissions() {
         }
         other => panic!("expected latent emission, got {:?}", other),
     }
+}
+
+#[test]
+fn embedded_facade_accepts_explicit_turn_plans_without_registry_lookup() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(
+        corpus.path().join("guide.txt"),
+        "explicit plans should execute without preset lookup",
+    )
+    .expect("write corpus file");
+
+    let plan = custom_lexical_plan("custom-lexical");
+    let engine = Sift::builder().build();
+    let response = engine
+        .search_turn(
+            SearchTurnRequest::new(corpus.path(), "preset lookup")
+                .with_strategy("missing-preset")
+                .with_plan(plan.clone())
+                .with_limit(1)
+                .with_shortlist(1),
+        )
+        .expect("turn search with explicit plan");
+
+    assert_eq!(response.turn.strategy, plan.name);
+    assert_eq!(response.turn.result_count, 1);
+
+    match response.emission {
+        SearchEmission::View(view) => {
+            assert_eq!(view.strategy, "custom-lexical");
+            assert!(view.results[0].path.ends_with("guide.txt"));
+        }
+        other => panic!("expected view emission, got {:?}", other),
+    }
+}
+
+#[test]
+fn embedded_facade_runs_controller_turns_from_explicit_plan_state() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(
+        corpus.path().join("alpha.txt"),
+        "alpha implementation details for the controller loop",
+    )
+    .expect("write alpha corpus file");
+    std::fs::write(
+        corpus.path().join("beta.txt"),
+        "beta implementation details for the controller loop",
+    )
+    .expect("write beta corpus file");
+
+    let plan = custom_lexical_plan("controller-lexical");
+    let engine = Sift::builder().build();
+    let response = engine
+        .search_controller(
+            SearchControllerRequest::new(
+                plan.clone(),
+                vec![
+                    SearchTurnRequest::new(corpus.path(), "alpha")
+                        .with_strategy("missing-preset")
+                        .with_turn_id("turn-a")
+                        .with_limit(1)
+                        .with_shortlist(1),
+                    SearchTurnRequest::new(corpus.path(), "beta")
+                        .with_strategy("missing-preset")
+                        .with_turn_id("turn-b")
+                        .with_limit(1)
+                        .with_shortlist(1),
+                ],
+            )
+            .with_session_id("session-1")
+            .with_retained_evidence_limit(2),
+        )
+        .expect("controller search with explicit plan");
+
+    assert_eq!(response.plan.name, "controller-lexical");
+    assert_eq!(response.turns.len(), 2);
+    assert_eq!(response.trace.turns.len(), 2);
+    assert!(response.state.completed);
+    assert_eq!(response.state.next_turn, 2);
+    assert!(response.state.retained_evidence.len() <= 2);
+    assert_eq!(response.turns[0].turn.strategy, "controller-lexical");
+    assert_eq!(response.turns[1].turn.strategy, "controller-lexical");
+    assert!(!response.turns[1].turn.retained_evidence.is_empty());
+    assert_eq!(
+        response.trace.turns[0]
+            .decisions
+            .last()
+            .expect("first turn continuation")
+            .action,
+        SearchControllerAction::Continue
+    );
+    assert_eq!(
+        response.trace.turns[1]
+            .decisions
+            .last()
+            .expect("terminal turn")
+            .action,
+        SearchControllerAction::Terminate
+    );
 }

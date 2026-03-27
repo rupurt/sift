@@ -84,7 +84,7 @@
 
 | Voyage | Status |
 |--------|--------|
-| [Build Local Multi-Turn Loop Execution](epics/VF1Vhy2qJ/voyages/VF1Vt0iCU/) | planned |
+| [Build Local Multi-Turn Loop Execution](epics/VF1Vhy2qJ/voyages/VF1Vt0iCU/) | in-progress |
 
 ### [Agentic Traceability and Evaluation](epics/VF1VhyGqK/) (active)
 

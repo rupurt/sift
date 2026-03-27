@@ -29,7 +29,7 @@ started_at: 2026-03-26T18:03:08
 
 | Title | Type | Status |
 |-------|------|--------|
-| [Add Turn-Native Search Domain And Controller Requests](../../../../stories/VF1VuFBgx/README.md) | feat | in-progress |
+| [Add Turn-Native Search Domain And Controller Requests](../../../../stories/VF1VuFBgx/README.md) | feat | needs-human-verification |
 | [Add Explicit Emission Modes And Agentic Outputs](../../../../stories/VF1VuFDgy/README.md) | feat | backlog |
 | [Expose Stable Agentic Entry Points In The Public Facade](../../../../stories/VF1VuFbgz/README.md) | feat | backlog |
 <!-- END GENERATED -->

@@ -4,6 +4,7 @@
 //! - [`Sift`] and [`SiftBuilder`] for constructing a search engine instance
 //! - [`SearchInput`] and [`SearchOptions`] for issuing direct searches
 //! - [`SearchTurnRequest`], [`SearchTurnResponse`], and [`SearchEmissionMode`] for turn-aware search control
+//! - [`SearchControllerRequest`] and [`SearchControllerResponse`] for deterministic multi-turn control
 //! - [`Retriever`], [`Fusion`], and [`Reranking`] for supported strategy overrides
 //! - [`SearchResponse`], [`SearchHit`], and [`ScoreConfidence`] for results
 //!
@@ -29,10 +30,12 @@ pub use crate::facade::{
     SiftBuilder,
 };
 pub use crate::search::{
-    LatentSearchEmission, LatentSearchHit, ProtocolSearchEmission, RetainedEvidence,
-    ScoreConfidence, SearchControllerAction, SearchControllerDecision, SearchEmission,
-    SearchEmissionMode, SearchHit, SearchResponse, SearchTrace, SearchTurn, SearchTurnRequest,
-    SearchTurnResponse, SearchTurnTrace,
+    FusionPolicy, LatentSearchEmission, LatentSearchHit, ProtocolSearchEmission,
+    QueryExpansionPolicy, RerankingPolicy, RetainedEvidence, RetrieverPolicy, ScoreConfidence,
+    SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
+    SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode, SearchHit,
+    SearchPlan, SearchResponse, SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse,
+    SearchTurnTrace,
 };
 
 #[doc(hidden)]

@@ -24,7 +24,7 @@ impl Engine {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SearchPlan {
     pub name: String,
     pub query_expansion: QueryExpansionPolicy,
@@ -218,6 +218,7 @@ pub struct SearchTurnRequest {
     pub query: String,
     pub intent: Option<String>,
     pub strategy: Option<String>,
+    pub plan: Option<SearchPlan>,
     pub limit: Option<usize>,
     pub shortlist: Option<usize>,
     pub verbose: u8,
@@ -236,6 +237,7 @@ impl SearchTurnRequest {
             query: query.into(),
             intent: None,
             strategy: None,
+            plan: None,
             limit: None,
             shortlist: None,
             verbose: 0,
@@ -274,6 +276,11 @@ impl SearchTurnRequest {
         self
     }
 
+    pub fn with_plan(mut self, plan: SearchPlan) -> Self {
+        self.plan = Some(plan);
+        self
+    }
+
     pub fn with_limit(mut self, limit: usize) -> Self {
         self.limit = Some(limit);
         self
@@ -296,6 +303,77 @@ impl SearchTurnRequest {
 
     pub fn with_retained_evidence(mut self, retained_evidence: Vec<RetainedEvidence>) -> Self {
         self.retained_evidence = retained_evidence;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SearchControllerState {
+    pub next_turn: usize,
+    pub turn_limit: usize,
+    pub retained_evidence: Vec<RetainedEvidence>,
+    pub completed: bool,
+}
+
+impl SearchControllerState {
+    pub fn new(turn_limit: usize) -> Self {
+        Self {
+            next_turn: 0,
+            turn_limit,
+            retained_evidence: Vec::new(),
+            completed: false,
+        }
+    }
+
+    pub fn with_next_turn(mut self, next_turn: usize) -> Self {
+        self.next_turn = next_turn;
+        self
+    }
+
+    pub fn with_turn_limit(mut self, turn_limit: usize) -> Self {
+        self.turn_limit = turn_limit;
+        self
+    }
+
+    pub fn with_retained_evidence(mut self, retained_evidence: Vec<RetainedEvidence>) -> Self {
+        self.retained_evidence = retained_evidence;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SearchControllerRequest {
+    pub session_id: Option<String>,
+    pub plan: SearchPlan,
+    pub turns: Vec<SearchTurnRequest>,
+    pub state: SearchControllerState,
+    pub retained_evidence_limit: usize,
+}
+
+impl SearchControllerRequest {
+    pub fn new(plan: SearchPlan, turns: Vec<SearchTurnRequest>) -> Self {
+        let turn_limit = turns.len();
+        Self {
+            session_id: None,
+            plan,
+            turns,
+            state: SearchControllerState::new(turn_limit),
+            retained_evidence_limit: 5,
+        }
+    }
+
+    pub fn with_session_id(mut self, session_id: impl Into<String>) -> Self {
+        self.session_id = Some(session_id.into());
+        self
+    }
+
+    pub fn with_state(mut self, state: SearchControllerState) -> Self {
+        self.state = state;
+        self
+    }
+
+    pub fn with_retained_evidence_limit(mut self, retained_evidence_limit: usize) -> Self {
+        self.retained_evidence_limit = retained_evidence_limit;
         self
     }
 }
@@ -405,6 +483,14 @@ pub struct SearchTurnResponse {
     pub turn: SearchTurn,
     pub trace: SearchTrace,
     pub emission: SearchEmission,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchControllerResponse {
+    pub plan: SearchPlan,
+    pub state: SearchControllerState,
+    pub turns: Vec<SearchTurnResponse>,
+    pub trace: SearchTrace,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
