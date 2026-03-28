@@ -674,6 +674,136 @@ impl AutonomousSearchRequest {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AutonomousPlannerAction {
+    Search,
+    Continue,
+    Terminate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AutonomousPlannerStopReason {
+    GoalSatisfied,
+    StepLimitReached,
+    NoFurtherQueries,
+    NoAdditionalEvidence,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutonomousPlannerDecision {
+    pub action: AutonomousPlannerAction,
+    pub rationale: Option<String>,
+    pub query: Option<String>,
+    pub turn_id: Option<String>,
+    pub next_step: Option<AutonomousPlannerStepCursor>,
+    pub stop_reason: Option<AutonomousPlannerStopReason>,
+}
+
+impl AutonomousPlannerDecision {
+    pub fn new(action: AutonomousPlannerAction) -> Self {
+        Self {
+            action,
+            rationale: None,
+            query: None,
+            turn_id: None,
+            next_step: None,
+            stop_reason: None,
+        }
+    }
+
+    pub fn with_rationale(mut self, rationale: impl Into<String>) -> Self {
+        self.rationale = Some(rationale.into());
+        self
+    }
+
+    pub fn with_query(mut self, query: impl Into<String>) -> Self {
+        self.query = Some(query.into());
+        self
+    }
+
+    pub fn with_turn_id(mut self, turn_id: impl Into<String>) -> Self {
+        self.turn_id = Some(turn_id.into());
+        self
+    }
+
+    pub fn with_next_step(mut self, next_step: AutonomousPlannerStepCursor) -> Self {
+        self.next_step = Some(next_step);
+        self
+    }
+
+    pub fn with_stop_reason(mut self, stop_reason: AutonomousPlannerStopReason) -> Self {
+        self.stop_reason = Some(stop_reason);
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutonomousPlannerTraceStep {
+    pub step: AutonomousPlannerStepCursor,
+    pub decisions: Vec<AutonomousPlannerDecision>,
+}
+
+impl AutonomousPlannerTraceStep {
+    pub fn new(step: AutonomousPlannerStepCursor) -> Self {
+        Self {
+            step,
+            decisions: Vec::new(),
+        }
+    }
+
+    pub fn with_decisions(mut self, decisions: Vec<AutonomousPlannerDecision>) -> Self {
+        self.decisions = decisions;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutonomousPlannerTrace {
+    pub session_id: Option<String>,
+    pub planner_strategy: AutonomousPlannerStrategy,
+    pub steps: Vec<AutonomousPlannerTraceStep>,
+    pub completed: bool,
+    pub stop_reason: Option<AutonomousPlannerStopReason>,
+}
+
+impl AutonomousPlannerTrace {
+    pub fn new(planner_strategy: AutonomousPlannerStrategy) -> Self {
+        Self {
+            session_id: None,
+            planner_strategy,
+            steps: Vec::new(),
+            completed: false,
+            stop_reason: None,
+        }
+    }
+
+    pub fn with_session_id(mut self, session_id: impl Into<String>) -> Self {
+        self.session_id = Some(session_id.into());
+        self
+    }
+
+    pub fn with_steps(mut self, steps: Vec<AutonomousPlannerTraceStep>) -> Self {
+        self.steps = steps;
+        self
+    }
+
+    pub fn with_completed(mut self, completed: bool) -> Self {
+        self.completed = completed;
+        self
+    }
+
+    pub fn with_stop_reason(mut self, stop_reason: AutonomousPlannerStopReason) -> Self {
+        self.stop_reason = Some(stop_reason);
+        self
+    }
+}
+
+pub trait AutonomousPlanner: Send + Sync {
+    fn plan(&self, request: &AutonomousSearchRequest) -> Result<AutonomousPlannerTrace>;
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SearchControllerState {
     pub next_turn: usize,
@@ -870,6 +1000,7 @@ pub struct AutonomousSearchResponse {
     pub plan: SearchPlan,
     pub state: AutonomousPlannerState,
     pub turns: Vec<SearchTurnResponse>,
+    pub planner_trace: AutonomousPlannerTrace,
     pub trace: SearchTrace,
 }
 

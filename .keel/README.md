@@ -112,11 +112,11 @@
 
 ### [Bounded Linear Autonomous Planner](epics/VFC7H4QFx/) (draft)
 
-### [Planner Contract and Replay](epics/VFC7H4QFy/) (active)
+### [Planner Contract and Replay](epics/VFC7H4QFy/) (done)
 
 | Voyage | Status |
 |--------|--------|
-| [Define Planner State and Stop Semantics](epics/VFC7H4QFy/voyages/VFC7MN6fR/) | in-progress |
+| [Define Planner State and Stop Semantics](epics/VFC7H4QFy/voyages/VFC7MN6fR/) | done |
 
 ### [Autonomous Planning Evaluation and Surface](epics/VFC7H4pFw/) (draft)
 

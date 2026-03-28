@@ -7,6 +7,7 @@
 //! - [`SearchTurnRequest`], [`SearchTurnResponse`], and [`SearchEmissionMode`] for turn-aware search control
 //! - [`SearchControllerRequest`] and [`SearchControllerResponse`] for deterministic multi-turn control
 //! - [`AutonomousSearchRequest`] and [`AutonomousSearchResponse`] for linear autonomous-planner contracts
+//! - [`AutonomousPlanner`] and [`AutonomousPlannerTrace`] for the library-first autonomous execution seam
 //! - [`Retriever`], [`Fusion`], and [`Reranking`] for supported strategy overrides
 //! - [`SearchResponse`], [`SearchHit`], [`ContextArtifact`], and [`ScoreConfidence`] for results and artifact metadata
 //!
@@ -35,16 +36,17 @@ pub use crate::facade::{
 };
 pub use crate::search::{
     AcquisitionAdapterKind, AgentTurnInput, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
-    AutonomousPlannerState, AutonomousPlannerStepCursor, AutonomousPlannerStrategy,
-    AutonomousPlannerStrategyKind, AutonomousSearchRequest, AutonomousSearchResponse,
-    ContextArtifact, ContextArtifactKind, ContextAssemblyBudget, ContextAssemblyRequest,
-    ContextAssemblyResponse, CorpusLoadRequest, EnvironmentFactInput, FusionPolicy,
-    LatentSearchEmission, LatentSearchHit, LocalContextSource, ProtocolSearchEmission,
-    QueryExpansionPolicy, RerankingPolicy, RetainedArtifact, RetrieverPolicy, ScoreConfidence,
-    SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
-    SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode, SearchHit,
-    SearchPlan, SearchResponse, SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse,
-    SearchTurnTrace, ToolOutputInput,
+    AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerDecision, AutonomousPlannerState,
+    AutonomousPlannerStepCursor, AutonomousPlannerStopReason, AutonomousPlannerStrategy,
+    AutonomousPlannerStrategyKind, AutonomousPlannerTrace, AutonomousPlannerTraceStep,
+    AutonomousSearchRequest, AutonomousSearchResponse, ContextArtifact, ContextArtifactKind,
+    ContextAssemblyBudget, ContextAssemblyRequest, ContextAssemblyResponse, CorpusLoadRequest,
+    EnvironmentFactInput, FusionPolicy, LatentSearchEmission, LatentSearchHit, LocalContextSource,
+    ProtocolSearchEmission, QueryExpansionPolicy, RerankingPolicy, RetainedArtifact,
+    RetrieverPolicy, ScoreConfidence, SearchControllerAction, SearchControllerDecision,
+    SearchControllerRequest, SearchControllerResponse, SearchControllerState, SearchEmission,
+    SearchEmissionMode, SearchHit, SearchPlan, SearchResponse, SearchTrace, SearchTurn,
+    SearchTurnRequest, SearchTurnResponse, SearchTurnTrace, ToolOutputInput,
 };
 
 #[doc(hidden)]

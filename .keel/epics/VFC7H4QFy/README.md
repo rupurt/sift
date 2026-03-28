@@ -22,8 +22,8 @@ mission: VFC7FgLCO
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 1/3 stories done
+**Progress:** 1/1 voyages complete, 3/3 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Define Planner State and Stop Semantics](voyages/VFC7MN6fR/) | in-progress | 1/3 |
+| [Define Planner State and Stop Semantics](voyages/VFC7MN6fR/) | done | 3/3 |
 <!-- END GENERATED -->

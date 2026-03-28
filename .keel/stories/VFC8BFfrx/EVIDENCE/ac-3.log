@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T14:28:01.956377848-07:00
+mode: manual
+---
+The autonomous seam ships with an end-to-end library facade test plus full just check coverage, and it does not alter the existing single-turn or planned-controller implementations.

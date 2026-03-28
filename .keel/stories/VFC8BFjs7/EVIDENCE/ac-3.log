@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T14:22:52.891009740-07:00
+mode: manual
+---
+Planner trace steps and next-step cursors keep stable step identifiers while stop reasons are explicit enums, preserving a linear-first contract that can extend toward branching later.

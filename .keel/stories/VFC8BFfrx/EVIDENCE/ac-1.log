@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T14:27:41.118181644-07:00
+mode: manual
+---
+Added the AutonomousPlanner trait and Sift::search_autonomous_with, which lowers planner search decisions into SearchControllerRequest while preserving planner state and planner trace in AutonomousSearchResponse; verified with cargo test --test library_facade_test and just check.

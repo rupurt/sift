@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
 
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow, bail};
 
 use crate::config::{Config, Ignore};
 use crate::dense::DenseModelSpec;
@@ -11,11 +11,13 @@ use crate::search::adapters::qwen::QwenModelSpec;
 pub use crate::search::domain::{Conversation, GenerativeModel};
 use crate::search::engine::SearchEngine;
 use crate::search::{
-    Bm25Index, ContextAssemblyBudget, ContextAssemblyRequest, ContextAssemblyResponse, Embedder,
-    FusionPolicy, LatentSearchEmission, LatentSearchHit, LocalFileCorpusRepository,
-    ProtocolSearchEmission, QueryEmbeddingCache, RerankingPolicy, RetrieverPolicy,
-    SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
-    SearchControllerResponse, SearchEmission, SearchEmissionMode, SearchEnvironment, SearchPlan,
+    AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerStopReason,
+    AutonomousPlannerTrace, AutonomousSearchRequest, AutonomousSearchResponse, Bm25Index,
+    ContextAssemblyBudget, ContextAssemblyRequest, ContextAssemblyResponse, Embedder, FusionPolicy,
+    LatentSearchEmission, LatentSearchHit, LocalFileCorpusRepository, ProtocolSearchEmission,
+    QueryEmbeddingCache, RerankingPolicy, RetrieverPolicy, SearchControllerAction,
+    SearchControllerDecision, SearchControllerRequest, SearchControllerResponse,
+    SearchControllerState, SearchEmission, SearchEmissionMode, SearchEnvironment, SearchPlan,
     SearchRequest, SearchResponse, SearchServiceBuilder, SearchTrace, SearchTurn,
     SearchTurnRequest, SearchTurnResponse, SearchTurnTrace, StrategyPresetRegistry,
     load_search_corpus, run_search_with_plan,
@@ -508,6 +510,77 @@ impl Sift {
         })
     }
 
+    pub fn search_autonomous_with<P: AutonomousPlanner + ?Sized>(
+        &self,
+        request: AutonomousSearchRequest,
+        planner: &P,
+    ) -> Result<AutonomousSearchResponse> {
+        let plan = self.resolve_autonomous_plan(&request)?;
+        let mut planner_trace = planner.plan(&request)?;
+
+        if planner_trace.planner_strategy != request.planner_strategy {
+            bail!("planner trace strategy must match the autonomous request strategy");
+        }
+        if planner_trace.steps.len() > request.state.step_limit {
+            bail!("planner trace exceeded the configured autonomous step limit");
+        }
+        if planner_trace.session_id.is_none() {
+            planner_trace.session_id = request.session_id.clone();
+        }
+
+        let turns = self.lower_autonomous_turns(&request, &planner_trace)?;
+        let state = if turns.is_empty() {
+            if !Self::planner_trace_completed(&planner_trace) {
+                bail!("planner trace must emit a search decision or mark the episode complete");
+            }
+            self.derive_autonomous_state(&request, &planner_trace, None)
+        } else {
+            let mut controller_request = SearchControllerRequest::new(plan.clone(), turns)
+                .with_state(
+                    SearchControllerState::new(Self::count_autonomous_search_turns(&planner_trace))
+                        .with_retained_artifacts(request.state.retained_artifacts.clone()),
+                )
+                .with_retained_artifact_limit(request.retained_artifact_limit);
+            if let Some(session_id) = request.session_id.clone() {
+                controller_request = controller_request.with_session_id(session_id);
+            }
+            let controller_response = self.search_controller(controller_request)?;
+
+            let state = self.derive_autonomous_state(
+                &request,
+                &planner_trace,
+                Some(&controller_response.state),
+            );
+            return Ok(AutonomousSearchResponse {
+                root_task: request.root_task,
+                planner_strategy: request.planner_strategy,
+                plan,
+                state,
+                turns: controller_response.turns,
+                planner_trace,
+                trace: controller_response.trace,
+            });
+        };
+
+        let completed = state.completed;
+        Ok(AutonomousSearchResponse {
+            root_task: request.root_task,
+            planner_strategy: request.planner_strategy,
+            plan,
+            state,
+            turns: Vec::new(),
+            planner_trace: planner_trace.clone(),
+            trace: SearchTrace {
+                session_id: planner_trace.session_id.clone(),
+                turns: Vec::new(),
+                completed,
+                termination_reason: planner_trace
+                    .stop_reason
+                    .map(Self::format_autonomous_stop_reason),
+            },
+        })
+    }
+
     pub fn generative(&self, options: SearchOptions) -> Result<Arc<dyn GenerativeModel>> {
         let strategy = options
             .strategy
@@ -531,6 +604,18 @@ impl Sift {
     }
 
     fn resolve_turn_plan(&self, request: &SearchTurnRequest) -> Result<SearchPlan> {
+        if let Some(plan) = &request.plan {
+            return Ok(plan.clone());
+        }
+
+        let strategy = request
+            .strategy
+            .as_deref()
+            .unwrap_or(&self.config.search.strategy);
+        StrategyPresetRegistry::default_registry().resolve(strategy)
+    }
+
+    fn resolve_autonomous_plan(&self, request: &AutonomousSearchRequest) -> Result<SearchPlan> {
         if let Some(plan) = &request.plan {
             return Ok(plan.clone());
         }
@@ -725,6 +810,109 @@ impl Sift {
                 request.session_id.clone(),
             ),
         }
+    }
+
+    fn lower_autonomous_turns(
+        &self,
+        request: &AutonomousSearchRequest,
+        planner_trace: &AutonomousPlannerTrace,
+    ) -> Result<Vec<SearchTurnRequest>> {
+        let mut turns = Vec::new();
+
+        for step in &planner_trace.steps {
+            for decision in &step.decisions {
+                if decision.action != AutonomousPlannerAction::Search {
+                    continue;
+                }
+
+                let query = decision
+                    .query
+                    .clone()
+                    .ok_or_else(|| anyhow!("autonomous search decisions require a query"))?;
+                let mut turn = SearchTurnRequest::new(&request.path, query)
+                    .with_turn_id(
+                        decision
+                            .turn_id
+                            .clone()
+                            .unwrap_or_else(|| format!("turn-{}", turns.len() + 1)),
+                    )
+                    .with_intent_opt(request.intent.clone())
+                    .with_verbose(request.verbose)
+                    .with_emission_mode(request.emission_mode)
+                    .with_local_context(request.local_context.clone());
+
+                if let Some(session_id) = &request.session_id {
+                    turn = turn.with_session_id(session_id.clone());
+                }
+                if let Some(limit) = request.limit {
+                    turn = turn.with_limit(limit);
+                }
+                if let Some(shortlist) = request.shortlist {
+                    turn = turn.with_shortlist(shortlist);
+                }
+
+                turns.push(turn);
+            }
+        }
+
+        Ok(turns)
+    }
+
+    fn count_autonomous_search_turns(planner_trace: &AutonomousPlannerTrace) -> usize {
+        planner_trace
+            .steps
+            .iter()
+            .flat_map(|step| step.decisions.iter())
+            .filter(|decision| decision.action == AutonomousPlannerAction::Search)
+            .count()
+    }
+
+    fn planner_trace_completed(planner_trace: &AutonomousPlannerTrace) -> bool {
+        planner_trace.completed || planner_trace.stop_reason.is_some()
+    }
+
+    fn derive_autonomous_state(
+        &self,
+        request: &AutonomousSearchRequest,
+        planner_trace: &AutonomousPlannerTrace,
+        controller_state: Option<&SearchControllerState>,
+    ) -> crate::search::AutonomousPlannerState {
+        let current_step = planner_trace
+            .steps
+            .last()
+            .and_then(|step| {
+                step.decisions
+                    .iter()
+                    .rev()
+                    .find_map(|decision| decision.next_step.clone())
+            })
+            .or_else(|| planner_trace.steps.last().map(|step| step.step.clone()))
+            .unwrap_or_else(|| request.state.current_step.clone());
+
+        crate::search::AutonomousPlannerState {
+            current_step,
+            step_limit: request.state.step_limit,
+            retained_artifacts: controller_state
+                .map(|state| state.retained_artifacts.clone())
+                .unwrap_or_else(|| request.state.retained_artifacts.clone()),
+            completed: Self::planner_trace_completed(planner_trace) || request.state.completed,
+        }
+    }
+
+    fn format_autonomous_stop_reason(reason: AutonomousPlannerStopReason) -> String {
+        match reason {
+            AutonomousPlannerStopReason::GoalSatisfied => "planner terminated: goal satisfied",
+            AutonomousPlannerStopReason::StepLimitReached => {
+                "planner terminated: step limit reached"
+            }
+            AutonomousPlannerStopReason::NoFurtherQueries => {
+                "planner terminated: no further queries available"
+            }
+            AutonomousPlannerStopReason::NoAdditionalEvidence => {
+                "planner terminated: no additional evidence found"
+            }
+        }
+        .to_string()
     }
 
     fn merge_retained_artifacts(

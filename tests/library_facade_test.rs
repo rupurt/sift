@@ -1,10 +1,39 @@
 use sift::{
-    AcquisitionAdapterKind, AgentTurnInput, ContextArtifactKind, ContextAssemblyBudget,
-    ContextAssemblyRequest, EnvironmentFactInput, Fusion, FusionPolicy, QueryExpansionPolicy,
-    Reranking, RerankingPolicy, Retriever, RetrieverPolicy, SearchControllerAction,
-    SearchControllerRequest, SearchEmission, SearchEmissionMode, SearchInput, SearchOptions,
-    SearchPlan, SearchTurnRequest, Sift, ToolOutputInput,
+    AcquisitionAdapterKind, AgentTurnInput, AutonomousPlanner, AutonomousPlannerAction,
+    AutonomousPlannerDecision, AutonomousPlannerStopReason, AutonomousPlannerStrategy,
+    AutonomousPlannerTrace, AutonomousPlannerTraceStep, AutonomousSearchRequest,
+    ContextArtifactKind, ContextAssemblyBudget, ContextAssemblyRequest, EnvironmentFactInput,
+    Fusion, FusionPolicy, QueryExpansionPolicy, Reranking, RerankingPolicy, Retriever,
+    RetrieverPolicy, SearchControllerAction, SearchControllerRequest, SearchEmission,
+    SearchEmissionMode, SearchInput, SearchOptions, SearchPlan, SearchTurnRequest, Sift,
+    ToolOutputInput,
 };
+
+struct SingleStepPlanner;
+
+impl AutonomousPlanner for SingleStepPlanner {
+    fn plan(&self, request: &AutonomousSearchRequest) -> anyhow::Result<AutonomousPlannerTrace> {
+        Ok(
+            AutonomousPlannerTrace::new(request.planner_strategy.clone())
+                .with_steps(vec![
+                    AutonomousPlannerTraceStep::new(sift::AutonomousPlannerStepCursor::new(
+                        "step-1", 1,
+                    ))
+                    .with_decisions(vec![
+                        AutonomousPlannerDecision::new(AutonomousPlannerAction::Search)
+                            .with_query("alpha")
+                            .with_turn_id("turn-a")
+                            .with_rationale("start with the most explicit token"),
+                        AutonomousPlannerDecision::new(AutonomousPlannerAction::Terminate)
+                            .with_stop_reason(AutonomousPlannerStopReason::GoalSatisfied)
+                            .with_rationale("the root task is satisfied by the first turn"),
+                    ]),
+                ])
+                .with_completed(true)
+                .with_stop_reason(AutonomousPlannerStopReason::GoalSatisfied),
+        )
+    }
+}
 
 fn custom_lexical_plan(name: &str) -> SearchPlan {
     SearchPlan {
@@ -450,5 +479,43 @@ fn controller_records_pruning_when_context_budget_is_exceeded() {
             .decisions
             .iter()
             .any(|decision| decision.action == SearchControllerAction::Prune)
+    );
+}
+
+#[test]
+fn embedded_facade_lowers_autonomous_planner_trace_into_controller_runtime() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(
+        corpus.path().join("alpha.txt"),
+        "alpha implementation details for the autonomous planner seam",
+    )
+    .expect("write alpha corpus file");
+
+    let engine = Sift::builder().build();
+    let response = engine
+        .search_autonomous_with(
+            AutonomousSearchRequest::new(corpus.path(), "find the alpha details")
+                .with_strategy("bm25")
+                .with_planner_strategy(AutonomousPlannerStrategy::heuristic())
+                .with_limit(1)
+                .with_shortlist(1),
+            &SingleStepPlanner,
+        )
+        .expect("autonomous search with planner seam");
+
+    assert_eq!(response.root_task, "find the alpha details");
+    assert_eq!(response.turns.len(), 1);
+    assert_eq!(response.turns[0].turn.turn_id, "turn-a");
+    assert_eq!(response.turns[0].turn.strategy, "bm25");
+    assert_eq!(response.trace.turns.len(), 1);
+    assert!(response.state.completed);
+    assert_eq!(response.planner_trace.steps.len(), 1);
+    assert_eq!(
+        response.planner_trace.steps[0].decisions[0].action,
+        AutonomousPlannerAction::Search
+    );
+    assert_eq!(
+        response.planner_trace.stop_reason,
+        Some(AutonomousPlannerStopReason::GoalSatisfied)
     );
 }

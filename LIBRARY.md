@@ -13,7 +13,9 @@ The stable crate-root contract includes:
 - `SearchTurnRequest`, `SearchTurnResponse`
 - `SearchControllerRequest`, `SearchControllerResponse`
 - `AutonomousSearchRequest`, `AutonomousSearchResponse`
-- `AutonomousPlannerState`, `AutonomousPlannerStepCursor`, `AutonomousPlannerStrategy`
+- `AutonomousPlannerState`, `AutonomousPlannerStepCursor`, `AutonomousPlannerStrategy`, `AutonomousPlannerStrategyKind`
+- `AutonomousPlannerTrace`, `AutonomousPlannerTraceStep`, `AutonomousPlannerDecision`, `AutonomousPlannerAction`, `AutonomousPlannerStopReason`
+- `AutonomousPlanner`
 - `SearchEmission`, `SearchEmissionMode`
 - `SearchPlan`, `QueryExpansionPolicy`, `RetrieverPolicy`, `FusionPolicy`, `RerankingPolicy`
 - `Retriever`, `Fusion`, `Reranking`
@@ -217,6 +219,60 @@ These records are stable now so embedders can model root-task planning state,
 retained evidence, and planner selection. The execution seam that actually runs
 autonomous planning through `Sift` lands separately.
 
+`AutonomousSearchResponse` also carries an `AutonomousPlannerTrace`, which
+captures step-local planner decisions and explicit stop reasons separately from
+the lower-level search trace.
+
+## Mode 6: Autonomous Execution Seam
+
+Use `Sift::search_autonomous_with` when your application already owns the
+planning policy and wants Sift to lower planner-issued search decisions into
+the existing controller runtime.
+
+```rust
+use anyhow::Result;
+use sift::{
+    AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerDecision,
+    AutonomousPlannerStopReason, AutonomousPlannerTrace, AutonomousPlannerTraceStep,
+    AutonomousSearchRequest, Sift,
+};
+
+struct SingleStepPlanner;
+
+impl AutonomousPlanner for SingleStepPlanner {
+    fn plan(&self, request: &AutonomousSearchRequest) -> Result<AutonomousPlannerTrace> {
+        Ok(AutonomousPlannerTrace::new(request.planner_strategy.clone())
+            .with_steps(vec![
+                AutonomousPlannerTraceStep::new(sift::AutonomousPlannerStepCursor::new(
+                    "step-1", 1,
+                ))
+                .with_decisions(vec![
+                    AutonomousPlannerDecision::new(AutonomousPlannerAction::Search)
+                        .with_query("alpha")
+                        .with_turn_id("turn-a"),
+                    AutonomousPlannerDecision::new(AutonomousPlannerAction::Terminate)
+                        .with_stop_reason(AutonomousPlannerStopReason::GoalSatisfied),
+                ]),
+            ])
+            .with_completed(true)
+            .with_stop_reason(AutonomousPlannerStopReason::GoalSatisfied))
+    }
+}
+
+fn main() -> Result<()> {
+    let engine = Sift::builder().build();
+    let response = engine.search_autonomous_with(
+        AutonomousSearchRequest::new("./docs", "find the alpha details")
+            .with_strategy("bm25"),
+        &SingleStepPlanner,
+    )?;
+
+    assert_eq!(response.turns.len(), 1);
+    assert!(response.state.completed);
+    Ok(())
+}
+```
+
 ## Local Context Injection
 
 All request modes can inject synthetic context artifacts alongside filesystem
@@ -276,6 +332,6 @@ Supported now:
 
 Not shipped yet:
 
-- autonomous planner execution
+- built-in heuristic and model-driven autonomous planner policies
 - a stable crate-root config type
 - a general-purpose interactive agentic CLI command

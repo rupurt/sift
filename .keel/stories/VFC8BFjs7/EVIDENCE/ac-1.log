@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T14:22:40.637183355-07:00
+mode: manual
+---
+Added AutonomousPlannerDecision, AutonomousPlannerStopReason, AutonomousPlannerTrace, and AutonomousPlannerTraceStep; verified replayable serde shape with cargo test --test autonomous_planner_contract_test and just check.
