@@ -22,7 +22,10 @@ mission: VFC7FgLCO
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/0 voyages complete, 0/0 stories done
+**Progress:** 0/3 voyages complete, 0/6 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
+| [Benchmark Autonomous Planning Against Baselines](voyages/VFCWBDyA2/) | planned | 0/2 |
+| [Promote Autonomous Library Entry Point](voyages/VFCWCm3Mc/) | planned | 0/2 |
+| [Add Agent Search CLI Surface](voyages/VFCWG2tZd/) | planned | 0/2 |
 <!-- END GENERATED -->

@@ -110,7 +110,13 @@
 |--------|--------|
 | [Expose Artifact-Based Context Assembly And Emissions](epics/VF53suDXv/voyages/VF60I1J0l/) | done |
 
-### [Bounded Linear Autonomous Planner](epics/VFC7H4QFx/) (draft)
+### [Bounded Linear Autonomous Planner](epics/VFC7H4QFx/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Ship Heuristic Planner Baseline](epics/VFC7H4QFx/voyages/VFCW6PVzz/) | planned |
+| [Wire Strategy-Selected Autonomous Runtime](epics/VFC7H4QFx/voyages/VFCW85Y1r/) | planned |
+| [Add Model-Driven Planner Strategy](epics/VFC7H4QFx/voyages/VFCW9fu6V/) | planned |
 
 ### [Planner Contract and Replay](epics/VFC7H4QFy/) (done)
 
@@ -118,7 +124,13 @@
 |--------|--------|
 | [Define Planner State and Stop Semantics](epics/VFC7H4QFy/voyages/VFC7MN6fR/) | done |
 
-### [Autonomous Planning Evaluation and Surface](epics/VFC7H4pFw/) (draft)
+### [Autonomous Planning Evaluation and Surface](epics/VFC7H4pFw/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Benchmark Autonomous Planning Against Baselines](epics/VFC7H4pFw/voyages/VFCWBDyA2/) | planned |
+| [Promote Autonomous Library Entry Point](epics/VFC7H4pFw/voyages/VFCWCm3Mc/) | planned |
+| [Add Agent Search CLI Surface](epics/VFC7H4pFw/voyages/VFCWG2tZd/) | planned |
 
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
