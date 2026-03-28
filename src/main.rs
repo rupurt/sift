@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::{Args, Parser, Subcommand};
 use sift::internal::{
     cache::cache_dir,
@@ -18,11 +18,13 @@ use sift::internal::{
         OutputFormat,
         adapters::gemma::GemmaModelSpec,
         adapters::qwen::{DEFAULT_QWEN_MODEL_ID, DEFAULT_QWEN_REVISION, QwenModelSpec},
-        render_search_response,
+        render_autonomous_search_response, render_search_response,
     },
     system::Telemetry,
 };
-use sift::{Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift};
+use sift::{
+    AutonomousSearchRequest, Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift,
+};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[cfg(test)]
@@ -79,11 +81,19 @@ enum Commands {
 
 #[derive(Args)]
 #[command(arg_required_else_help = true)]
-#[command(override_usage = "sift search [OPTIONS] [PATH] <QUERY>")]
-#[command(after_help = "If PATH is omitted, sift searches the current directory.")]
+#[command(
+    override_usage = "sift search [OPTIONS] [PATH] <QUERY>\n       sift search [OPTIONS] [PATH] --agent <ROOT_TASK>"
+)]
+#[command(
+    after_help = "If PATH is omitted, sift searches the current directory.\nUse --agent to run the shared autonomous planner runtime with ROOT_TASK."
+)]
 struct SearchCommand {
     #[arg(long)]
     strategy: Option<String>,
+
+    #[arg(long, value_name = "ROOT_TASK")]
+    /// Run the shared autonomous planner runtime with ROOT_TASK.
+    agent: Option<String>,
 
     #[arg(long)]
     /// Explicit intent context to help guide search and ranking.
@@ -128,8 +138,9 @@ struct SearchCommand {
     #[arg(long)]
     reranking: Option<SearchReranking>,
 
-    /// Provide QUERY to search the current directory, or PATH QUERY to search a specific corpus.
-    #[arg(num_args = 1..=2, value_names = ["PATH", "QUERY"])]
+    /// Provide QUERY to search the current directory, PATH QUERY to search a specific corpus,
+    /// or PATH when using --agent.
+    #[arg(num_args = 0..=2, value_names = ["PATH", "QUERY"])]
     targets: Vec<String>,
 }
 
@@ -194,11 +205,24 @@ impl From<SearchReranking> for Reranking {
 }
 
 impl SearchCommand {
-    fn resolve_targets(&self) -> (PathBuf, String) {
+    fn resolve_direct_targets(&self) -> Result<(PathBuf, String)> {
         match self.targets.as_slice() {
-            [query] => (PathBuf::from("."), query.clone()),
-            [path, query] => (PathBuf::from(path), query.clone()),
-            _ => unreachable!("clap enforces one or two search targets"),
+            [query] => Ok((PathBuf::from("."), query.clone())),
+            [path, query] => Ok((PathBuf::from(path), query.clone())),
+            _ => bail!("direct search expects QUERY or PATH QUERY"),
+        }
+    }
+
+    fn resolve_agent_target(&self) -> Result<(PathBuf, String)> {
+        let root_task = self
+            .agent
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("agent search requires --agent <ROOT_TASK>"))?;
+
+        match self.targets.as_slice() {
+            [] => Ok((PathBuf::from("."), root_task)),
+            [path] => Ok((PathBuf::from(path), root_task)),
+            _ => bail!("agent search expects PATH --agent <ROOT_TASK> or --agent <ROOT_TASK>"),
         }
     }
 
@@ -210,8 +234,8 @@ impl SearchCommand {
         }
     }
 
-    fn to_input(&self, config: &Config) -> SearchInput {
-        let (path, query) = self.resolve_targets();
+    fn to_input(&self, config: &Config) -> Result<SearchInput> {
+        let (path, query) = self.resolve_direct_targets()?;
         let mut options = SearchOptions::default().with_verbose(self.verbose);
 
         if let Some(strategy) = &self.strategy {
@@ -243,7 +267,55 @@ impl SearchCommand {
             options = options.with_reranking(reranking.into());
         }
 
-        SearchInput::new(path, query).with_options(options)
+        Ok(SearchInput::new(path, query).with_options(options))
+    }
+
+    fn to_autonomous_request(&self) -> Result<AutonomousSearchRequest> {
+        self.ensure_supported_agent_options()?;
+        let (path, root_task) = self.resolve_agent_target()?;
+        let mut request = AutonomousSearchRequest::new(path, root_task).with_verbose(self.verbose);
+
+        if let Some(strategy) = &self.strategy {
+            request = request.with_strategy(strategy.clone());
+        }
+        if let Some(intent) = &self.intent {
+            request = request.with_intent(intent.clone());
+        }
+        if let Some(limit) = self.limit {
+            request = request.with_limit(limit);
+        }
+        if let Some(shortlist) = self.shortlist {
+            request = request.with_shortlist(shortlist);
+        }
+
+        Ok(request)
+    }
+
+    fn ensure_supported_agent_options(&self) -> Result<()> {
+        let mut unsupported = Vec::new();
+        if self.model_id.is_some() || self.model_revision.is_some() || self.max_length.is_some() {
+            unsupported.push("--model-id/--model-revision/--max-length");
+        }
+        if self.rerank_model_id.is_some() || self.rerank_revision.is_some() {
+            unsupported.push("--rerank-model-id/--rerank-revision");
+        }
+        if self.retrievers.is_some() {
+            unsupported.push("--retrievers");
+        }
+        if self.fusion.is_some() {
+            unsupported.push("--fusion");
+        }
+        if self.reranking.is_some() {
+            unsupported.push("--reranking");
+        }
+        if unsupported.is_empty() {
+            return Ok(());
+        }
+
+        bail!(
+            "agent search currently supports --strategy, --intent, --limit, --shortlist, --json, and verbosity flags; unsupported with --agent: {}",
+            unsupported.join(", ")
+        )
     }
 
     fn resolve_dense_model(&self, config: &Config) -> Option<DenseModelSpec> {
@@ -726,15 +798,25 @@ fn main() -> Result<()> {
             println!("{}", Config::highlight_toml(&toml_string));
         }
         Commands::Search(search) => {
-            let input = search.to_input(&config);
-            let response = Sift::builder()
+            let direct_input = if search.agent.is_some() {
+                None
+            } else {
+                Some(search.to_input(&config)?)
+            };
+            let engine = Sift::builder()
                 .with_config(config)
                 .with_ignore(ignore)
                 .with_telemetry(telemetry)
                 .with_query_cache(query_cache)
-                .build()
-                .search(input)?;
-            let output = render_search_response(&response, search.output_format())?;
+                .build();
+            let output = if search.agent.is_some() {
+                let response = engine.search_autonomous(search.to_autonomous_request()?)?;
+                render_autonomous_search_response(&response, search.output_format())?
+            } else {
+                let response =
+                    engine.search(direct_input.expect("direct search input should be built"))?;
+                render_search_response(&response, search.output_format())?
+            };
             println!("{output}");
         }
     }

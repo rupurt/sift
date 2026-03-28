@@ -10,6 +10,16 @@ pub fn render_search_response(response: &SearchResponse, format: OutputFormat) -
     }
 }
 
+pub fn render_autonomous_search_response(
+    response: &AutonomousSearchResponse,
+    format: OutputFormat,
+) -> Result<String> {
+    match format {
+        OutputFormat::Json => Ok(serde_json::to_string_pretty(response)?),
+        OutputFormat::Text => render_autonomous_text_response(response),
+    }
+}
+
 fn render_text_response(response: &SearchResponse) -> Result<String> {
     let mut output = String::new();
 
@@ -45,4 +55,56 @@ fn render_text_response(response: &SearchResponse) -> Result<String> {
     }
 
     Ok(output.trim_end().to_string())
+}
+
+fn render_autonomous_text_response(response: &AutonomousSearchResponse) -> Result<String> {
+    let mut output = String::new();
+    writeln!(
+        &mut output,
+        "planner: {}",
+        planner_strategy_kind_label(response.planner_strategy.kind)
+    )?;
+    writeln!(&mut output, "turns: {}", response.turns.len())?;
+    if let Some(stop_reason) = response.planner_trace.stop_reason {
+        writeln!(
+            &mut output,
+            "stop: {}",
+            autonomous_stop_reason_label(stop_reason)
+        )?;
+    }
+
+    if let Some(SearchEmission::View(view)) = response
+        .turns
+        .iter()
+        .rev()
+        .map(|turn| &turn.emission)
+        .find(|emission| matches!(emission, SearchEmission::View(_)))
+    {
+        let body = render_text_response(view)?;
+        if !body.is_empty() {
+            writeln!(&mut output)?;
+            write!(&mut output, "{body}")?;
+        }
+    } else if response.turns.is_empty() {
+        writeln!(&mut output)?;
+        writeln!(&mut output, "no autonomous turns executed")?;
+    }
+
+    Ok(output.trim_end().to_string())
+}
+
+fn planner_strategy_kind_label(kind: AutonomousPlannerStrategyKind) -> &'static str {
+    match kind {
+        AutonomousPlannerStrategyKind::Heuristic => "heuristic",
+        AutonomousPlannerStrategyKind::ModelDriven => "model-driven",
+    }
+}
+
+fn autonomous_stop_reason_label(reason: AutonomousPlannerStopReason) -> &'static str {
+    match reason {
+        AutonomousPlannerStopReason::GoalSatisfied => "goal-satisfied",
+        AutonomousPlannerStopReason::StepLimitReached => "step-limit-reached",
+        AutonomousPlannerStopReason::NoFurtherQueries => "no-further-queries",
+        AutonomousPlannerStopReason::NoAdditionalEvidence => "no-additional-evidence",
+    }
 }

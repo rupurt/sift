@@ -42,16 +42,19 @@ Sift combines:
 
 ### Agentic Status
 
-Agentic support in Sift currently shows up in three places:
+Agentic support in Sift currently shows up in four places:
 
 1. **Intent-aware search:** `--intent` lets you add task context to a search.
-2. **Turn-aware library APIs:** The crate root exposes `search_turn`,
-   `search_controller`, and protocol/latent emissions.
-3. **Fixture-driven controller evals:** `sift eval agentic` measures planned
-   multi-turn controller runs against a collapsed single-turn baseline.
+2. **Planner-driven CLI search:** `sift search --agent` runs the shared
+   autonomous runtime from the executable.
+3. **Turn-aware library APIs:** The crate root exposes `search_turn`,
+   `search_controller`, `search_autonomous`, and protocol/latent emissions.
+4. **Fixture-driven autonomous/controller evals:** `sift eval agentic`
+   benchmarks autonomous planner runs, planned multi-turn controller runs, and
+   collapsed single-turn baselines.
 
-What is not shipped yet is a general-purpose interactive agentic CLI command or
-an autonomous planner that invents turns on its own.
+What is not shipped yet is a general-purpose interactive agent shell or
+branching/graph autonomous search.
 
 ## Choosing a Strategy
 
@@ -77,6 +80,12 @@ sift search --strategy bm25 "service catalog"
 
 ```bash
 sift search --intent "I am looking for the trait definitions" "engine"
+```
+
+### Agent Mode
+
+```bash
+sift search --strategy bm25 ./my-project --agent "find the cache invalidation path"
 ```
 
 ### Manual Pipeline Overrides
@@ -108,7 +117,7 @@ See [CONFIGURATION.md](CONFIGURATION.md) for the full configuration surface.
 Sift ships two evaluation families:
 
 - **Retrieval evals:** `sift eval all`, `sift eval quality`, `sift eval latency`
-- **Controller evals:** `sift eval agentic`
+- **Agentic evals:** `sift eval agentic`
 
 See [EVALUATIONS.md](EVALUATIONS.md) for datasets, metrics, and report shapes.
 

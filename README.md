@@ -26,7 +26,7 @@ For project background and design rationale, read the introductory post:
 - **Current champion preset:** `page-index-hybrid` is the richer benchmark preset for comparative evaluation.
 - **Layered pipeline:** Query Expansion -> Retrieval -> Fusion -> Reranking.
 - **Executable surface:** `search`, `eval`, `dataset`, `optimize`, and `config` are the supported CLI commands.
-- **Library surface:** `search`, `assemble_context`, `search_turn`, and `search_controller` are supported at the crate root.
+- **Library surface:** `search`, `assemble_context`, `search_turn`, `search_controller`, and `search_autonomous` are supported at the crate root.
 - **Emission modes:** Turn-aware library calls can emit `view`, `protocol`, or `latent` responses.
 - **Supported inputs:** Text, HTML, PDF, and OOXML files (`.docx`, `.xlsx`, `.pptx`).
 
@@ -59,17 +59,18 @@ The executable currently exposes the following command groups:
 | Command | Purpose |
 |---------|---------|
 | `sift search [OPTIONS] [PATH] <QUERY>` | Direct single-turn search over a local corpus. |
+| `sift search [OPTIONS] [PATH] --agent <ROOT_TASK>` | Planner-driven search over a local corpus using the shared autonomous runtime. |
 | `sift eval all` | Compare all registered retrieval strategies. |
 | `sift eval quality` | Emit a JSON quality report for one strategy, optionally against a baseline. |
 | `sift eval latency` | Emit a JSON latency report for one strategy. |
-| `sift eval agentic` | Run planned multi-turn controller fixtures and compare them against a collapsed single-turn baseline. |
+| `sift eval agentic` | Benchmark autonomous planner runs, planned controller fixtures, and collapsed single-turn baselines. |
 | `sift dataset download` / `sift dataset materialize` | Manage evaluation datasets such as SciFact. |
 | `sift optimize` | Tune prompt templates used by generative expansion. |
 | `sift config` | Print the merged effective configuration. |
 
-There is not yet a general-purpose `sift agentic` interactive CLI command. The
-turn-aware controller surface is library-first today, while the executable
-exposes agentic behavior primarily through `eval agentic`.
+There is not a separate `sift agentic` interactive shell. Agent-mode search
+ships through `sift search --agent`, while evaluation-oriented benchmarking
+continues to live under `eval agentic`.
 
 ## Search Examples
 
@@ -96,6 +97,12 @@ Use a vector-only plan:
 
 ```bash
 sift search --strategy vector "architecture"
+```
+
+Run the supported autonomous planner runtime from the CLI:
+
+```bash
+sift search --strategy bm25 tests/fixtures/rich-docs --agent "find the cache invalidation path"
 ```
 
 Override individual pipeline stages:
