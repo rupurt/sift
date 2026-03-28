@@ -1,11 +1,26 @@
 generate:
     keel generate
 
-doctor:
-    keel doctor
+heartbeat:
+    keel heartbeat
 
-flow:
-    keel flow
+health *args:
+    keel health {{args}}
+
+doctor *args:
+    keel doctor {{args}}
+
+pulse:
+    keel pulse
+
+mission next *args:
+    keel mission next {{args}}
+
+flow *args:
+    keel flow {{args}}
+
+hooks install:
+    keel hooks install
 
 next:
     keel next --agent

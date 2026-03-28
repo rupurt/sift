@@ -31,11 +31,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1774654911,
-        "narHash": "sha256-3mlHSaYQ5apIs+zA21uYPqAdEF4kDi5kIGLOkIMtFgg=",
+        "lastModified": 1774663966,
+        "narHash": "sha256-J+U1/Q7PrYxTyy0YOn+JdXBjnT2xcUAvi+sFq4DF+rU=",
         "ref": "refs/heads/main",
-        "rev": "adf94f270cbc97d4812a4a4ad7ed9789adb09639",
-        "revCount": 557,
+        "rev": "68369da3af0676cf6d6a3de3cd19794688402f42",
+        "revCount": 566,
         "type": "git",
         "url": "ssh://git@github.com/spoke-sh/keel.git"
       },
