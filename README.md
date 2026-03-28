@@ -105,6 +105,13 @@ Run the supported autonomous planner runtime from the CLI:
 sift search --strategy bm25 tests/fixtures/rich-docs --agent "find the cache invalidation path"
 ```
 
+Select the built-in model-driven planner explicitly:
+
+```bash
+sift search --strategy hybrid --agent "trace the cache invalidation path" \
+  --planner-strategy model-driven --planner-profile local-planner-v1
+```
+
 Override individual pipeline stages:
 
 ```bash

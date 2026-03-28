@@ -88,6 +88,14 @@ sift search --intent "I am looking for the trait definitions" "engine"
 sift search --strategy bm25 ./my-project --agent "find the cache invalidation path"
 ```
 
+Swap to the model-driven planner when you have a local planner profile wired
+through the same runtime:
+
+```bash
+sift search --strategy hybrid --agent "trace the cache invalidation path" \
+  --planner-strategy model-driven --planner-profile local-planner-v1
+```
+
 ### Manual Pipeline Overrides
 
 ```bash

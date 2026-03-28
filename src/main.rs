@@ -23,12 +23,81 @@ use sift::internal::{
     system::Telemetry,
 };
 use sift::{
-    AutonomousSearchRequest, Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift,
+    AutonomousPlannerStrategy, AutonomousPlannerStrategyKind, AutonomousSearchRequest, Fusion,
+    Reranking, Retriever, SearchInput, SearchOptions, Sift,
 };
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 #[cfg(test)]
 mod versioning;
+
+#[cfg(test)]
+mod search_cli_tests {
+    use super::*;
+
+    #[test]
+    fn direct_search_targets_remain_query_driven_without_agent() {
+        let cli = Cli::try_parse_from(["sift", "search", "./docs", "cache invalidation"])
+            .expect("parse direct search command");
+
+        let Commands::Search(search) = cli.command else {
+            panic!("expected search command");
+        };
+
+        let (path, query) = search
+            .resolve_direct_targets()
+            .expect("resolve direct search targets");
+        assert_eq!(path, PathBuf::from("./docs"));
+        assert_eq!(query, "cache invalidation");
+    }
+
+    #[test]
+    fn agent_search_builds_heuristic_autonomous_request() {
+        let cli = Cli::try_parse_from(["sift", "search", "--agent", "Search Me", "./docs"])
+            .expect("parse agent search command");
+
+        let Commands::Search(search) = cli.command else {
+            panic!("expected search command");
+        };
+
+        let request = search
+            .to_autonomous_request()
+            .expect("build autonomous request");
+        assert_eq!(request.path, PathBuf::from("./docs"));
+        assert_eq!(request.root_task, "Search Me");
+        assert_eq!(
+            request.planner_strategy,
+            AutonomousPlannerStrategy::heuristic()
+        );
+    }
+
+    #[test]
+    fn agent_search_can_select_model_driven_strategy_and_profile() {
+        let cli = Cli::try_parse_from([
+            "sift",
+            "search",
+            "--agent",
+            "Search Me",
+            "--planner-strategy",
+            "model-driven",
+            "--planner-profile",
+            "local-planner-v1",
+        ])
+        .expect("parse model-driven agent search command");
+
+        let Commands::Search(search) = cli.command else {
+            panic!("expected search command");
+        };
+
+        let request = search
+            .to_autonomous_request()
+            .expect("build model-driven autonomous request");
+        assert_eq!(
+            request.planner_strategy,
+            AutonomousPlannerStrategy::model_driven().with_profile("local-planner-v1")
+        );
+    }
+}
 
 const SCIFACT_BASE_URL: &str = "https://huggingface.co/datasets/BeIR/scifact/resolve/main";
 const SCIFACT_QRELS_BASE_URL: &str =
@@ -94,6 +163,14 @@ struct SearchCommand {
     #[arg(long, value_name = "ROOT_TASK")]
     /// Run the shared autonomous planner runtime with ROOT_TASK.
     agent: Option<String>,
+
+    #[arg(long, value_enum, requires = "agent")]
+    /// Built-in planner strategy for agent mode.
+    planner_strategy: Option<AutonomousPlannerStrategyKind>,
+
+    #[arg(long, requires = "agent")]
+    /// Optional planner profile, typically used with model-driven planning.
+    planner_profile: Option<String>,
 
     #[arg(long)]
     /// Explicit intent context to help guide search and ranking.
@@ -273,7 +350,9 @@ impl SearchCommand {
     fn to_autonomous_request(&self) -> Result<AutonomousSearchRequest> {
         self.ensure_supported_agent_options()?;
         let (path, root_task) = self.resolve_agent_target()?;
-        let mut request = AutonomousSearchRequest::new(path, root_task).with_verbose(self.verbose);
+        let mut request = AutonomousSearchRequest::new(path, root_task)
+            .with_planner_strategy(self.resolve_agent_planner_strategy())
+            .with_verbose(self.verbose);
 
         if let Some(strategy) = &self.strategy {
             request = request.with_strategy(strategy.clone());
@@ -289,6 +368,25 @@ impl SearchCommand {
         }
 
         Ok(request)
+    }
+
+    fn resolve_agent_planner_strategy(&self) -> AutonomousPlannerStrategy {
+        let kind = match (self.planner_strategy, self.planner_profile.as_ref()) {
+            (Some(kind), _) => kind,
+            (None, Some(_)) => AutonomousPlannerStrategyKind::ModelDriven,
+            (None, None) => AutonomousPlannerStrategyKind::Heuristic,
+        };
+
+        let mut strategy = match kind {
+            AutonomousPlannerStrategyKind::Heuristic => AutonomousPlannerStrategy::heuristic(),
+            AutonomousPlannerStrategyKind::ModelDriven => AutonomousPlannerStrategy::model_driven(),
+        };
+
+        if let Some(profile) = &self.planner_profile {
+            strategy = strategy.with_profile(profile.clone());
+        }
+
+        strategy
     }
 
     fn ensure_supported_agent_options(&self) -> Result<()> {
@@ -313,7 +411,7 @@ impl SearchCommand {
         }
 
         bail!(
-            "agent search currently supports --strategy, --intent, --limit, --shortlist, --json, and verbosity flags; unsupported with --agent: {}",
+            "agent search currently supports --strategy, --planner-strategy, --planner-profile, --intent, --limit, --shortlist, --json, and verbosity flags; unsupported with --agent: {}",
             unsupported.join(", ")
         )
     }
