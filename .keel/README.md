@@ -129,7 +129,7 @@
 | Voyage | Status |
 |--------|--------|
 | [Benchmark Autonomous Planning Against Baselines](epics/VFC7H4pFw/voyages/VFCWBDyA2/) | done |
-| [Promote Autonomous Library Entry Point](epics/VFC7H4pFw/voyages/VFCWCm3Mc/) | planned |
+| [Promote Autonomous Library Entry Point](epics/VFC7H4pFw/voyages/VFCWCm3Mc/) | in-progress |
 | [Add Agent Search CLI Surface](epics/VFC7H4pFw/voyages/VFCWG2tZd/) | planned |
 
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
