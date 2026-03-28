@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T14:18:41.700672561-07:00
+mode: manual
+---
+Added AutonomousSearchRequest/Response/State plus planner strategy/state exports and verified with cargo test --test autonomous_planner_contract_test and just check.

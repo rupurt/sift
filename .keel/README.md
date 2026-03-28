@@ -116,7 +116,7 @@
 
 | Voyage | Status |
 |--------|--------|
-| [Define Planner State and Stop Semantics](epics/VFC7H4QFy/voyages/VFC7MN6fR/) | planned |
+| [Define Planner State and Stop Semantics](epics/VFC7H4QFy/voyages/VFC7MN6fR/) | in-progress |
 
 ### [Autonomous Planning Evaluation and Surface](epics/VFC7H4pFw/) (draft)
 

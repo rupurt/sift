@@ -460,6 +460,220 @@ impl SearchTurnRequest {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub enum AutonomousPlannerStrategyKind {
+    Heuristic,
+    ModelDriven,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutonomousPlannerStrategy {
+    pub kind: AutonomousPlannerStrategyKind,
+    pub profile: Option<String>,
+}
+
+impl AutonomousPlannerStrategy {
+    pub fn heuristic() -> Self {
+        Self {
+            kind: AutonomousPlannerStrategyKind::Heuristic,
+            profile: None,
+        }
+    }
+
+    pub fn model_driven() -> Self {
+        Self {
+            kind: AutonomousPlannerStrategyKind::ModelDriven,
+            profile: None,
+        }
+    }
+
+    pub fn with_profile(mut self, profile: impl Into<String>) -> Self {
+        self.profile = Some(profile.into());
+        self
+    }
+}
+
+impl Default for AutonomousPlannerStrategy {
+    fn default() -> Self {
+        Self::heuristic()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutonomousPlannerStepCursor {
+    pub step_id: String,
+    pub parent_step_id: Option<String>,
+    pub sequence: usize,
+}
+
+impl AutonomousPlannerStepCursor {
+    pub fn new(step_id: impl Into<String>, sequence: usize) -> Self {
+        Self {
+            step_id: step_id.into(),
+            parent_step_id: None,
+            sequence,
+        }
+    }
+
+    pub fn first() -> Self {
+        Self::new("step-1", 1)
+    }
+
+    pub fn with_parent_step_id(mut self, parent_step_id: impl Into<String>) -> Self {
+        self.parent_step_id = Some(parent_step_id.into());
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutonomousPlannerState {
+    pub current_step: AutonomousPlannerStepCursor,
+    pub step_limit: usize,
+    pub retained_artifacts: Vec<RetainedArtifact>,
+    pub completed: bool,
+}
+
+impl AutonomousPlannerState {
+    pub fn new(step_limit: usize) -> Self {
+        Self {
+            current_step: AutonomousPlannerStepCursor::first(),
+            step_limit,
+            retained_artifacts: Vec::new(),
+            completed: false,
+        }
+    }
+
+    pub fn with_current_step(mut self, current_step: AutonomousPlannerStepCursor) -> Self {
+        self.current_step = current_step;
+        self
+    }
+
+    pub fn with_step_limit(mut self, step_limit: usize) -> Self {
+        self.step_limit = step_limit;
+        self
+    }
+
+    pub fn with_retained_artifacts(mut self, retained_artifacts: Vec<RetainedArtifact>) -> Self {
+        self.retained_artifacts = retained_artifacts;
+        self
+    }
+
+    pub fn with_completed(mut self, completed: bool) -> Self {
+        self.completed = completed;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutonomousSearchRequest {
+    pub session_id: Option<String>,
+    pub path: PathBuf,
+    pub root_task: String,
+    pub intent: Option<String>,
+    pub strategy: Option<String>,
+    pub plan: Option<SearchPlan>,
+    pub planner_strategy: AutonomousPlannerStrategy,
+    pub state: AutonomousPlannerState,
+    pub limit: Option<usize>,
+    pub shortlist: Option<usize>,
+    pub verbose: u8,
+    pub emission_mode: SearchEmissionMode,
+    pub local_context: Vec<LocalContextSource>,
+    pub retained_artifact_limit: usize,
+}
+
+impl AutonomousSearchRequest {
+    pub fn new(path: impl AsRef<Path>, root_task: impl Into<String>) -> Self {
+        Self {
+            session_id: None,
+            path: path.as_ref().to_path_buf(),
+            root_task: root_task.into(),
+            intent: None,
+            strategy: None,
+            plan: None,
+            planner_strategy: AutonomousPlannerStrategy::default(),
+            state: AutonomousPlannerState::new(3),
+            limit: None,
+            shortlist: None,
+            verbose: 0,
+            emission_mode: SearchEmissionMode::View,
+            local_context: Vec::new(),
+            retained_artifact_limit: 5,
+        }
+    }
+
+    pub fn with_session_id(mut self, session_id: impl Into<String>) -> Self {
+        self.session_id = Some(session_id.into());
+        self
+    }
+
+    pub fn with_intent(mut self, intent: impl Into<String>) -> Self {
+        self.intent = Some(intent.into());
+        self
+    }
+
+    pub fn with_intent_opt(mut self, intent: Option<String>) -> Self {
+        self.intent = intent;
+        self
+    }
+
+    pub fn with_strategy(mut self, strategy: impl Into<String>) -> Self {
+        self.strategy = Some(strategy.into());
+        self
+    }
+
+    pub fn with_plan(mut self, plan: SearchPlan) -> Self {
+        self.plan = Some(plan);
+        self
+    }
+
+    pub fn with_planner_strategy(mut self, planner_strategy: AutonomousPlannerStrategy) -> Self {
+        self.planner_strategy = planner_strategy;
+        self
+    }
+
+    pub fn with_state(mut self, state: AutonomousPlannerState) -> Self {
+        self.state = state;
+        self
+    }
+
+    pub fn with_step_limit(mut self, step_limit: usize) -> Self {
+        self.state = self.state.with_step_limit(step_limit);
+        self
+    }
+
+    pub fn with_limit(mut self, limit: usize) -> Self {
+        self.limit = Some(limit);
+        self
+    }
+
+    pub fn with_shortlist(mut self, shortlist: usize) -> Self {
+        self.shortlist = Some(shortlist);
+        self
+    }
+
+    pub fn with_verbose(mut self, verbose: u8) -> Self {
+        self.verbose = verbose;
+        self
+    }
+
+    pub fn with_emission_mode(mut self, emission_mode: SearchEmissionMode) -> Self {
+        self.emission_mode = emission_mode;
+        self
+    }
+
+    pub fn with_local_context(mut self, local_context: Vec<LocalContextSource>) -> Self {
+        self.local_context = local_context;
+        self
+    }
+
+    pub fn with_retained_artifact_limit(mut self, retained_artifact_limit: usize) -> Self {
+        self.retained_artifact_limit = retained_artifact_limit;
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SearchControllerState {
     pub next_turn: usize,
@@ -645,6 +859,16 @@ pub struct SearchTurnResponse {
 pub struct SearchControllerResponse {
     pub plan: SearchPlan,
     pub state: SearchControllerState,
+    pub turns: Vec<SearchTurnResponse>,
+    pub trace: SearchTrace,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AutonomousSearchResponse {
+    pub root_task: String,
+    pub planner_strategy: AutonomousPlannerStrategy,
+    pub plan: SearchPlan,
+    pub state: AutonomousPlannerState,
     pub turns: Vec<SearchTurnResponse>,
     pub trace: SearchTrace,
 }

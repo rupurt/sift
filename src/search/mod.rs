@@ -14,7 +14,9 @@ pub use application::{
 pub use corpus::load_search_corpus;
 pub use domain::{
     AcquisitionAdapterKind, AgentTurnInput, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
-    Bm25Index, CachedEmbedder, Candidate, CandidateList, ContextArtifact, ContextArtifactKind,
+    AutonomousPlannerState, AutonomousPlannerStepCursor, AutonomousPlannerStrategy,
+    AutonomousPlannerStrategyKind, AutonomousSearchRequest, AutonomousSearchResponse, Bm25Index,
+    CachedEmbedder, Candidate, CandidateList, ContextArtifact, ContextArtifactKind,
     ContextAssemblyBudget, ContextAssemblyRequest, ContextAssemblyResponse, ContributorScore,
     Conversation, CorpusLoadRequest, CorpusRepository, Embedder, EnvironmentFactInput, Expander,
     Fuser, FusionPolicy, GenerativeModel, LatentSearchEmission, LatentSearchHit, LoadedCorpus,

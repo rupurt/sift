@@ -12,6 +12,8 @@ The stable crate-root contract includes:
 - `ContextAssemblyRequest`, `ContextAssemblyResponse`
 - `SearchTurnRequest`, `SearchTurnResponse`
 - `SearchControllerRequest`, `SearchControllerResponse`
+- `AutonomousSearchRequest`, `AutonomousSearchResponse`
+- `AutonomousPlannerState`, `AutonomousPlannerStepCursor`, `AutonomousPlannerStrategy`
 - `SearchEmission`, `SearchEmissionMode`
 - `SearchPlan`, `QueryExpansionPolicy`, `RetrieverPolicy`, `FusionPolicy`, `RerankingPolicy`
 - `Retriever`, `Fusion`, `Reranking`
@@ -190,6 +192,31 @@ This mode gives you:
 It is deterministic and plan-driven. It does not currently invent turns or do
 autonomous decomposition by itself.
 
+## Mode 5: Autonomous Planner Contracts
+
+Use `AutonomousSearchRequest`, `AutonomousSearchResponse`, and
+`AutonomousPlannerState` when your application wants to persist or exchange
+linear autonomous-planning state through a stable crate-root contract.
+
+```rust
+use sift::{AutonomousPlannerStrategy, AutonomousSearchRequest};
+
+fn main() {
+    let request = AutonomousSearchRequest::new("./docs", "find the cache invalidation path")
+        .with_planner_strategy(
+            AutonomousPlannerStrategy::model_driven().with_profile("local-planner-v1"),
+        )
+        .with_step_limit(4)
+        .with_strategy("hybrid");
+
+    assert_eq!(request.state.current_step.step_id, "step-1");
+}
+```
+
+These records are stable now so embedders can model root-task planning state,
+retained evidence, and planner selection. The execution seam that actually runs
+autonomous planning through `Sift` lands separately.
+
 ## Local Context Injection
 
 All request modes can inject synthetic context artifacts alongside filesystem
@@ -249,6 +276,6 @@ Supported now:
 
 Not shipped yet:
 
-- autonomous turn planning
+- autonomous planner execution
 - a stable crate-root config type
 - a general-purpose interactive agentic CLI command

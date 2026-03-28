@@ -6,6 +6,7 @@
 //! - [`ContextAssemblyRequest`] and [`ContextAssemblyResponse`] for bounded evidence assembly
 //! - [`SearchTurnRequest`], [`SearchTurnResponse`], and [`SearchEmissionMode`] for turn-aware search control
 //! - [`SearchControllerRequest`] and [`SearchControllerResponse`] for deterministic multi-turn control
+//! - [`AutonomousSearchRequest`] and [`AutonomousSearchResponse`] for linear autonomous-planner contracts
 //! - [`Retriever`], [`Fusion`], and [`Reranking`] for supported strategy overrides
 //! - [`SearchResponse`], [`SearchHit`], [`ContextArtifact`], and [`ScoreConfidence`] for results and artifact metadata
 //!
@@ -34,6 +35,8 @@ pub use crate::facade::{
 };
 pub use crate::search::{
     AcquisitionAdapterKind, AgentTurnInput, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
+    AutonomousPlannerState, AutonomousPlannerStepCursor, AutonomousPlannerStrategy,
+    AutonomousPlannerStrategyKind, AutonomousSearchRequest, AutonomousSearchResponse,
     ContextArtifact, ContextArtifactKind, ContextAssemblyBudget, ContextAssemblyRequest,
     ContextAssemblyResponse, CorpusLoadRequest, EnvironmentFactInput, FusionPolicy,
     LatentSearchEmission, LatentSearchHit, LocalContextSource, ProtocolSearchEmission,
