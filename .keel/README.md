@@ -68,11 +68,11 @@
 |--------|--------|
 | [Prepare 0.2.0 Release](epics/VDWyNSW9x/voyages/VDWyUguh1/) | done |
 
-### [Configurable Prompts and Optimizer](epics/VE1xUOaxK/) (active)
+### [Configurable Prompts and Optimizer](epics/VE1xUOaxK/) (done)
 
 | Voyage | Status |
 |--------|--------|
-| [Configurable Prompts](epics/VE1xUOaxK/voyages/VE1xdk4hF/) | in-progress |
+| [Configurable Prompts](epics/VE1xUOaxK/voyages/VE1xdk4hF/) | done |
 
 ### [Turn-Native Search Contract and Emissions](epics/VF1VhxmqI/) (done)
 
