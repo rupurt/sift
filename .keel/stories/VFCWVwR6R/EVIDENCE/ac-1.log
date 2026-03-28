@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:50:20.341763045-07:00
+mode: manual
+---
+The executable now maps 'sift search --agent' into AutonomousSearchRequest in src/main.rs and invokes Sift::search_autonomous instead of a CLI-only planner path.

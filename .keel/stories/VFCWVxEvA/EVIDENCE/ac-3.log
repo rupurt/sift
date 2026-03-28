@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:50:20.449556727-07:00
+mode: manual
+---
+Full repository verification passed with just check after adding the agent flag, covering search, eval, library, and the new CLI integration tests.

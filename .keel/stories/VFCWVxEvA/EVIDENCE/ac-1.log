@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:50:20.400251789-07:00
+mode: manual
+---
+tests/cli_agent_search_test.rs preserves the existing non-agent JSON search shape when --agent is absent, so direct search output stays unchanged.

@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:50:20.424489168-07:00
+mode: manual
+---
+src/main.rs routes agent mode through the same Sift::search_autonomous runtime used by the supported library surface; it does not reimplement planner execution in the CLI.

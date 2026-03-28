@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:50:20.371328646-07:00
+mode: manual
+---
+Agent-mode text and JSON rendering in src/search/adapters/cli.rs now expose planner strategy, stop reason, planner trace, and autonomous turn metadata, with integration coverage in tests/cli_agent_search_test.rs.

@@ -124,13 +124,13 @@
 |--------|--------|
 | [Define Planner State and Stop Semantics](epics/VFC7H4QFy/voyages/VFC7MN6fR/) | done |
 
-### [Autonomous Planning Evaluation and Surface](epics/VFC7H4pFw/) (active)
+### [Autonomous Planning Evaluation and Surface](epics/VFC7H4pFw/) (done)
 
 | Voyage | Status |
 |--------|--------|
 | [Benchmark Autonomous Planning Against Baselines](epics/VFC7H4pFw/voyages/VFCWBDyA2/) | done |
 | [Promote Autonomous Library Entry Point](epics/VFC7H4pFw/voyages/VFCWCm3Mc/) | done |
-| [Add Agent Search CLI Surface](epics/VFC7H4pFw/voyages/VFCWG2tZd/) | planned |
+| [Add Agent Search CLI Surface](epics/VFC7H4pFw/voyages/VFCWG2tZd/) | done |
 
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 

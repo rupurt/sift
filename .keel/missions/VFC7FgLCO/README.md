@@ -1,13 +1,14 @@
 ---
 # system-managed
 id: VFC7FgLCO
-status: active
+status: achieved
 created_at: 2026-03-28T13:05:40
-updated_at: 2026-03-28T13:09:56
+updated_at: 2026-03-28T15:50:49
 # authored
 title: Introduce Local Autonomous Planning and Decomposition
 watch: ~
 activated_at: 2026-03-28T13:09:56
+achieved_at: 2026-03-28T15:50:49
 ---
 
 # Introduce Local Autonomous Planning and Decomposition
