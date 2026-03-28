@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:30:57.542648016-07:00
+mode: manual
+---
+Implemented ModelDrivenAutonomousPlanner under the shared AutonomousPlanner contract in src/search/planner.rs and verified shared trace emission with planner tests plus just check.

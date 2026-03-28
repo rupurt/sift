@@ -1,5 +1,5 @@
 ---
-recorded_at: 2026-03-28T15:26:37.625658686-07:00
+recorded_at: 2026-03-28T15:28:44.393303602-07:00
 mode: manual
 ---
-Verified the built-in autonomous runtime can resume from explicit planner state through the same facade/controller stack using tests/library_facade_test.rs built_in_autonomous_runtime_resumes_from_explicit_planner_state plus just check; no parallel autonomous executor was introduced.
+Verified the built-in autonomous runtime honors explicit planner state by resuming from step-2/turn-2 through Sift::search_autonomous in tests/library_facade_test.rs via cargo test --test library_facade_test built_in_autonomous_runtime_resumes_from_explicit_planner_state -- --exact and just check.

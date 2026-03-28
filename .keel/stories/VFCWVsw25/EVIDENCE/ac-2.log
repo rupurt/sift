@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:31:22.610483093-07:00
+mode: manual
+---
+Autonomous traces and responses continue to record the executing planner strategy via request.planner_strategy in the shared response contract; verified in model-driven runtime tests and just check.

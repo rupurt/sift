@@ -110,13 +110,13 @@
 |--------|--------|
 | [Expose Artifact-Based Context Assembly And Emissions](epics/VF53suDXv/voyages/VF60I1J0l/) | done |
 
-### [Bounded Linear Autonomous Planner](epics/VFC7H4QFx/) (active)
+### [Bounded Linear Autonomous Planner](epics/VFC7H4QFx/) (done)
 
 | Voyage | Status |
 |--------|--------|
 | [Ship Heuristic Planner Baseline](epics/VFC7H4QFx/voyages/VFCW6PVzz/) | done |
 | [Wire Strategy-Selected Autonomous Runtime](epics/VFC7H4QFx/voyages/VFCW85Y1r/) | done |
-| [Add Model-Driven Planner Strategy](epics/VFC7H4QFx/voyages/VFCW9fu6V/) | planned |
+| [Add Model-Driven Planner Strategy](epics/VFC7H4QFx/voyages/VFCW9fu6V/) | done |
 
 ### [Planner Contract and Replay](epics/VFC7H4QFy/) (done)
 

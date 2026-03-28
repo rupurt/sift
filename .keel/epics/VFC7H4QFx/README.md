@@ -22,10 +22,10 @@ mission: VFC7FgLCO
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 2/3 voyages complete, 4/6 stories done
+**Progress:** 3/3 voyages complete, 6/6 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
 | [Ship Heuristic Planner Baseline](voyages/VFCW6PVzz/) | done | 2/2 |
 | [Wire Strategy-Selected Autonomous Runtime](voyages/VFCW85Y1r/) | done | 2/2 |
-| [Add Model-Driven Planner Strategy](voyages/VFCW9fu6V/) | planned | 0/2 |
+| [Add Model-Driven Planner Strategy](voyages/VFCW9fu6V/) | done | 2/2 |
 <!-- END GENERATED -->

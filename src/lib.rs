@@ -7,7 +7,7 @@
 //! - [`SearchTurnRequest`], [`SearchTurnResponse`], and [`SearchEmissionMode`] for turn-aware search control
 //! - [`SearchControllerRequest`] and [`SearchControllerResponse`] for deterministic multi-turn control
 //! - [`AutonomousSearchRequest`] and [`AutonomousSearchResponse`] for linear autonomous-planner contracts
-//! - [`AutonomousPlanner`], [`AutonomousPlannerTrace`], and [`HeuristicAutonomousPlanner`] for the library-first autonomous execution seam
+//! - [`AutonomousPlanner`], [`AutonomousPlannerTrace`], [`HeuristicAutonomousPlanner`], and [`ModelDrivenAutonomousPlanner`] for the library-first autonomous execution seam
 //! - [`Retriever`], [`Fusion`], and [`Reranking`] for supported strategy overrides
 //! - [`SearchResponse`], [`SearchHit`], [`ContextArtifact`], and [`ScoreConfidence`] for results and artifact metadata
 //!
@@ -42,11 +42,11 @@ pub use crate::search::{
     AutonomousSearchRequest, AutonomousSearchResponse, ContextArtifact, ContextArtifactKind,
     ContextAssemblyBudget, ContextAssemblyRequest, ContextAssemblyResponse, CorpusLoadRequest,
     EnvironmentFactInput, FusionPolicy, HeuristicAutonomousPlanner, LatentSearchEmission,
-    LatentSearchHit, LocalContextSource, ProtocolSearchEmission, QueryExpansionPolicy,
-    RerankingPolicy, RetainedArtifact, RetrieverPolicy, ScoreConfidence, SearchControllerAction,
-    SearchControllerDecision, SearchControllerRequest, SearchControllerResponse,
-    SearchControllerState, SearchEmission, SearchEmissionMode, SearchHit, SearchPlan,
-    SearchResponse, SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse,
+    LatentSearchHit, LocalContextSource, ModelDrivenAutonomousPlanner, ProtocolSearchEmission,
+    QueryExpansionPolicy, RerankingPolicy, RetainedArtifact, RetrieverPolicy, ScoreConfidence,
+    SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
+    SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode, SearchHit,
+    SearchPlan, SearchResponse, SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse,
     SearchTurnTrace, ToolOutputInput,
 };
 

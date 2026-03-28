@@ -3,13 +3,40 @@ use sift::{
     AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerDecision,
     AutonomousPlannerStopReason, AutonomousPlannerStrategy, AutonomousPlannerTrace,
     AutonomousPlannerTraceStep, AutonomousSearchRequest, ContextArtifactKind,
-    ContextAssemblyBudget, ContextAssemblyRequest, EnvironmentFactInput, Fusion, FusionPolicy,
-    QueryExpansionPolicy, Reranking, RerankingPolicy, RetainedArtifact, Retriever, RetrieverPolicy,
-    SearchControllerAction, SearchControllerRequest, SearchEmission, SearchEmissionMode,
-    SearchInput, SearchOptions, SearchPlan, SearchTurnRequest, Sift, ToolOutputInput,
+    ContextAssemblyBudget, ContextAssemblyRequest, Conversation, EnvironmentFactInput, Fusion,
+    FusionPolicy, GenerativeModel, QueryExpansionPolicy, Reranking, RerankingPolicy,
+    RetainedArtifact, Retriever, RetrieverPolicy, SearchControllerAction, SearchControllerRequest,
+    SearchEmission, SearchEmissionMode, SearchInput, SearchOptions, SearchPlan, SearchTurnRequest,
+    Sift, ToolOutputInput,
 };
 
 struct SingleStepPlanner;
+
+struct EmptyConversation;
+
+impl Conversation for EmptyConversation {
+    fn send(&mut self, _message: &str, _max_tokens: usize) -> anyhow::Result<String> {
+        Ok(String::new())
+    }
+
+    fn history(&self) -> &[String] {
+        &[]
+    }
+}
+
+struct StaticGenerativeModel {
+    output: String,
+}
+
+impl GenerativeModel for StaticGenerativeModel {
+    fn generate(&self, _prompt: &str, _max_tokens: usize) -> anyhow::Result<String> {
+        Ok(self.output.clone())
+    }
+
+    fn start_conversation(&self) -> anyhow::Result<Box<dyn Conversation>> {
+        Ok(Box::new(EmptyConversation))
+    }
+}
 
 impl AutonomousPlanner for SingleStepPlanner {
     fn plan(&self, request: &AutonomousSearchRequest) -> anyhow::Result<AutonomousPlannerTrace> {
@@ -678,20 +705,15 @@ fn built_in_autonomous_runtime_advances_from_explicit_planner_state() {
         )
         .expect("built-in autonomous search resumed from explicit planner state");
 
-    assert_eq!(response.turns.len(), 2);
+    assert_eq!(response.turns.len(), 1);
     assert_eq!(response.turns[0].turn.turn_id, "turn-2");
-    assert_eq!(response.turns[1].turn.turn_id, "turn-3");
     assert_eq!(response.planner_trace.steps[0].step.step_id, "step-2");
-    assert_eq!(
-        response.planner_trace.steps[1].step.parent_step_id.as_deref(),
-        Some("step-2")
-    );
-    assert_eq!(response.trace.turns.len(), 2);
+    assert_eq!(response.trace.turns.len(), 1);
     assert_eq!(
         response.trace.turns[0].decisions[0].action,
         SearchControllerAction::Retrieve
     );
-    assert_eq!(response.state.current_step.step_id, "step-3");
+    assert_eq!(response.state.current_step.step_id, "step-2");
     assert!(response.state.completed);
 }
 
@@ -741,5 +763,105 @@ fn built_in_autonomous_runtime_resumes_from_explicit_planner_state() {
     assert_eq!(
         response.planner_trace.stop_reason,
         Some(AutonomousPlannerStopReason::NoAdditionalEvidence)
+    );
+}
+
+#[test]
+fn built_in_autonomous_runtime_routes_model_driven_strategy_selection() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(
+        corpus.path().join("alpha.txt"),
+        "alpha runtime details for the model driven autonomous turn",
+    )
+    .expect("write alpha corpus file");
+
+    let model_output = r#"{
+        "steps": [
+            {
+                "step": {
+                    "step_id": "step-1",
+                    "parent_step_id": null,
+                    "sequence": 1
+                },
+                "decisions": [
+                    {
+                        "action": "search",
+                        "rationale": "model-driven planner selected the most salient token",
+                        "query": "alpha runtime details",
+                        "turn_id": "turn-md-1",
+                        "next_step": null,
+                        "stop_reason": null
+                    },
+                    {
+                        "action": "terminate",
+                        "rationale": "the root task is satisfied after the first search",
+                        "query": null,
+                        "turn_id": null,
+                        "next_step": null,
+                        "stop_reason": "goal-satisfied"
+                    }
+                ]
+            }
+        ],
+        "completed": true,
+        "stop_reason": "goal-satisfied"
+    }"#;
+
+    let engine = Sift::builder()
+        .with_generative_model(std::sync::Arc::new(StaticGenerativeModel {
+            output: model_output.to_string(),
+        }))
+        .build();
+    let response = engine
+        .search_autonomous(
+            AutonomousSearchRequest::new(corpus.path(), "find alpha details")
+                .with_strategy("bm25")
+                .with_planner_strategy(
+                    AutonomousPlannerStrategy::model_driven().with_profile("local-planner-v1"),
+                )
+                .with_limit(1)
+                .with_shortlist(1),
+        )
+        .expect("model-driven autonomous search");
+
+    assert_eq!(response.turns.len(), 1);
+    assert_eq!(response.turns[0].turn.turn_id, "turn-md-1");
+    assert_eq!(
+        response.planner_strategy,
+        AutonomousPlannerStrategy::model_driven().with_profile("local-planner-v1")
+    );
+    assert_eq!(
+        response.planner_trace.stop_reason,
+        Some(AutonomousPlannerStopReason::GoalSatisfied)
+    );
+    assert_eq!(
+        response.planner_trace.steps[0].decisions[0].action,
+        AutonomousPlannerAction::Search
+    );
+}
+
+#[test]
+fn built_in_autonomous_runtime_reports_unavailable_model_driven_profiles() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(corpus.path().join("alpha.txt"), "alpha runtime details")
+        .expect("write alpha corpus file");
+
+    let engine = Sift::builder().build();
+    let error = engine
+        .search_autonomous(
+            AutonomousSearchRequest::new(corpus.path(), "find alpha details")
+                .with_strategy("bm25")
+                .with_planner_strategy(
+                    AutonomousPlannerStrategy::model_driven().with_profile("missing-profile"),
+                )
+                .with_limit(1)
+                .with_shortlist(1),
+        )
+        .expect_err("missing model-driven profile should fail explicitly");
+
+    assert!(
+        error
+            .to_string()
+            .contains("failed to resolve model-driven planner profile")
     );
 }

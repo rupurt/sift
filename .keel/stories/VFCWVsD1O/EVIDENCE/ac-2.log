@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:30:57.566645384-07:00
+mode: manual
+---
+The model-driven planner remains local-first and zero-daemon: it consumes an in-process GenerativeModel via SiftBuilder::with_generative_model / Sift::generative with no network orchestration layer, verified by code review and just check.

@@ -15,13 +15,13 @@ use crate::search::{
     AutonomousPlannerStrategyKind, AutonomousPlannerTrace, AutonomousSearchRequest,
     AutonomousSearchResponse, Bm25Index, ContextAssemblyBudget, ContextAssemblyRequest,
     ContextAssemblyResponse, Embedder, FusionPolicy, HeuristicAutonomousPlanner,
-    LatentSearchEmission, LatentSearchHit, LocalFileCorpusRepository, ProtocolSearchEmission,
-    QueryEmbeddingCache, RerankingPolicy, RetrieverPolicy, SearchControllerAction,
-    SearchControllerDecision, SearchControllerRequest, SearchControllerResponse,
-    SearchControllerState, SearchEmission, SearchEmissionMode, SearchEnvironment, SearchPlan,
-    SearchRequest, SearchResponse, SearchServiceBuilder, SearchTrace, SearchTurn,
-    SearchTurnRequest, SearchTurnResponse, SearchTurnTrace, StrategyPresetRegistry,
-    load_search_corpus, run_search_with_plan,
+    LatentSearchEmission, LatentSearchHit, LocalFileCorpusRepository, ModelDrivenAutonomousPlanner,
+    ProtocolSearchEmission, QueryEmbeddingCache, RerankingPolicy, RetrieverPolicy,
+    SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
+    SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode,
+    SearchEnvironment, SearchPlan, SearchRequest, SearchResponse, SearchServiceBuilder,
+    SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse, SearchTurnTrace,
+    StrategyPresetRegistry, load_search_corpus, run_search_with_plan,
 };
 use crate::system::Telemetry;
 
@@ -83,6 +83,7 @@ pub struct SiftBuilder {
     query_cache: QueryEmbeddingCache,
     cache_dir: Option<PathBuf>,
     embedder: Option<Arc<dyn Embedder>>,
+    generative_model: Option<Arc<dyn GenerativeModel>>,
 }
 
 impl Default for SiftBuilder {
@@ -100,6 +101,7 @@ impl SiftBuilder {
             query_cache: Arc::new(RwLock::new(HashMap::new())),
             cache_dir: None,
             embedder: None,
+            generative_model: None,
         }
     }
 
@@ -138,6 +140,11 @@ impl SiftBuilder {
         self
     }
 
+    pub fn with_generative_model(mut self, generative_model: Arc<dyn GenerativeModel>) -> Self {
+        self.generative_model = Some(generative_model);
+        self
+    }
+
     pub fn build(self) -> Sift {
         Sift {
             config: self.config,
@@ -146,6 +153,7 @@ impl SiftBuilder {
             query_cache: self.query_cache,
             cache_dir: self.cache_dir,
             embedder: self.embedder,
+            generative_model: self.generative_model,
         }
     }
 }
@@ -157,6 +165,7 @@ pub struct Sift {
     query_cache: QueryEmbeddingCache,
     cache_dir: Option<PathBuf>,
     embedder: Option<Arc<dyn Embedder>>,
+    generative_model: Option<Arc<dyn GenerativeModel>>,
 }
 
 #[derive(Debug, Clone)]
@@ -592,12 +601,31 @@ impl Sift {
                 self.search_autonomous_with(request, &planner)
             }
             AutonomousPlannerStrategyKind::ModelDriven => {
-                bail!("model-driven autonomous planner is not available yet")
+                let planner_strategy = request.planner_strategy.clone();
+                let strategy = planner_strategy
+                    .profile
+                    .clone()
+                    .or_else(|| request.strategy.clone())
+                    .unwrap_or_else(|| self.config.search.strategy.clone());
+                let model = self
+                    .generative(SearchOptions::default().with_strategy(strategy.clone()))
+                    .map_err(|error| {
+                        anyhow!(
+                            "failed to resolve model-driven planner profile '{}': {error}",
+                            strategy
+                        )
+                    })?;
+                let planner = ModelDrivenAutonomousPlanner::new(model);
+                self.search_autonomous_with(request, &planner)
             }
         }
     }
 
     pub fn generative(&self, options: SearchOptions) -> Result<Arc<dyn GenerativeModel>> {
+        if let Some(model) = &self.generative_model {
+            return Ok(model.clone());
+        }
+
         let strategy = options
             .strategy
             .clone()

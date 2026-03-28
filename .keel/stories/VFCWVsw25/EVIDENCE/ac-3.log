@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:31:22.637375165-07:00
+mode: manual
+---
+Unavailable model-driven planner profiles now fail explicitly from the shared runtime selection surface without launching an unbounded run, verified by cargo test --test library_facade_test built_in_autonomous_runtime_reports_unavailable_model_driven_profiles -- --exact and just check.

@@ -32,6 +32,6 @@ pub use domain::{
     StrategyPresetRegistry, ToolOutputInput, tokenize,
 };
 pub use engine::{SearchEngine, SearchEnvironment};
-pub use planner::HeuristicAutonomousPlanner;
+pub use planner::{HeuristicAutonomousPlanner, ModelDrivenAutonomousPlanner};
 #[allow(unused_imports)]
 pub use presentation::*;

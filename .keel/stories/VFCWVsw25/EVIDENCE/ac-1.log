@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:31:22.586917747-07:00
+mode: manual
+---
+Routed heuristic and model-driven execution through the single Sift::search_autonomous surface in src/facade.rs using planner_strategy.kind/profile, verified by cargo test --test library_facade_test built_in_autonomous_runtime_routes_model_driven_strategy_selection -- --exact and just check.

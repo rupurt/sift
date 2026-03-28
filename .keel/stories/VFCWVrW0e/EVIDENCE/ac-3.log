@@ -1,5 +1,5 @@
 ---
-recorded_at: 2026-03-28T15:26:37.672321416-07:00
+recorded_at: 2026-03-28T15:28:44.432509300-07:00
 mode: manual
 ---
-The autonomous runtime still lowers planner-generated search decisions into SearchControllerRequest and reuses shared retained-evidence/pruning semantics, verified by tests/library_facade_test.rs built_in_autonomous_runtime_reuses_controller_retained_evidence_carryover and code review of src/facade.rs.
+The autonomous runtime reuses shared controller semantics instead of a forked retained-evidence stack: Sift::search_autonomous dispatches into search_autonomous_with and then search_controller, with carryover verified by tests/library_facade_test.rs built_in_autonomous_runtime_reuses_controller_retained_evidence_carryover and just check.
