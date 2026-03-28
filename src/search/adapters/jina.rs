@@ -81,6 +81,13 @@ impl JinaReranker {
         let tokenizer_path = root.join("tokenizer.json");
         let config_path = root.join("config.json");
 
+        ensure_hf_asset(&spec.model_id, &spec.revision, &config_path, "config.json")?;
+        ensure_hf_asset(
+            &spec.model_id,
+            &spec.revision,
+            &tokenizer_path,
+            "tokenizer.json",
+        )?;
         ensure_hf_asset(
             &spec.model_id,
             &spec.revision,
