@@ -86,11 +86,11 @@
 |--------|--------|
 | [Build Local Multi-Turn Loop Execution](epics/VF1Vhy2qJ/voyages/VF1Vt0iCU/) | done |
 
-### [Agentic Traceability and Evaluation](epics/VF1VhyGqK/) (active)
+### [Agentic Traceability and Evaluation](epics/VF1VhyGqK/) (done)
 
 | Voyage | Status |
 |--------|--------|
-| [Add Turn Traces and Agentic Evaluation](epics/VF1VhyGqK/voyages/VF1Vt0sCV/) | in-progress |
+| [Add Turn Traces and Agentic Evaluation](epics/VF1VhyGqK/voyages/VF1Vt0sCV/) | done |
 
 ### [Context Artifact Model And Corpus Substrate](epics/VF53stqXt/) (done)
 

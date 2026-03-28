@@ -2,14 +2,15 @@
 id: VF1VxvOU3
 title: Benchmark Agentic Search Against The Hybrid Champion
 type: feat
-status: needs-human-verification
+status: done
 created_at: 2026-03-26T17:34:50
-updated_at: 2026-03-27T17:12:51
+updated_at: 2026-03-27T17:13:46
 operator-signal: 
 scope: VF1VhyGqK/VF1Vt0sCV
 index: 2
 started_at: 2026-03-27T17:06:17
 submitted_at: 2026-03-27T17:12:51
+completed_at: 2026-03-27T17:13:46
 ---
 
 # Benchmark Agentic Search Against The Hybrid Champion
