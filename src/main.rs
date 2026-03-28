@@ -674,6 +674,7 @@ fn main() -> Result<()> {
                     &AgenticEvaluationRequest {
                         strategy,
                         baseline_strategy: None,
+                        planner_strategy: sift::AutonomousPlannerStrategy::default(),
                         command: command_line,
                         corpus_dir: corpus,
                         fixtures_path: fixtures,

@@ -325,6 +325,8 @@ pub struct AgenticFixtureSet {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AgenticTaskFixture {
     pub id: String,
+    #[serde(default)]
+    pub root_task: Option<String>,
     pub turns: Vec<AgenticTurnFixture>,
     #[serde(default)]
     pub expected_final_documents: Vec<String>,
@@ -357,6 +359,44 @@ pub struct AgenticTurnEvaluation {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AutonomousStopReasonCount {
+    pub stop_reason: crate::search::AutonomousPlannerStopReason,
+    pub tasks: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AutonomousEvaluationMetrics {
+    pub task_success_rate: f64,
+    pub average_final_recall: f64,
+    pub average_turns: f64,
+    pub average_retained_evidence_efficiency: f64,
+    pub stop_reasons: Vec<AutonomousStopReasonCount>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AutonomousTaskEvaluation {
+    pub task_id: String,
+    pub root_task: String,
+    pub success: bool,
+    pub turns_executed: usize,
+    pub latency_ms: f64,
+    pub final_documents: Vec<String>,
+    pub expected_final_documents: Vec<String>,
+    pub final_recall_at_10: f64,
+    pub retained_evidence_efficiency: f64,
+    pub stop_reason: Option<crate::search::AutonomousPlannerStopReason>,
+    pub planner_trace: crate::search::AutonomousPlannerTrace,
+    pub trace: crate::search::SearchTrace,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct AutonomousEvaluationReport {
+    pub planner_strategy: crate::search::AutonomousPlannerStrategy,
+    pub metrics: AutonomousEvaluationMetrics,
+    pub tasks: Vec<AutonomousTaskEvaluation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AgenticTaskEvaluation {
     pub task_id: String,
     pub success: bool,
@@ -375,29 +415,41 @@ pub struct AgenticComparisonMetrics {
     pub task_success_rate: f64,
     pub average_final_recall: f64,
     pub average_turns: f64,
+    pub average_retained_evidence_efficiency: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AgenticComparisonRun {
     pub strategy: String,
     pub mode: String,
+    pub planner_strategy: Option<crate::search::AutonomousPlannerStrategy>,
     pub metrics: AgenticComparisonMetrics,
     pub latency_ms: LatencyMetrics,
+    pub stop_reasons: Vec<AutonomousStopReasonCount>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AgenticTaskComparison {
     pub task_id: String,
+    pub root_task: String,
     pub collapsed_query: String,
     pub expected_final_documents: Vec<String>,
-    pub agentic_final_documents: Vec<String>,
+    pub autonomous_final_documents: Vec<String>,
+    pub planned_controller_final_documents: Vec<String>,
     pub baseline_final_documents: Vec<String>,
-    pub agentic_success: bool,
+    pub autonomous_success: bool,
+    pub planned_controller_success: bool,
     pub baseline_success: bool,
-    pub agentic_final_recall_at_10: f64,
+    pub autonomous_final_recall_at_10: f64,
+    pub planned_controller_final_recall_at_10: f64,
     pub baseline_final_recall_at_10: f64,
-    pub agentic_latency_ms: f64,
+    pub autonomous_latency_ms: f64,
+    pub planned_controller_latency_ms: f64,
     pub baseline_latency_ms: f64,
+    pub autonomous_turns: usize,
+    pub planned_controller_turns: usize,
+    pub autonomous_stop_reason: Option<crate::search::AutonomousPlannerStopReason>,
+    pub autonomous_retained_evidence_efficiency: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -405,6 +457,7 @@ pub struct AgenticComparisonDelta {
     pub task_success_rate: f64,
     pub average_final_recall: f64,
     pub average_turns: f64,
+    pub average_retained_evidence_efficiency: Option<f64>,
     pub p50_latency_ms: f64,
     pub p90_latency_ms: f64,
     pub max_latency_ms: f64,
@@ -414,9 +467,11 @@ pub struct AgenticComparisonDelta {
 pub struct AgenticComparisonReport {
     pub baseline_strategy: String,
     pub baseline_query_mode: String,
-    pub agentic: AgenticComparisonRun,
+    pub planned_controller: AgenticComparisonRun,
+    pub autonomous: AgenticComparisonRun,
     pub baseline: AgenticComparisonRun,
-    pub delta: AgenticComparisonDelta,
+    pub delta_vs_planned_controller: AgenticComparisonDelta,
+    pub delta_vs_baseline: AgenticComparisonDelta,
     pub tasks: Vec<AgenticTaskComparison>,
 }
 
@@ -425,6 +480,7 @@ pub struct AgenticEvaluationReport {
     pub metadata: EvaluationMetadata,
     pub metrics: AgenticEvaluationMetrics,
     pub tasks: Vec<AgenticTaskEvaluation>,
+    pub autonomous: AutonomousEvaluationReport,
     pub comparison: AgenticComparisonReport,
 }
 
@@ -469,6 +525,7 @@ pub struct LatencyEvaluationRequest {
 pub struct AgenticEvaluationRequest {
     pub strategy: String,
     pub baseline_strategy: Option<String>,
+    pub planner_strategy: crate::search::AutonomousPlannerStrategy,
     pub command: String,
     pub corpus_dir: PathBuf,
     pub fixtures_path: PathBuf,
@@ -808,13 +865,20 @@ pub fn run_agentic_evaluation(
     };
 
     let mut task_results = Vec::new();
-    let mut successful_tasks = 0_usize;
-    let mut total_turns = 0_usize;
-    let mut total_prune_actions = 0_usize;
+    let mut autonomous_task_results = Vec::new();
+    let mut planned_controller_successes = 0_usize;
+    let mut planned_controller_turns = 0_usize;
+    let mut planned_controller_prune_actions = 0_usize;
     let mut recall_sum = 0.0;
     let mut recall_count = 0_usize;
-    let mut final_recall_sum = 0.0;
-    let mut agentic_timings = Vec::new();
+    let mut planned_controller_final_recall_sum = 0.0;
+    let mut planned_controller_timings = Vec::new();
+    let mut autonomous_task_successes = 0_usize;
+    let mut autonomous_final_recall_sum = 0.0;
+    let mut autonomous_turns = 0_usize;
+    let mut autonomous_retained_evidence_efficiency_sum = 0.0;
+    let mut autonomous_stop_reasons = Vec::new();
+    let mut autonomous_timings = Vec::new();
     let mut baseline_task_successes = 0_usize;
     let mut baseline_final_recall_sum = 0.0;
     let mut baseline_timings = Vec::new();
@@ -840,13 +904,14 @@ pub fn run_agentic_evaluation(
             })
             .collect();
 
-        let agentic_started = Instant::now();
+        let planned_controller_started = Instant::now();
         let response = engine.search_controller(
             crate::search::SearchControllerRequest::new(plan.clone(), turns)
                 .with_session_id(task.id.clone())
                 .with_retained_artifact_limit(request.retained_artifact_limit),
         )?;
-        let agentic_latency_ms = agentic_started.elapsed().as_secs_f64() * 1000.0;
+        let planned_controller_latency_ms =
+            planned_controller_started.elapsed().as_secs_f64() * 1000.0;
         if response.turns.len() != task.turns.len() {
             bail!(
                 "agentic task '{}' executed {} turn(s), expected {}",
@@ -903,12 +968,69 @@ pub fn run_agentic_evaluation(
         let final_recall_at_10 =
             recall_against_expected(&final_documents, &task.expected_final_documents);
         if success {
-            successful_tasks += 1;
+            planned_controller_successes += 1;
         }
-        final_recall_sum += final_recall_at_10;
-        agentic_timings.push(agentic_latency_ms);
+        planned_controller_final_recall_sum += final_recall_at_10;
+        planned_controller_timings.push(planned_controller_latency_ms);
 
         let collapsed_query = collapse_agentic_task_query(task);
+        let root_task = task
+            .root_task
+            .clone()
+            .unwrap_or_else(|| collapsed_query.clone());
+        let autonomous_started = Instant::now();
+        let autonomous_response = engine.search_autonomous(
+            crate::search::AutonomousSearchRequest::new(&request.corpus_dir, root_task.clone())
+                .with_session_id(format!("{}-autonomous", task.id))
+                .with_strategy(request.strategy.clone())
+                .with_planner_strategy(request.planner_strategy.clone())
+                .with_step_limit(task.turns.len().max(1))
+                .with_limit(10)
+                .with_shortlist(request.shortlist)
+                .with_verbose(request.verbose)
+                .with_emission_mode(crate::search::SearchEmissionMode::Protocol)
+                .with_retained_artifact_limit(request.retained_artifact_limit),
+        )?;
+        let autonomous_latency_ms = autonomous_started.elapsed().as_secs_f64() * 1000.0;
+        let autonomous_final_documents: Vec<_> = autonomous_response
+            .state
+            .retained_artifacts
+            .iter()
+            .map(|evidence| search_path_to_document_id(&evidence.path))
+            .collect();
+        let autonomous_success = expected_documents_satisfied(
+            &task.expected_final_documents,
+            &autonomous_final_documents,
+        );
+        let autonomous_final_recall_at_10 =
+            recall_against_expected(&autonomous_final_documents, &task.expected_final_documents);
+        let autonomous_retained_evidence_efficiency = retained_evidence_efficiency(
+            &autonomous_final_documents,
+            &task.expected_final_documents,
+        );
+        if autonomous_success {
+            autonomous_task_successes += 1;
+        }
+        autonomous_final_recall_sum += autonomous_final_recall_at_10;
+        autonomous_turns += autonomous_response.turns.len();
+        autonomous_retained_evidence_efficiency_sum += autonomous_retained_evidence_efficiency;
+        autonomous_stop_reasons.push(autonomous_response.planner_trace.stop_reason);
+        autonomous_timings.push(autonomous_latency_ms);
+        autonomous_task_results.push(AutonomousTaskEvaluation {
+            task_id: task.id.clone(),
+            root_task: root_task.clone(),
+            success: autonomous_success,
+            turns_executed: autonomous_response.turns.len(),
+            latency_ms: autonomous_latency_ms,
+            final_documents: autonomous_final_documents.clone(),
+            expected_final_documents: task.expected_final_documents.clone(),
+            final_recall_at_10: autonomous_final_recall_at_10,
+            retained_evidence_efficiency: autonomous_retained_evidence_efficiency,
+            stop_reason: autonomous_response.planner_trace.stop_reason,
+            planner_trace: autonomous_response.planner_trace.clone(),
+            trace: autonomous_response.trace.clone(),
+        });
+
         let baseline_started = Instant::now();
         let baseline_response = engine.search_turn(
             crate::search::SearchTurnRequest::new(&request.corpus_dir, collapsed_query.clone())
@@ -932,14 +1054,14 @@ pub fn run_agentic_evaluation(
         baseline_final_recall_sum += baseline_final_recall_at_10;
         baseline_timings.push(baseline_latency_ms);
 
-        total_turns += response.turns.len();
-        total_prune_actions += task_prune_actions;
+        planned_controller_turns += response.turns.len();
+        planned_controller_prune_actions += task_prune_actions;
         task_results.push(AgenticTaskEvaluation {
             task_id: task.id.clone(),
             success,
             turns_executed: response.turns.len(),
             prune_actions: task_prune_actions,
-            latency_ms: agentic_latency_ms,
+            latency_ms: planned_controller_latency_ms,
             final_documents,
             expected_final_documents: task.expected_final_documents.clone(),
             final_recall_at_10,
@@ -948,19 +1070,28 @@ pub fn run_agentic_evaluation(
         });
         task_comparisons.push(AgenticTaskComparison {
             task_id: task.id.clone(),
+            root_task,
             collapsed_query,
             expected_final_documents: task.expected_final_documents.clone(),
-            agentic_final_documents: task_results
+            autonomous_final_documents,
+            planned_controller_final_documents: task_results
                 .last()
                 .map(|task| task.final_documents.clone())
                 .unwrap_or_default(),
             baseline_final_documents,
-            agentic_success: success,
+            autonomous_success,
+            planned_controller_success: success,
             baseline_success,
-            agentic_final_recall_at_10: final_recall_at_10,
+            autonomous_final_recall_at_10,
+            planned_controller_final_recall_at_10: final_recall_at_10,
             baseline_final_recall_at_10,
-            agentic_latency_ms,
+            autonomous_latency_ms,
+            planned_controller_latency_ms,
             baseline_latency_ms,
+            autonomous_turns: autonomous_response.turns.len(),
+            planned_controller_turns: response.turns.len(),
+            autonomous_stop_reason: autonomous_response.planner_trace.stop_reason,
+            autonomous_retained_evidence_efficiency,
         });
     }
 
@@ -981,54 +1112,86 @@ pub fn run_agentic_evaluation(
     } else {
         recall_sum / recall_count as f64
     };
-    let average_final_recall = final_recall_sum / task_count;
-    let agentic_run = AgenticComparisonRun {
+    let average_final_recall = planned_controller_final_recall_sum / task_count;
+    let autonomous_average_final_recall = autonomous_final_recall_sum / task_count;
+    let autonomous_average_retained_evidence_efficiency =
+        autonomous_retained_evidence_efficiency_sum / task_count;
+    let autonomous_stop_reasons = summarize_autonomous_stop_reasons(&autonomous_stop_reasons);
+    let planned_controller_run = AgenticComparisonRun {
         strategy: request.strategy.clone(),
         mode: "planned-controller".to_string(),
+        planner_strategy: None,
         metrics: AgenticComparisonMetrics {
-            task_success_rate: successful_tasks as f64 / task_count,
+            task_success_rate: planned_controller_successes as f64 / task_count,
             average_final_recall,
-            average_turns: total_turns as f64 / task_count,
+            average_turns: planned_controller_turns as f64 / task_count,
+            average_retained_evidence_efficiency: None,
         },
-        latency_ms: summarize_latencies(&agentic_timings),
+        latency_ms: summarize_latencies(&planned_controller_timings),
+        stop_reasons: Vec::new(),
+    };
+    let autonomous_run = AgenticComparisonRun {
+        strategy: request.strategy.clone(),
+        mode: "autonomous-planner".to_string(),
+        planner_strategy: Some(request.planner_strategy.clone()),
+        metrics: AgenticComparisonMetrics {
+            task_success_rate: autonomous_task_successes as f64 / task_count,
+            average_final_recall: autonomous_average_final_recall,
+            average_turns: autonomous_turns as f64 / task_count,
+            average_retained_evidence_efficiency: Some(
+                autonomous_average_retained_evidence_efficiency,
+            ),
+        },
+        latency_ms: summarize_latencies(&autonomous_timings),
+        stop_reasons: autonomous_stop_reasons.clone(),
     };
     let baseline_run = AgenticComparisonRun {
         strategy: baseline_strategy.clone(),
         mode: "collapsed-single-turn".to_string(),
+        planner_strategy: None,
         metrics: AgenticComparisonMetrics {
             task_success_rate: baseline_task_successes as f64 / task_count,
             average_final_recall: baseline_final_recall_sum / task_count,
             average_turns: 1.0,
+            average_retained_evidence_efficiency: None,
         },
         latency_ms: summarize_latencies(&baseline_timings),
+        stop_reasons: Vec::new(),
     };
+    let delta_vs_planned_controller =
+        build_agentic_comparison_delta(&autonomous_run, &planned_controller_run);
+    let delta_vs_baseline = build_agentic_comparison_delta(&autonomous_run, &baseline_run);
 
     Ok(AgenticEvaluationReport {
         metadata,
         metrics: AgenticEvaluationMetrics {
-            task_success_rate: agentic_run.metrics.task_success_rate,
+            task_success_rate: planned_controller_run.metrics.task_success_rate,
             average_turn_recall,
             average_final_recall,
-            average_turns: agentic_run.metrics.average_turns,
-            average_prune_actions: total_prune_actions as f64 / task_count,
+            average_turns: planned_controller_run.metrics.average_turns,
+            average_prune_actions: planned_controller_prune_actions as f64 / task_count,
         },
         tasks: task_results,
+        autonomous: AutonomousEvaluationReport {
+            planner_strategy: request.planner_strategy.clone(),
+            metrics: AutonomousEvaluationMetrics {
+                task_success_rate: autonomous_run.metrics.task_success_rate,
+                average_final_recall: autonomous_average_final_recall,
+                average_turns: autonomous_run.metrics.average_turns,
+                average_retained_evidence_efficiency:
+                    autonomous_average_retained_evidence_efficiency,
+                stop_reasons: autonomous_stop_reasons,
+            },
+            tasks: autonomous_task_results,
+        },
         comparison: AgenticComparisonReport {
             baseline_strategy,
             baseline_query_mode: "concatenate-planned-turn-queries".to_string(),
-            delta: AgenticComparisonDelta {
-                task_success_rate: agentic_run.metrics.task_success_rate
-                    - baseline_run.metrics.task_success_rate,
-                average_final_recall: agentic_run.metrics.average_final_recall
-                    - baseline_run.metrics.average_final_recall,
-                average_turns: agentic_run.metrics.average_turns
-                    - baseline_run.metrics.average_turns,
-                p50_latency_ms: agentic_run.latency_ms.p50_ms - baseline_run.latency_ms.p50_ms,
-                p90_latency_ms: agentic_run.latency_ms.p90_ms - baseline_run.latency_ms.p90_ms,
-                max_latency_ms: agentic_run.latency_ms.max_ms - baseline_run.latency_ms.max_ms,
-            },
-            agentic: agentic_run,
+            planned_controller: planned_controller_run.clone(),
+            autonomous: autonomous_run.clone(),
             baseline: baseline_run,
+            delta_vs_planned_controller,
+            delta_vs_baseline,
             tasks: task_comparisons,
         },
     })
@@ -1664,6 +1827,70 @@ fn document_ids_from_emission(emission: &crate::search::SearchEmission) -> Vec<S
             .map(|hit| search_path_to_document_id(&hit.path))
             .collect(),
     }
+}
+
+fn build_agentic_comparison_delta(
+    left: &AgenticComparisonRun,
+    right: &AgenticComparisonRun,
+) -> AgenticComparisonDelta {
+    AgenticComparisonDelta {
+        task_success_rate: left.metrics.task_success_rate - right.metrics.task_success_rate,
+        average_final_recall: left.metrics.average_final_recall
+            - right.metrics.average_final_recall,
+        average_turns: left.metrics.average_turns - right.metrics.average_turns,
+        average_retained_evidence_efficiency: match (
+            left.metrics.average_retained_evidence_efficiency,
+            right.metrics.average_retained_evidence_efficiency,
+        ) {
+            (Some(left), Some(right)) => Some(left - right),
+            (Some(left), None) => Some(left),
+            (None, Some(right)) => Some(-right),
+            (None, None) => None,
+        },
+        p50_latency_ms: left.latency_ms.p50_ms - right.latency_ms.p50_ms,
+        p90_latency_ms: left.latency_ms.p90_ms - right.latency_ms.p90_ms,
+        max_latency_ms: left.latency_ms.max_ms - right.latency_ms.max_ms,
+    }
+}
+
+fn retained_evidence_efficiency(final_documents: &[String], expected_documents: &[String]) -> f64 {
+    if final_documents.is_empty() {
+        return if expected_documents.is_empty() {
+            1.0
+        } else {
+            0.0
+        };
+    }
+
+    let expected: HashSet<_> = expected_documents.iter().map(String::as_str).collect();
+    let hits = final_documents
+        .iter()
+        .filter(|document| expected.contains(document.as_str()))
+        .count();
+
+    hits as f64 / final_documents.len() as f64
+}
+
+fn summarize_autonomous_stop_reasons(
+    reasons: &[Option<crate::search::AutonomousPlannerStopReason>],
+) -> Vec<AutonomousStopReasonCount> {
+    const ORDER: [crate::search::AutonomousPlannerStopReason; 4] = [
+        crate::search::AutonomousPlannerStopReason::GoalSatisfied,
+        crate::search::AutonomousPlannerStopReason::StepLimitReached,
+        crate::search::AutonomousPlannerStopReason::NoFurtherQueries,
+        crate::search::AutonomousPlannerStopReason::NoAdditionalEvidence,
+    ];
+
+    ORDER
+        .into_iter()
+        .filter_map(|stop_reason| {
+            let tasks = reasons
+                .iter()
+                .filter(|candidate| **candidate == Some(stop_reason))
+                .count();
+            (tasks > 0).then_some(AutonomousStopReasonCount { stop_reason, tasks })
+        })
+        .collect()
 }
 
 fn summarize_latencies(values: &[f64]) -> LatencyMetrics {

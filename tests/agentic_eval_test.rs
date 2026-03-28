@@ -19,6 +19,7 @@ fn agentic_harness_runs_planned_multi_turn_fixtures_from_repo_local_files() {
         &AgenticEvaluationRequest {
             strategy: "bm25".to_string(),
             baseline_strategy: Some("bm25".to_string()),
+            planner_strategy: sift::AutonomousPlannerStrategy::heuristic(),
             command: "cargo test --test agentic_eval_test".to_string(),
             corpus_dir: root.join("corpus"),
             fixtures_path: root.join("fixtures.json"),
@@ -33,6 +34,7 @@ fn agentic_harness_runs_planned_multi_turn_fixtures_from_repo_local_files() {
     .expect("run agentic evaluation");
 
     assert_eq!(report.tasks.len(), 2);
+    assert_eq!(report.autonomous.tasks.len(), 2);
     assert_eq!(report.metrics.task_success_rate, 1.0);
     assert_eq!(report.metrics.average_final_recall, 1.0);
     assert_eq!(report.metrics.average_turns, 2.0);
@@ -42,13 +44,52 @@ fn agentic_harness_runs_planned_multi_turn_fixtures_from_repo_local_files() {
     );
     assert_eq!(report.comparison.baseline_strategy, "bm25");
     assert_eq!(
+        report
+            .comparison
+            .planned_controller
+            .metrics
+            .task_success_rate,
+        1.0
+    );
+    assert_eq!(report.comparison.autonomous.metrics.task_success_rate, 1.0);
+    assert_eq!(report.comparison.autonomous.metrics.average_turns, 1.0);
+    assert_eq!(
+        report.comparison.autonomous.planner_strategy,
+        Some(sift::AutonomousPlannerStrategy::heuristic())
+    );
+    assert_eq!(
+        report
+            .autonomous
+            .metrics
+            .average_retained_evidence_efficiency,
+        1.0
+    );
+    assert_eq!(report.autonomous.metrics.stop_reasons.len(), 1);
+    assert_eq!(
         report.comparison.baseline_query_mode,
         "concatenate-planned-turn-queries"
     );
-    assert_eq!(report.comparison.agentic.metrics.task_success_rate, 1.0);
     assert_eq!(
         report.comparison.tasks[0].collapsed_query,
         "alpha module beta module"
+    );
+    assert_eq!(
+        report.comparison.tasks[0].root_task,
+        "beta completes final execution path"
+    );
+    assert_eq!(
+        report.comparison.tasks[0].autonomous_final_documents,
+        vec!["beta".to_string()]
+    );
+    assert_eq!(
+        report.comparison.tasks[0].planned_controller_final_documents,
+        vec!["beta".to_string()]
+    );
+    assert_eq!(report.comparison.tasks[0].autonomous_turns, 1);
+    assert_eq!(report.comparison.tasks[0].planned_controller_turns, 2);
+    assert_eq!(
+        report.comparison.tasks[0].autonomous_retained_evidence_efficiency,
+        1.0
     );
     assert_eq!(
         report.comparison.tasks[1].collapsed_query,
@@ -76,7 +117,39 @@ fn agentic_harness_runs_planned_multi_turn_fixtures_from_repo_local_files() {
         report_json["comparison"]["tasks"][0]["collapsed_query"],
         "alpha module beta module"
     );
+    assert_eq!(
+        report_json["comparison"]["tasks"][0]["root_task"],
+        "beta completes final execution path"
+    );
+    assert_eq!(
+        report_json["comparison"]["tasks"][0]["autonomous_final_documents"][0],
+        "beta"
+    );
+    assert_eq!(
+        report_json["autonomous"]["planner_strategy"]["kind"],
+        "heuristic"
+    );
+    assert_eq!(
+        report_json["autonomous"]["tasks"][0]["stop_reason"],
+        "no-further-queries"
+    );
+    assert_eq!(
+        report_json["comparison"]["autonomous"]["stop_reasons"][0]["tasks"],
+        2
+    );
+    assert_eq!(
+        report_json["autonomous"]["metrics"]["task_success_rate"],
+        1.0
+    );
     assert_eq!(report_json["comparison"]["baseline"]["strategy"], "bm25");
+    assert_eq!(
+        report_json["comparison"]["autonomous"]["mode"],
+        "autonomous-planner"
+    );
+    assert_eq!(
+        report_json["comparison"]["planned_controller"]["mode"],
+        "planned-controller"
+    );
     assert!(
         report_json["tasks"][0]["trace"]["turns"][1]["decisions"]
             .as_array()

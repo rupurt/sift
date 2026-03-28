@@ -1,15 +1,15 @@
 # Evaluation & Dataset Guide
 
 Sift includes evaluation harnesses for both the retrieval substrate and the
-current deterministic agentic controller layer.
+current agentic search runtime layers.
 
 The important split is:
 
 - **Retrieval evaluations:** Measure single-turn quality and latency for the
   underlying hybrid search plans.
-- **Agentic evaluations:** Measure fixture-driven multi-turn execution,
-  retained-evidence behavior, and comparison against a collapsed single-turn
-  baseline.
+- **Agentic evaluations:** Measure autonomous-planner runs, planned multi-turn
+  controller execution, retained-evidence behavior, and comparison against a
+  collapsed single-turn baseline.
 
 ## Concepts
 
@@ -17,8 +17,9 @@ The important split is:
 2. **Materialized corpus:** A directory of local text files derived from the
    raw dataset. This is what `sift` searches during evaluation.
 3. **Qrels:** Query relevance judgments mapping query IDs to relevant documents.
-4. **Agentic fixture:** A planned multi-turn task with ordered queries,
-   expected per-turn documents, and expected final retained evidence.
+4. **Agentic fixture:** A task fixture with a root task, planned multi-turn
+   controller queries, expected per-turn documents, and expected final retained
+   evidence.
 5. **Collapsed baseline:** A single-turn baseline query created by
    concatenating the planned turn queries for comparison with controller
    execution.
@@ -112,10 +113,12 @@ just sift eval all --dataset scifact --query-limit 10
 
 ## Agentic Evaluations
 
-`eval agentic` measures the current planned controller interface. It does not
-benchmark an autonomous planner. Instead, it runs explicit multi-turn fixtures,
-tracks retained evidence, and compares the controller run against a collapsed
-single-turn baseline.
+`eval agentic` now benchmarks the built-in autonomous planner alongside the
+existing planned controller path. For each fixture it runs:
+
+- the built-in autonomous planner from the fixture root task
+- the planned multi-turn controller path from the ordered fixture turns
+- a collapsed single-turn baseline formed by concatenating the planned queries
 
 ```bash
 just sift eval agentic \
@@ -125,7 +128,7 @@ just sift eval agentic \
 ```
 
 By default, the baseline strategy for the comparison is `hybrid`, and the
-controller retains at most one artifact unless you override
+controller/autonomous runtime retains at most one artifact unless you override
 `--retained-artifact-limit`.
 
 ```bash
@@ -145,27 +148,34 @@ The agentic report includes:
 - `average_final_recall`
 - `average_turns`
 - `average_prune_actions`
-- per-task traces and per-turn recall
-- retained final documents for the controller run
-- a comparison block against the collapsed single-turn baseline
-- latency deltas between controller execution and the baseline run
+- an `autonomous` block with planner strategy, task success/final recall, turn
+  counts, retained-evidence efficiency, and stop-reason summaries
+- per-task planned-controller traces and per-turn recall
+- retained final documents for both the planned-controller and autonomous runs
+- a comparison block covering autonomous-planner, planned-controller, and
+  collapsed-single-turn runs
+- latency, turn-count, and retained-evidence-efficiency deltas for the
+  autonomous run versus both baselines
 
 Each task comparison records:
 
+- the autonomous root task
 - the collapsed baseline query
 - expected final documents
-- controller final documents
+- autonomous final documents
+- planned-controller final documents
 - baseline final documents
-- success/failure for both runs
-- final recall for both runs
-- per-task latency for both runs
+- success/failure for all three runs
+- final recall for all three runs
+- per-task latency for all three runs
+- autonomous stop reason
+- autonomous retained-evidence efficiency
 
 ### What `eval agentic` Does Not Measure Yet
 
 The current agentic harness is useful, but it is intentionally narrow. It does
 not yet measure:
 
-- autonomous query decomposition quality
 - grounded answer synthesis quality or faithfulness
 - evidence-retention precision beyond recall/success style metrics
 - end-user answer usefulness after retrieval

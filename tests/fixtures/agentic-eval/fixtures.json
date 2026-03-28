@@ -2,6 +2,7 @@
   "tasks": [
     {
       "id": "alpha-beta-handoff",
+      "root_task": "beta completes final execution path",
       "turns": [
         {
           "query": "alpha module",
@@ -16,6 +17,7 @@
     },
     {
       "id": "policy-audit-escalation",
+      "root_task": "audit trail final approved change set",
       "turns": [
         {
           "query": "policy layer",
