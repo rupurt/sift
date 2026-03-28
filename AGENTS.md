@@ -11,8 +11,17 @@ This repository uses Keel as its project management engine. Your primary respons
 2. **Heartbeat Hygiene**: Monitor the system's pulse via `just keel heartbeat` and `just keel health --scene`. The pacemaker is derived from repository activity; uncommitted energy in the worktree is tactical debt that should be closed autonomously by landing the sealing commit.
 3. **Notification Discipline**: Ping the human operator ONLY when you need input on design direction or how the application behaves. Resolve technical drift and tactical moves autonomously.
 
+### Canonical Turn Loop
+Keel's operator rhythm is the `Orient -> Inspect -> Pull -> Ship -> Close` loop surfaced by `just keel turn`.
+
+- **Orient**: Inspect charge and board stability with `just keel heartbeat`, `just keel health --scene`, `just keel flow --scene`, and `just keel doctor`.
+- **Inspect**: Read current demand with `just keel mission next --status`, `just keel pulse`, `just keel roles`, and `just keel next --role <role> --explain` when routing is unclear.
+- **Pull**: Select one role-scoped slice with `just keel next --role <role>`.
+- **Ship**: Execute the slice, record proof, and advance lifecycle state.
+- **Close**: Land the relevant transition and the sealing commit that clears open-loop energy.
+
 ### Session Start & Human Interaction
-When a human user opens the chat or "pokes" you (for example, "Wake up" or "I'm poking you"), you MUST immediately energize the system and orient yourself by following the **Human Interaction & Pokes** workflow in [INSTRUCTIONS.md](INSTRUCTIONS.md):
+When a human user opens the chat or "pokes" you (e.g., "Wake up", "I'm poking you"), you MUST immediately perform the `Orient` and `Inspect` halves of the turn loop by following the **Human Interaction & Pokes** workflow in [INSTRUCTIONS.md](INSTRUCTIONS.md):
 1. **Heartbeat**: Run `just keel heartbeat` to inspect current charge and whether the worktree is carrying uncommitted energy.
 2. **Pulse**: Run `just keel health --scene` to check subsystem stability.
 3. **Scan**: Run `just keel mission next --status` and `just keel pulse`.
@@ -121,7 +130,7 @@ Run `keel --help` for the full command tree. Common commands:
 | Discovery | `keel bearing new <name>` `keel bearing research <id>` `keel bearing assess <id>` `keel bearing list` |
 | Planning | `keel epic new "<title>" --problem "<problem>"` `keel voyage new "<title>" --epic <epic-id> --goal "<goal>"` |
 | Execution | `keel story new "<title>" [--type <type>] [--epic <epic-id> [--voyage <voyage-id>]]` |
-| Board Ops | `keel mission next [<id>]` `keel next --role manager` `keel next --role operator` `keel flow --scene` `keel doctor` `keel health --scene` `keel generate` `keel config show` `keel mission show <id>` |
+| Board Ops | `keel turn` `keel mission next [<id>]` `keel next --role manager` `keel next --role operator` `keel next --role <role> --explain` `keel roles` `keel flow --scene` `keel doctor` `keel health --scene` `keel generate` `keel config show` `keel mission show <id>` `keel mission attach <mission-id> --epic <epic-id>` |
 | Verification | `keel verify run <id>` `keel verify detect` `keel verify recommend` |
 | Pulse | `keel heartbeat` `keel pulse` `keel poke "<summary>"` |
 
@@ -143,4 +152,5 @@ Use CLI commands only. Do not move `.keel` files manually.
 | Bearing assess | `keel bearing assess <id>` |
 | Bearing lay | `keel bearing lay <id>` |
 | Mission activate | `keel mission activate <id>` |
+| Mission attach | `keel mission attach <mission-id> --epic <epic-id> \| --bearing <bearing-id> \| --adr <adr-id>` |
 | Mission achieve | `keel mission achieve <id>` |

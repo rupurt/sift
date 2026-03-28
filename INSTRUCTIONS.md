@@ -2,20 +2,20 @@
 
 Procedural instructions and workflow guidance for agents and operators working with the Sift repository.
 
-## The Tactical Loop
+## The Turn Loop
 
-Sift uses Keel as its project management engine. Your job is to perform tactical moves that push work through the state machine while eliminating drift.
+Sift uses Keel as its project management engine. Your job is to move the board through the canonical `Orient -> Inspect -> Pull -> Ship -> Close` loop while eliminating drift.
 
-Every session follows this deterministic cycle:
+`just keel turn` is the canonical reference surface for this rhythm. Every session follows this deterministic cycle:
 
-1. **Mission Orientation**: Start by running `just keel mission next --status`. This gives you the top high-signal moves required by the engine. Check `just keel flow --scene` to visualize whether the workflow is autonomous or blocked waiting for human input.
-2. **Role Selection**: Identify whether you are acting as a `manager` (planning and decisions) or an `operator` (implementation). Do not drift across these roles in a single atomic change.
-3. **Execute Move**: Perform exactly one move, such as planning a voyage, implementing a story, or fixing a diagnostic.
-4. **Seal Move**: Close the loop with `story submit`, `voyage plan`, or `bearing lay`. This mutates the `.keel` state and may leave temporary worktree energy that should be cleared by the sealing commit.
-5. **Log & Commit**:
+1. **Orient**: Run `just keel heartbeat`, `just keel health --scene`, `just keel flow --scene`, and `just keel doctor`. This tells you whether the board is energized, healthy, and structurally coherent.
+2. **Inspect**: Run `just keel mission next --status` and `just keel pulse`. If routing is unclear, inspect `just keel roles` or `just keel next --role <role> --explain`.
+3. **Pull**: Choose the correct lane and role (`manager`, `operator`, or a configured role family) and pull exactly one slice of work with `just keel next --role <role>`.
+4. **Ship**: Execute the move, record proof while the work is fresh, and land the relevant lifecycle transition (`story submit`, `voyage plan`, `bearing lay`, etc.).
+5. **Close**:
    - Record your move in the mission `LOG.md`.
    - **Heartbeat Check**: Use `just keel heartbeat` if you need to inspect the current activity source or confirm the circuit is still energized before the commit boundary.
-   - **Commit**: Execute `git commit`. The installed hook stack can run repo-local checks and append `doctor --status` to the commit message. Resolve any issues if the commit is rejected.
+   - **Commit**: Execute `git commit`. The installed hooks can run repo-local checks and append `doctor --status` to the commit message. Resolve any issues if the commit is rejected.
 6. **Re-orient**: After the commit lands, run `just keel doctor --status` and `just keel flow --scene` to see what the board needs next.
 
 This is the plug-the-chord-back-in moment: reconnect to the board's current state. If the delivery lane has ready work, start the next loop immediately. Only stop to ask the human when you reach a manual lane, such as design direction, bearing assessment, or human verification.
@@ -24,14 +24,14 @@ This is the plug-the-chord-back-in moment: reconnect to the board's current stat
 
 ### Operator (Implementation)
 Focus on evidence-backed delivery.
-- **Context**: `keel story show <id>` and `keel voyage show <id>`.
+- **Context**: `keel story show <id>`, `keel voyage show <id>`, and `keel next --role operator`.
 - **Action**: Implement requirements, record proofs with `keel story record`, and `submit`.
 - **Constraint**: Every acceptance criterion must have a proof.
 
 ### Manager (Planning)
 Focus on strategic alignment and unblocking.
-- **Context**: `keel epic show <id>` and `keel flow --scene`.
-- **Action**: Author `PRD.md`, `SRS.md`, `SDD.md`, and decompose stories.
+- **Context**: `keel epic show <id>`, `keel roles`, `keel next --role manager --explain`, and `keel flow --scene`.
+- **Action**: Author `PRD.md`, `SRS.md`, `SDD.md`, decompose stories, and attach mission children explicitly with `keel mission attach <mission-id> --epic <epic-id>`, `--bearing <bearing-id>`, or `--adr <adr-id>`.
 - **Constraint**: Move voyages from `draft` to `planned` only when requirements are coherent.
 
 ### Explorer (Research)
@@ -45,13 +45,13 @@ Focus on technical discovery and fog reduction.
 Keel's autonomous flow is governed by a physical battery metaphor, but the charge is derived from real repository activity rather than a synthetic wake file.
 
 If a human user pokes you, for example "I'm poking you" or "Wake up", you MUST:
-1. **Inspect the Charge**: Immediately execute `just keel heartbeat` to see whether recent repository activity is still energizing the board and whether the worktree is carrying uncommitted energy.
-2. **Autonomous Scan**: Run `just keel mission next --status` and `just keel pulse` to identify new work that has become ready or materialized.
-3. **Visual Confirmation**: Run `just keel flow --scene` to verify whether the light is ON or whether the board is idle waiting for a real move.
+1. **Orient**: Execute `just keel heartbeat`, `just keel health --scene`, `just keel flow --scene`, and `just keel doctor`.
+2. **Inspect**: Run `just keel mission next --status` and `just keel pulse` to identify any new work that has become ready or materialized.
+3. **Route if Needed**: Use `just keel roles` or `just keel next --role <role> --explain` when lane selection or queue behavior needs clarification.
 
 ## Autonomous Backlog Discharge
 
-As long as the system is AUTONOMOUS and the circuit is healthy, you are responsible for discharging the delivery backlog.
+As long as the system is AUTONOMOUS and the circuit is healthy, you are responsible for discharging the delivery backlog during the `Pull` and `Ship` phases of the turn loop.
 
 1. **Identify Ready Work**: Scan the delivery lane for stories in `backlog` that are not blocked by dependencies.
 2. **Autonomous Start**: For each ready story, execute `keel story start <id>`.
@@ -75,10 +75,10 @@ Apply these checks to every change before finalizing work:
    - **CIRCULATORY**: Workflow (graph integrity and topology)
    - **PACEMAKER**: Heartbeat (derived repository activity and open-loop warning state)
    - **KINETIC**: Delivery (backlog liquidity and execution capacity)
-3. **Pacemaker Protocol**: The system's heartbeat is derived from Git and worktree activity and inspected with `keel heartbeat`. A clean repo falls back to the latest commit, while a dirty repo uses the freshest changed path it can observe. `doctor` warns when the worktree carries uncommitted energy, and the sealing commit is what clears that warning. The installed hooks can keep quality checks and `doctor --status` metadata tied to the commit boundary.
+3. **Pacemaker Protocol**: The system's heartbeat is derived from Git and worktree activity and inspected with `keel heartbeat`. A clean repo falls back to the latest commit, while a dirty repo uses the freshest changed path it can observe. `doctor` warns when the worktree carries uncommitted energy, and the sealing commit is what clears that warning. The installed hooks keep repo-local checks and `doctor --status` metadata tied to the commit boundary.
 4. **Gardening First**: Tend to the garden before notifying the human operator or requesting input.
 5. **Notification Threshold**: Only request human intervention when you reach a manual lane that requires design direction or a decision on application behavior, such as assessing a bearing, planning a voyage, or human verification of a complex story.
-6. **Automated Guardrails**: You do not need to run `just check` or `just test` manually before every commit. The installed hook stack via `just keel hooks install` can enforce repo-local checks and append doctor metadata. If a commit fails, resolve the reported issues and try again.
+6. **Automated Guardrails**: You do not need to run `just check` manually before every commit. The installed hook stack via `just keel hooks install` can enforce repo-local checks and append doctor metadata. If a commit fails, resolve the reported issues and try again.
 7. **Lifecycle Before Commit**: Run board-mutating lifecycle commands before the atomic commit when they generate or rewrite `.keel` artifacts, for example `story submit`, `voyage plan`, `voyage done`, `bearing assess`, or `bearing lay`. After the transition, inspect `git status` and include the resulting `.keel` churn in the same commit.
 8. **Atomic Commits**: Commit once per logical unit of work. Use [Conventional Commits](https://www.conventionalcommits.org/):
    - `feat:` for new features
@@ -138,10 +138,12 @@ Run `keel --help` for the full command tree. The core commands you should rely o
 
 | Category | Commands |
 |----------|----------|
+| Orientation | `keel turn` `keel heartbeat` `keel health --scene` `keel flow --scene` `keel doctor` |
+| Inspection | `keel mission next [<id>]` `keel pulse` `keel roles` `keel next --role manager --explain` `keel next --role operator --explain` |
 | Discovery | `keel bearing new <name>` `keel bearing research <id>` `keel bearing assess <id>` `keel bearing list` |
 | Planning | `keel epic new "<title>" --problem "<problem>"` `keel voyage new "<title>" --epic <epic-id> --goal "<goal>"` |
 | Execution | `keel story new "<title>" [--type <type>] [--epic <epic-id> [--voyage <voyage-id>]]` |
-| Board Ops | `keel mission next [<id>]` `keel next --role manager` `keel next --role operator` `keel flow --scene` `keel doctor` `keel health --scene` `keel generate` `keel config show` `keel mission show <id>` |
+| Board Ops | `keel next --role manager` `keel next --role operator` `keel generate` `keel config show` `keel mission show <id>` `keel mission attach <mission-id> --epic <epic-id>` `keel mission attach <mission-id> --bearing <bearing-id>` `keel mission attach <mission-id> --adr <adr-id>` |
 | Verification | `keel verify run <id>` `keel verify detect` `keel verify recommend` |
 | Pulse | `keel heartbeat` `keel pulse` `keel poke "<summary>"` |
 
@@ -163,4 +165,5 @@ Use CLI commands only. Do not move `.keel` files manually.
 | Bearing assess | `keel bearing assess <id>` |
 | Bearing lay | `keel bearing lay <id>` |
 | Mission activate | `keel mission activate <id>` |
+| Mission attach | `keel mission attach <mission-id> --epic <epic-id> \| --bearing <bearing-id> \| --adr <adr-id>` |
 | Mission achieve | `keel mission achieve <id>` |

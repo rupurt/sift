@@ -1,6 +1,9 @@
 generate:
     keel generate
 
+turn *args:
+    keel turn {{args}}
+
 heartbeat:
     keel heartbeat
 
@@ -13,8 +16,8 @@ doctor *args:
 pulse:
     keel pulse
 
-mission next *args:
-    keel mission next {{args}}
+roles *args:
+    keel roles {{args}}
 
 flow *args:
     keel flow {{args}}
@@ -22,8 +25,26 @@ flow *args:
 hooks install:
     keel hooks install
 
-next:
-    keel next --agent
+next *args:
+    keel next {{args}}
 
-verify story:
-    keel verify run {{story}}
+mission *args:
+    keel mission {{args}}
+
+story *args:
+    keel story {{args}}
+
+voyage *args:
+    keel voyage {{args}}
+
+bearing *args:
+    keel bearing {{args}}
+
+epic *args:
+    keel epic {{args}}
+
+config *args:
+    keel config {{args}}
+
+verify *args:
+    keel verify {{args}}
