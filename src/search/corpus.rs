@@ -6,7 +6,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result, bail};
 use walkdir::WalkDir;
 
-use crate::cache::{Manifest, get_file_heuristics, hash_file, load_blob, save_blob};
+use crate::cache::{
+    Manifest, get_file_heuristics, hash_file, load_blob, resolve_compatible_cache_path, save_blob,
+};
 
 use super::domain::{
     AcquisitionAdapterKind, AgentTurnInput, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
@@ -37,17 +39,18 @@ pub fn load_search_corpus(
     local_context: &[LocalContextSource],
     cache_base: Option<&Path>,
 ) -> Result<LoadedCorpus> {
+    let root = resolve_compatible_cache_path(root);
     if !root.exists() {
         bail!("search path '{}' does not exist", root.display());
     }
 
-    let file_paths = collect_file_paths(root, ignore);
+    let file_paths = collect_file_paths(&root, ignore);
     let total_sources = file_paths.len() + local_context.len();
     telemetry
         .total_files
         .store(total_sources, Ordering::Relaxed);
 
-    let cache_paths = cache_base.map(|base| CachePaths::for_root(base, root));
+    let cache_paths = cache_base.map(|base| CachePaths::for_root(base, &root));
     let mut manifest = if let Some(paths) = &cache_paths {
         Manifest::load(&paths.manifest_path)?
     } else {
@@ -57,7 +60,7 @@ pub fn load_search_corpus(
     let mut artifacts = Vec::new();
 
     for path in file_paths {
-        match load_file_artifact(root, &path, &mut manifest, cache_paths.as_ref(), telemetry) {
+        match load_file_artifact(&root, &path, &mut manifest, cache_paths.as_ref(), telemetry) {
             Ok(Some(artifact)) => {
                 telemetry
                     .total_segments

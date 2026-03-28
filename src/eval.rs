@@ -9,6 +9,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use flate2::read::GzDecoder;
 use serde::{Deserialize, Serialize};
 
+use crate::cache::resolve_compatible_cache_path;
 use crate::config::Ignore;
 use crate::dense::{DenseModelSpec, DenseReranker};
 use crate::search::{LoadedCorpus, SearchEngine, SearchRequest, load_search_corpus};
@@ -69,6 +70,7 @@ pub fn materialize_scifact_dir(
     source_dir: &Path,
     out_dir: &Path,
 ) -> Result<MaterializationSummary> {
+    let source_dir = resolve_compatible_cache_path(source_dir);
     fs::create_dir_all(out_dir)
         .with_context(|| format!("create materialized dir {}", out_dir.display()))?;
     fs::create_dir_all(out_dir.join("qrels")).with_context(|| {
@@ -184,7 +186,8 @@ fn read_jsonl_gz<T>(path: &Path) -> Result<Vec<T>>
 where
     T: for<'de> Deserialize<'de>,
 {
-    let file = fs::File::open(path).with_context(|| format!("open archive {}", path.display()))?;
+    let path = resolve_compatible_cache_path(path);
+    let file = fs::File::open(&path).with_context(|| format!("open archive {}", path.display()))?;
     let decoder = GzDecoder::new(file);
     let reader = BufReader::new(decoder);
     let mut rows = Vec::new();
@@ -203,7 +206,8 @@ where
 }
 
 fn read_qrels(path: &Path) -> Result<Vec<QrelRow>> {
-    let file = fs::File::open(path).with_context(|| format!("open qrels {}", path.display()))?;
+    let path = resolve_compatible_cache_path(path);
+    let file = fs::File::open(&path).with_context(|| format!("open qrels {}", path.display()))?;
     let reader = BufReader::new(file);
     let mut rows = Vec::new();
 
@@ -1517,7 +1521,8 @@ fn over_target_ms(value: f64) -> f64 {
 }
 
 fn load_queries(path: &Path) -> Result<HashMap<String, String>> {
-    let contents = fs::read_to_string(path)
+    let path = resolve_compatible_cache_path(path);
+    let contents = fs::read_to_string(&path)
         .with_context(|| format!("failed to read queries file {}", path.display()))?;
     let mut queries = HashMap::new();
 
@@ -1546,7 +1551,8 @@ fn load_queries(path: &Path) -> Result<HashMap<String, String>> {
 }
 
 fn load_qrels(path: &Path) -> Result<HashMap<String, HashMap<String, u32>>> {
-    let contents = fs::read_to_string(path)
+    let path = resolve_compatible_cache_path(path);
+    let contents = fs::read_to_string(&path)
         .with_context(|| format!("failed to read qrels file {}", path.display()))?;
     let mut qrels = HashMap::new();
 

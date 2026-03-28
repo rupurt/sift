@@ -192,7 +192,7 @@ surface.
 
 | Variable | Description |
 |----------|-------------|
-| `SIFT_CACHE` | Root directory for all Sift state. |
+| `SIFT_CACHE` | Root directory for all Sift state. Defaults to `XDG_CACHE_HOME/sift` or `$HOME/.cache/sift` on Unix, and the platform cache dir elsewhere. |
 | `SIFT_BLOBS_CACHE` | Override for the blob store. |
 | `SIFT_MANIFESTS_CACHE` | Override for project manifests. |
 | `SIFT_MODELS_CACHE` | Override for downloaded models. |

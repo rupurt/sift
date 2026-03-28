@@ -63,7 +63,7 @@ The executable currently exposes the following command groups:
 | `sift eval quality` | Emit a JSON quality report for one strategy, optionally against a baseline. |
 | `sift eval latency` | Emit a JSON latency report for one strategy. |
 | `sift eval agentic` | Run planned multi-turn controller fixtures and compare them against a collapsed single-turn baseline. |
-| `sift dataset download|materialize` | Manage evaluation datasets such as SciFact. |
+| `sift dataset download` / `sift dataset materialize` | Manage evaluation datasets such as SciFact. |
 | `sift optimize` | Tune prompt templates used by generative expansion. |
 | `sift config` | Print the merged effective configuration. |
 
