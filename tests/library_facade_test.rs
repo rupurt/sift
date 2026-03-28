@@ -1,12 +1,12 @@
 use sift::{
-    AcquisitionAdapterKind, AgentTurnInput, AutonomousPlanner, AutonomousPlannerAction,
-    AutonomousPlannerDecision, AutonomousPlannerStopReason, AutonomousPlannerStrategy,
-    AutonomousPlannerTrace, AutonomousPlannerTraceStep, AutonomousSearchRequest,
-    ContextArtifactKind, ContextAssemblyBudget, ContextAssemblyRequest, EnvironmentFactInput,
-    Fusion, FusionPolicy, QueryExpansionPolicy, Reranking, RerankingPolicy, Retriever,
-    RetrieverPolicy, SearchControllerAction, SearchControllerRequest, SearchEmission,
-    SearchEmissionMode, SearchInput, SearchOptions, SearchPlan, SearchTurnRequest, Sift,
-    ToolOutputInput,
+    AcquisitionAdapterKind, AgentTurnInput, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
+    AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerDecision,
+    AutonomousPlannerStopReason, AutonomousPlannerStrategy, AutonomousPlannerTrace,
+    AutonomousPlannerTraceStep, AutonomousSearchRequest, ContextArtifactKind,
+    ContextAssemblyBudget, ContextAssemblyRequest, EnvironmentFactInput, Fusion, FusionPolicy,
+    QueryExpansionPolicy, Reranking, RerankingPolicy, RetainedArtifact, Retriever, RetrieverPolicy,
+    SearchControllerAction, SearchControllerRequest, SearchEmission, SearchEmissionMode,
+    SearchInput, SearchOptions, SearchPlan, SearchTurnRequest, Sift, ToolOutputInput,
 };
 
 struct SingleStepPlanner;
@@ -43,6 +43,31 @@ fn custom_lexical_plan(name: &str) -> SearchPlan {
         fusion: FusionPolicy::Rrf,
         reranking: RerankingPolicy::None,
     }
+}
+
+fn retained_artifact(
+    artifact_id: &str,
+    path: &str,
+    snippet: &str,
+    rationale: &str,
+) -> RetainedArtifact {
+    RetainedArtifact::new(
+        artifact_id,
+        ContextArtifactKind::File,
+        path,
+        ArtifactProvenance {
+            adapter: AcquisitionAdapterKind::FileSystem,
+            source: "test".to_string(),
+            synthetic: false,
+        },
+        ArtifactFreshness {
+            observed_unix_secs: 1,
+            modified_unix_secs: Some(1),
+        },
+        ArtifactBudget::from_text(snippet, 1),
+    )
+    .with_snippet(snippet)
+    .with_rationale(rationale)
 }
 
 #[test]
@@ -517,5 +542,204 @@ fn embedded_facade_lowers_autonomous_planner_trace_into_controller_runtime() {
     assert_eq!(
         response.planner_trace.stop_reason,
         Some(AutonomousPlannerStopReason::GoalSatisfied)
+    );
+}
+
+#[test]
+fn embedded_facade_executes_built_in_heuristic_autonomous_runtime() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(
+        corpus.path().join("alpha.txt"),
+        "alpha runtime details for the built in autonomous facade",
+    )
+    .expect("write alpha corpus file");
+
+    let engine = Sift::builder().build();
+    let response = engine
+        .search_autonomous(
+            AutonomousSearchRequest::new(corpus.path(), "find alpha runtime details")
+                .with_strategy("bm25")
+                .with_limit(1)
+                .with_shortlist(1),
+        )
+        .expect("built-in autonomous search");
+
+    assert_eq!(response.turns.len(), 1);
+    assert_eq!(response.turns[0].turn.turn_id, "turn-1");
+    assert_eq!(response.turns[0].turn.strategy, "bm25");
+    assert_eq!(
+        response.planner_trace.steps[0].decisions[0].action,
+        AutonomousPlannerAction::Search
+    );
+    assert_eq!(
+        response.planner_trace.steps[0]
+            .decisions
+            .last()
+            .expect("terminal planner decision")
+            .action,
+        AutonomousPlannerAction::Terminate
+    );
+    assert!(response.state.completed);
+}
+
+#[test]
+fn built_in_autonomous_runtime_reuses_controller_retained_evidence_carryover() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(
+        corpus.path().join("alpha.txt"),
+        "alpha runtime details for the first autonomous turn",
+    )
+    .expect("write alpha corpus file");
+    std::fs::write(
+        corpus.path().join("beta.txt"),
+        "beta evidence carryover details for the second autonomous turn",
+    )
+    .expect("write beta corpus file");
+
+    let engine = Sift::builder().build();
+    let response = engine
+        .search_autonomous(
+            AutonomousSearchRequest::new(corpus.path(), "alpha runtime")
+                .with_strategy("bm25")
+                .with_limit(1)
+                .with_shortlist(1)
+                .with_retained_artifact_limit(1)
+                .with_state(
+                    sift::AutonomousPlannerState::new(2).with_retained_artifacts(vec![
+                        retained_artifact(
+                            "seed-evidence",
+                            "context/seed.txt",
+                            "beta evidence carryover",
+                            "carry beta into the next autonomous step",
+                        ),
+                    ]),
+                ),
+        )
+        .expect("built-in autonomous search with retained evidence");
+
+    assert_eq!(response.turns.len(), 2);
+    assert_eq!(
+        response.planner_trace.steps[1].decisions[0]
+            .query
+            .as_deref(),
+        Some("beta evidence carryover context seed")
+    );
+    assert_eq!(response.trace.turns.len(), 2);
+    assert_eq!(response.state.retained_artifacts.len(), 1);
+    assert!(
+        response.state.retained_artifacts[0]
+            .path
+            .ends_with("beta.txt"),
+        "the shared controller budget should carry forward fresh evidence from the later turn"
+    );
+    assert!(
+        response.trace.turns[1]
+            .decisions
+            .iter()
+            .any(|decision| decision.action == SearchControllerAction::Prune),
+        "the second turn should reuse shared controller retention semantics under the limit"
+    );
+}
+
+#[test]
+fn built_in_autonomous_runtime_advances_from_explicit_planner_state() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(
+        corpus.path().join("alpha.txt"),
+        "alpha runtime details for the resumed autonomous turn",
+    )
+    .expect("write alpha corpus file");
+    std::fs::write(
+        corpus.path().join("beta.txt"),
+        "beta evidence carryover details for the resumed autonomous follow-up",
+    )
+    .expect("write beta corpus file");
+
+    let engine = Sift::builder().build();
+    let response = engine
+        .search_autonomous(
+            AutonomousSearchRequest::new(corpus.path(), "alpha runtime")
+                .with_strategy("bm25")
+                .with_limit(1)
+                .with_shortlist(1)
+                .with_state(
+                    sift::AutonomousPlannerState::new(3)
+                        .with_current_step(
+                            sift::AutonomousPlannerStepCursor::new("step-2", 2)
+                                .with_parent_step_id("step-1"),
+                        )
+                        .with_retained_artifacts(vec![retained_artifact(
+                            "resume-evidence",
+                            "context/seed.txt",
+                            "beta evidence carryover",
+                            "advance from explicit planner state",
+                        )]),
+                ),
+        )
+        .expect("built-in autonomous search resumed from explicit planner state");
+
+    assert_eq!(response.turns.len(), 2);
+    assert_eq!(response.turns[0].turn.turn_id, "turn-2");
+    assert_eq!(response.turns[1].turn.turn_id, "turn-3");
+    assert_eq!(response.planner_trace.steps[0].step.step_id, "step-2");
+    assert_eq!(
+        response.planner_trace.steps[1].step.parent_step_id.as_deref(),
+        Some("step-2")
+    );
+    assert_eq!(response.trace.turns.len(), 2);
+    assert_eq!(
+        response.trace.turns[0].decisions[0].action,
+        SearchControllerAction::Retrieve
+    );
+    assert_eq!(response.state.current_step.step_id, "step-3");
+    assert!(response.state.completed);
+}
+
+#[test]
+fn built_in_autonomous_runtime_resumes_from_explicit_planner_state() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(
+        corpus.path().join("beta.txt"),
+        "retry loop adapter layer context seed beta runtime details",
+    )
+    .expect("write beta corpus file");
+
+    let engine = Sift::builder().build();
+    let response = engine
+        .search_autonomous(
+            AutonomousSearchRequest::new(corpus.path(), "find alpha details")
+                .with_strategy("bm25")
+                .with_limit(1)
+                .with_shortlist(1)
+                .with_state(
+                    sift::AutonomousPlannerState::new(3)
+                        .with_current_step(
+                            sift::AutonomousPlannerStepCursor::new("step-2", 2)
+                                .with_parent_step_id("step-1"),
+                        )
+                        .with_retained_artifacts(vec![retained_artifact(
+                            "seed-evidence",
+                            "context/seed.txt",
+                            "retry loop adapter layer",
+                            "resume from retained evidence",
+                        )]),
+                ),
+        )
+        .expect("resumed built-in autonomous search");
+
+    assert_eq!(response.turns.len(), 1);
+    assert_eq!(response.turns[0].turn.turn_id, "turn-2");
+    assert_eq!(response.planner_trace.steps.len(), 1);
+    assert_eq!(response.planner_trace.steps[0].step.step_id, "step-2");
+    assert_eq!(response.planner_trace.steps[0].step.sequence, 2);
+    assert_eq!(
+        response.planner_trace.steps[0].decisions[0]
+            .query
+            .as_deref(),
+        Some("retry loop adapter layer context seed")
+    );
+    assert_eq!(
+        response.planner_trace.stop_reason,
+        Some(AutonomousPlannerStopReason::NoAdditionalEvidence)
     );
 }

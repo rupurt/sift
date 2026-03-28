@@ -115,7 +115,7 @@
 | Voyage | Status |
 |--------|--------|
 | [Ship Heuristic Planner Baseline](epics/VFC7H4QFx/voyages/VFCW6PVzz/) | done |
-| [Wire Strategy-Selected Autonomous Runtime](epics/VFC7H4QFx/voyages/VFCW85Y1r/) | planned |
+| [Wire Strategy-Selected Autonomous Runtime](epics/VFC7H4QFx/voyages/VFCW85Y1r/) | done |
 | [Add Model-Driven Planner Strategy](epics/VFC7H4QFx/voyages/VFCW9fu6V/) | planned |
 
 ### [Planner Contract and Replay](epics/VFC7H4QFy/) (done)

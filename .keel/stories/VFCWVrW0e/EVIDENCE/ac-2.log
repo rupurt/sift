@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:26:37.647542604-07:00
+mode: manual
+---
+Confirmed non-autonomous paths remain intact: search_turn and search_controller continue to pass through tests/library_facade_test.rs and the broader repo regression suite under just check after adding search_autonomous.

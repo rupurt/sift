@@ -12,8 +12,9 @@ pub use crate::search::domain::{Conversation, GenerativeModel};
 use crate::search::engine::SearchEngine;
 use crate::search::{
     AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerStopReason,
-    AutonomousPlannerTrace, AutonomousSearchRequest, AutonomousSearchResponse, Bm25Index,
-    ContextAssemblyBudget, ContextAssemblyRequest, ContextAssemblyResponse, Embedder, FusionPolicy,
+    AutonomousPlannerStrategyKind, AutonomousPlannerTrace, AutonomousSearchRequest,
+    AutonomousSearchResponse, Bm25Index, ContextAssemblyBudget, ContextAssemblyRequest,
+    ContextAssemblyResponse, Embedder, FusionPolicy, HeuristicAutonomousPlanner,
     LatentSearchEmission, LatentSearchHit, LocalFileCorpusRepository, ProtocolSearchEmission,
     QueryEmbeddingCache, RerankingPolicy, RetrieverPolicy, SearchControllerAction,
     SearchControllerDecision, SearchControllerRequest, SearchControllerResponse,
@@ -579,6 +580,21 @@ impl Sift {
                     .map(Self::format_autonomous_stop_reason),
             },
         })
+    }
+
+    pub fn search_autonomous(
+        &self,
+        request: AutonomousSearchRequest,
+    ) -> Result<AutonomousSearchResponse> {
+        match request.planner_strategy.kind {
+            AutonomousPlannerStrategyKind::Heuristic => {
+                let planner = HeuristicAutonomousPlanner::default();
+                self.search_autonomous_with(request, &planner)
+            }
+            AutonomousPlannerStrategyKind::ModelDriven => {
+                bail!("model-driven autonomous planner is not available yet")
+            }
+        }
     }
 
     pub fn generative(&self, options: SearchOptions) -> Result<Arc<dyn GenerativeModel>> {

@@ -42,10 +42,12 @@ impl HeuristicAutonomousPlanner {
         let mut used_queries = HashSet::new();
         let mut used_terms = HashSet::new();
 
-        let initial_query = self.build_initial_query(request);
-        if !initial_query.is_empty() && used_queries.insert(initial_query.clone()) {
-            used_terms.extend(initial_query.split_whitespace().map(str::to_string));
-            all_queries.push(initial_query);
+        if self.should_seed_from_root_task(request) {
+            let initial_query = self.build_initial_query(request);
+            if !initial_query.is_empty() && used_queries.insert(initial_query.clone()) {
+                used_terms.extend(initial_query.split_whitespace().map(str::to_string));
+                all_queries.push(initial_query);
+            }
         }
 
         for artifact in &request.state.retained_artifacts {
@@ -68,6 +70,10 @@ impl HeuristicAutonomousPlanner {
             queries,
             stop_reason,
         }
+    }
+
+    fn should_seed_from_root_task(&self, request: &AutonomousSearchRequest) -> bool {
+        request.state.current_step.sequence <= 1
     }
 
     fn build_initial_query(&self, request: &AutonomousSearchRequest) -> String {
@@ -545,5 +551,37 @@ mod tests {
             .expect("second heuristic planner trace");
 
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn heuristic_planner_resumes_from_explicit_step_state_without_reseeding_root_query() {
+        let planner = HeuristicAutonomousPlanner::default();
+        let request = AutonomousSearchRequest::new("./docs", "find alpha details").with_state(
+            crate::search::AutonomousPlannerState::new(3)
+                .with_current_step(
+                    crate::search::AutonomousPlannerStepCursor::new("step-2", 2)
+                        .with_parent_step_id("step-1"),
+                )
+                .with_retained_artifacts(vec![retained_artifact(
+                    "artifact-1",
+                    "context/seed.txt",
+                    "retry loop adapter layer",
+                    "resume from retained evidence",
+                )]),
+        );
+
+        let trace = planner.plan(&request).expect("heuristic planner trace");
+
+        assert_eq!(trace.steps.len(), 1);
+        assert_eq!(trace.steps[0].step.step_id, "step-2");
+        assert_eq!(trace.steps[0].step.sequence, 2);
+        assert_eq!(
+            trace.steps[0].decisions[0].query.as_deref(),
+            Some("retry loop adapter layer context seed")
+        );
+        assert_eq!(
+            trace.steps[0].decisions[1].stop_reason,
+            Some(AutonomousPlannerStopReason::NoAdditionalEvidence)
+        );
     }
 }

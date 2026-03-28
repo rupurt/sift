@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:25:03.684274149-07:00
+mode: manual
+---
+Added Sift::search_autonomous as a built-in autonomous runtime entry point that resolves the heuristic planner without external custom planner injection; verified with cargo test --test library_facade_test embedded_facade_executes_built_in_heuristic_autonomous_runtime -- --exact and just check.

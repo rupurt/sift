@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:25:03.705086111-07:00
+mode: manual
+---
+Verified built-in autonomous runs lower planner-generated search decisions through the shared controller/runtime path with retained-evidence carryover under the controller budget via cargo test --test library_facade_test built_in_autonomous_runtime_reuses_controller_retained_evidence_carryover -- --exact and just check.
