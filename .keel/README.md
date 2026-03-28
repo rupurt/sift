@@ -110,6 +110,16 @@
 |--------|--------|
 | [Expose Artifact-Based Context Assembly And Emissions](epics/VF53suDXv/voyages/VF60I1J0l/) | done |
 
+### [Bounded Linear Autonomous Planner](epics/VFC7H4QFx/) (draft)
+
+### [Planner Contract and Replay](epics/VFC7H4QFy/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Define Planner State and Stop Semantics](epics/VFC7H4QFy/voyages/VFC7MN6fR/) | planned |
+
+### [Autonomous Planning Evaluation and Surface](epics/VFC7H4pFw/) (draft)
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |
