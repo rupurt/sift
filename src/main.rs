@@ -673,6 +673,7 @@ fn main() -> Result<()> {
                 let report = run_agentic_evaluation(
                     &AgenticEvaluationRequest {
                         strategy,
+                        baseline_strategy: None,
                         command: command_line,
                         corpus_dir: corpus,
                         fixtures_path: fixtures,

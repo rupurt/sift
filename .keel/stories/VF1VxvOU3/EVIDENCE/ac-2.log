@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T17:12:05.798051462-07:00
+mode: manual
+---
+Verified in src/eval.rs:907-1029 and src/eval.rs:1634-1676, with serialization assertions in tests/agentic_eval_test.rs:35-87. Comparative artifacts are built from fixture-ordered collapsed queries, stable per-task document IDs, and summarized latency fields rather than unstable raw traces, and the full repository verification passed via just check.

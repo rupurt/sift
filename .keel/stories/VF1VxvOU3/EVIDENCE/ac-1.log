@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-27T17:12:05.775151125-07:00
+mode: manual
+---
+Verified in src/eval.rs:755-1030 and src/main.rs:673-694. run_agentic_evaluation now defaults the comparison baseline to hybrid, runs the planned controller and a collapsed single-turn baseline on the same local fixtures, measures final-document recall plus task latency for both paths, and emits an AgenticComparisonReport with per-task evidence and tradeoff deltas through sift eval agentic.
