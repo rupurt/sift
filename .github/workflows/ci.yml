@@ -22,7 +22,7 @@ jobs:
       - name: Build
         run: cargo build --verbose
       - name: Lint
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets -- -D warnings
       - name: Format
         run: cargo fmt --check
       - name: Run tests

@@ -44,7 +44,10 @@ build profile="debug":
     fi
 
 clippy:
-    cargo clippy --all-targets --all-features -- -D warnings
+    cargo clippy --all-targets -- -D warnings
+
+clippy-cuda:
+    cargo clippy --all-targets --features cuda -- -D warnings
 
 test:
     cargo nextest run
@@ -54,9 +57,12 @@ test-doc:
 
 check:
     cargo fmt --check
-    cargo clippy --all-targets --all-features -- -D warnings
+    cargo clippy --all-targets -- -D warnings
     cargo nextest run
     cargo test --doc
+
+check-cuda:
+    cargo clippy --all-targets --features cuda -- -D warnings
 
 build-static:
     @if [ -f "flake.nix" ]; then \
