@@ -168,6 +168,39 @@ mod tests {
             assert_eq!(first.skipped_artifacts, 1);
             assert_eq!(first.hits, second.hits);
         }
+
+        #[test]
+        fn vector_search_accepts_relative_root_paths() {
+            let cwd = std::env::current_dir().expect("cwd");
+            let corpus = tempfile::Builder::new()
+                .prefix("sift-relative-search-")
+                .tempdir_in(&cwd)
+                .expect("relative corpus");
+            stdfs::write(
+                corpus.path().join("cache.txt"),
+                "Test function for cache\n\nCache invalidation search regression fixture.",
+            )
+            .expect("write cache fixture");
+
+            let relative_root =
+                Path::new(".").join(corpus.path().strip_prefix(&cwd).expect("corpus under cwd"));
+            let cache = tempdir().expect("cache dir");
+            let mut request =
+                SearchRequest::new("vector", "Test function for cache", relative_root);
+            request.cache_dir = Some(cache.path().to_path_buf());
+
+            let response = run_search(
+                &request,
+                None,
+                &LocalFileCorpusRepository,
+                Some(Arc::new(MockEmbedder)),
+            )
+            .expect("vector search response");
+
+            assert_eq!(response.indexed_artifacts, 1);
+            assert_eq!(response.hits.len(), 1);
+            assert!(response.hits[0].artifact_id.starts_with("./"));
+        }
     }
 
     mod rich_document {

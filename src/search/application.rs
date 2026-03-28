@@ -290,34 +290,7 @@ pub fn run_search_with_plan(
     };
 
     let candidates = service.execute(plan, request, &prepared)?;
-
-    let hits = candidates
-        .results
-        .into_iter()
-        .enumerate()
-        .map(|(index, result)| {
-            let artifact = corpus
-                .artifact_by_id(&result.id)
-                .expect("candidate artifact should exist in loaded corpus");
-            let mut path = result.path.display().to_string();
-            if path.starts_with("./") {
-                path = path.chars().skip(2).collect();
-            }
-            SearchHit {
-                artifact_id: artifact.id.clone(),
-                artifact_kind: artifact.kind,
-                path,
-                rank: index + 1,
-                score: result.score,
-                confidence: plan.categorize_score(result.score),
-                location: result.snippet_location.clone(),
-                snippet: resolve_snippet_from_candidate(&corpus, &result, &request.query),
-                provenance: artifact.provenance.clone(),
-                freshness: artifact.freshness.clone(),
-                budget: artifact.budget.clone(),
-            }
-        })
-        .collect();
+    let hits = project_hits(plan, &corpus, candidates.results, &request.query);
 
     Ok(SearchResponse {
         strategy: plan.name.clone(),
@@ -326,6 +299,47 @@ pub fn run_search_with_plan(
         skipped_artifacts: corpus.skipped_artifacts,
         hits,
     })
+}
+
+pub fn project_hits(
+    plan: &SearchPlan,
+    corpus: &LoadedCorpus,
+    results: Vec<Candidate>,
+    query: &str,
+) -> Vec<SearchHit> {
+    let mut hits = Vec::with_capacity(results.len());
+
+    for result in results {
+        let Some(artifact) = corpus.artifact_by_id(&result.id) else {
+            tracing::warn!(
+                candidate_id = %result.id,
+                candidate_path = %result.path.display(),
+                "skipping candidate missing from loaded corpus"
+            );
+            continue;
+        };
+
+        let mut path = result.path.display().to_string();
+        if path.starts_with("./") {
+            path = path.chars().skip(2).collect();
+        }
+
+        hits.push(SearchHit {
+            artifact_id: artifact.id.clone(),
+            artifact_kind: artifact.kind,
+            path,
+            rank: hits.len() + 1,
+            score: result.score,
+            confidence: plan.categorize_score(result.score),
+            location: result.snippet_location.clone(),
+            snippet: resolve_snippet_from_candidate(corpus, &result, query),
+            provenance: artifact.provenance.clone(),
+            freshness: artifact.freshness.clone(),
+            budget: artifact.budget.clone(),
+        });
+    }
+
+    hits
 }
 
 pub fn resolve_snippet_from_candidate(

@@ -1,8 +1,8 @@
 use super::adapters::*;
-use super::application::{SearchService, resolve_snippet_from_candidate};
+use super::application::{SearchService, project_hits};
 use super::domain::{
     Bm25Index, Embedder, FusionPolicy, GenerativeModel, LoadedCorpus, PreparedCorpus,
-    QueryEmbeddingCache, QueryExpansionPolicy, Reranker, RerankingPolicy, SearchHit, SearchPlan,
+    QueryEmbeddingCache, QueryExpansionPolicy, Reranker, RerankingPolicy, SearchPlan,
     SearchRequest, SearchResponse, StrategyPresetRegistry,
 };
 use anyhow::Result;
@@ -293,34 +293,7 @@ impl SearchExecution for PipelineExecution {
         };
 
         let candidates = self.service.execute(plan, request, &prepared)?;
-
-        let hits = candidates
-            .results
-            .into_iter()
-            .enumerate()
-            .map(|(idx, res)| {
-                let artifact = corpus
-                    .artifact_by_id(&res.id)
-                    .expect("candidate artifact should exist in loaded corpus");
-                let mut path = res.path.display().to_string();
-                if path.starts_with("./") {
-                    path = path.chars().skip(2).collect();
-                }
-                SearchHit {
-                    artifact_id: artifact.id.clone(),
-                    artifact_kind: artifact.kind,
-                    path,
-                    rank: idx + 1,
-                    score: res.score,
-                    confidence: plan.categorize_score(res.score),
-                    location: res.snippet_location.clone(),
-                    snippet: resolve_snippet_from_candidate(corpus, &res, &request.query),
-                    provenance: artifact.provenance.clone(),
-                    freshness: artifact.freshness.clone(),
-                    budget: artifact.budget.clone(),
-                }
-            })
-            .collect();
+        let hits = project_hits(plan, corpus, candidates.results, &request.query);
 
         Ok(SearchResponse {
             strategy: plan.name.clone(),

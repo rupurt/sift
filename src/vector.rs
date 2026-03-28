@@ -152,10 +152,7 @@ pub fn aggregate_segment_hits(hits: &[SegmentHit]) -> Vec<SemanticArtifactHit> {
     let mut artifacts = HashMap::<&str, DocAccumulator>::with_capacity(hits.len());
 
     for hit in hits {
-        let mut artifact_id = hit.artifact_id.as_str();
-        if artifact_id.starts_with("./") {
-            artifact_id = &artifact_id[2..];
-        }
+        let artifact_id = hit.artifact_id.as_str();
         let entry = artifacts
             .entry(artifact_id)
             .or_insert_with(|| DocAccumulator {
@@ -266,6 +263,21 @@ mod tests {
                 assert_eq!(ranked[0].segment_hits, 2);
                 assert_eq!(ranked[1].id, "doc-b");
                 assert!((ranked[1].score - (1.0 / 2_f64.sqrt())).abs() < 1.0e-9);
+            }
+
+            #[test]
+            fn preserves_exact_artifact_ids_for_relative_paths() {
+                let hits = vec![sample_hit(
+                    "./docs/cache.md:abc123",
+                    "./docs/cache.md:abc123",
+                    "./docs/cache.md",
+                    0.9,
+                )];
+
+                let ranked = aggregate_segment_hits(&hits);
+
+                assert_eq!(ranked.len(), 1);
+                assert_eq!(ranked[0].id, "./docs/cache.md:abc123");
             }
         }
     }
