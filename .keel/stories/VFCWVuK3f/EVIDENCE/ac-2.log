@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:43:27.485123865-07:00
+mode: manual
+---
+Stable JSON regression coverage for the planner-aware report lives in tests/agentic_eval_test.rs, and EVALUATIONS.md documents the emitted autonomous artifacts for replay/review.

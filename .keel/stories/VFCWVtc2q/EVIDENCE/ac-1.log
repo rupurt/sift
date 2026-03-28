@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:43:27.403419599-07:00
+mode: manual
+---
+Focused regression coverage in tests/agentic_eval_test.rs confirms eval agentic compares autonomous planner, planned controller, and collapsed single-turn baselines in one report.

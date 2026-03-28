@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:43:27.462924782-07:00
+mode: manual
+---
+The autonomous report now exposes planner strategy, turn counts, stop reasons, retained-evidence efficiency, and autonomous-vs-baseline/planned comparison deltas in src/eval.rs and tests/agentic_eval_test.rs.
