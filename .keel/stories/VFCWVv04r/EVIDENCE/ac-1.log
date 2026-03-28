@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:45:55.641386972-07:00
+mode: manual
+---
+Sift::search_autonomous is now documented as the supported crate-root autonomous entry point in src/facade.rs, src/lib.rs, and LIBRARY.md, and focused library facade coverage passes for built-in heuristic/model-driven routing.

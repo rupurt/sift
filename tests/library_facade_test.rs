@@ -595,6 +595,14 @@ fn embedded_facade_executes_built_in_heuristic_autonomous_runtime() {
     assert_eq!(response.turns[0].turn.turn_id, "turn-1");
     assert_eq!(response.turns[0].turn.strategy, "bm25");
     assert_eq!(
+        response.planner_strategy,
+        AutonomousPlannerStrategy::heuristic()
+    );
+    assert_eq!(
+        response.planner_trace.planner_strategy,
+        AutonomousPlannerStrategy::heuristic()
+    );
+    assert_eq!(
         response.planner_trace.steps[0].decisions[0].action,
         AutonomousPlannerAction::Search
     );

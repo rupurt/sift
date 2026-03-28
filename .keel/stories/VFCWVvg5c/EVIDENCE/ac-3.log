@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:45:55.733918490-07:00
+mode: manual
+---
+The documentation now makes clear that Sift::search_autonomous reuses the same shared runtime contract that the future CLI agent path will call, while search_autonomous_with remains the advanced custom seam.

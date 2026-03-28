@@ -194,40 +194,92 @@ This mode gives you:
 It is deterministic and plan-driven. It does not currently invent turns or do
 autonomous decomposition by itself.
 
-## Mode 5: Autonomous Planner Contracts
+## Mode 5: Supported Autonomous Search
 
-Use `AutonomousSearchRequest`, `AutonomousSearchResponse`, and
-`AutonomousPlannerState` when your application wants to persist or exchange
-linear autonomous-planning state through a stable crate-root contract.
+Use `Sift::search_autonomous` when you want the supported built-in autonomous
+runtime. It selects the shipped planner from
+`AutonomousSearchRequest::planner_strategy` and does not require custom planner
+injection.
 
 ```rust
-use sift::{AutonomousPlannerStrategy, AutonomousSearchRequest};
+use anyhow::Result;
+use sift::{AutonomousPlannerStrategy, AutonomousSearchRequest, Sift};
 
-fn main() {
-    let request = AutonomousSearchRequest::new("./docs", "find the cache invalidation path")
-        .with_planner_strategy(
-            AutonomousPlannerStrategy::model_driven().with_profile("local-planner-v1"),
-        )
-        .with_step_limit(4)
-        .with_strategy("hybrid");
+fn main() -> Result<()> {
+    let engine = Sift::builder().build();
+    let response = engine.search_autonomous(
+        AutonomousSearchRequest::new("./docs", "find the cache invalidation path")
+            .with_strategy("hybrid")
+            .with_planner_strategy(AutonomousPlannerStrategy::heuristic())
+            .with_step_limit(3),
+    )?;
 
-    assert_eq!(request.state.current_step.step_id, "step-1");
+    assert_eq!(response.planner_strategy, AutonomousPlannerStrategy::heuristic());
+    assert_eq!(
+        response.planner_trace.planner_strategy,
+        AutonomousPlannerStrategy::heuristic()
+    );
+    Ok(())
 }
 ```
 
-These records are stable now so embedders can model root-task planning state,
-retained evidence, and planner selection. The execution seam that actually runs
-autonomous planning through `Sift` lands separately.
+Use this mode when you need:
 
-`AutonomousSearchResponse` also carries an `AutonomousPlannerTrace`, which
-captures step-local planner decisions and explicit stop reasons separately from
-the lower-level search trace.
+- built-in planner selection through `AutonomousPlannerStrategy`
+- a stable `AutonomousSearchResponse` carrying both `planner_trace` and the
+  lowered `SearchTrace`
+- the same autonomous runtime contract that future CLI agent flows reuse
+- a public crate-root surface that still coexists with direct search, context
+  assembly, and explicit controller modes
 
-## Mode 6: Autonomous Execution Seam
+For model-driven planning, configure the engine with
+`SiftBuilder::with_generative_model` and request a model-driven strategy:
 
-Use `Sift::search_autonomous_with` when your application already owns the
+```rust
+use std::sync::Arc;
+
+use sift::{AutonomousPlannerStrategy, Conversation, GenerativeModel, Sift};
+
+struct MyPlannerModel;
+
+impl GenerativeModel for MyPlannerModel {
+    fn generate(&self, _prompt: &str, _max_tokens: usize) -> anyhow::Result<String> {
+        unimplemented!()
+    }
+
+    fn start_conversation(&self) -> anyhow::Result<Box<dyn Conversation>> {
+        unimplemented!()
+    }
+}
+
+fn main() -> anyhow::Result<()> {
+    let engine = Sift::builder()
+        .with_generative_model(Arc::new(MyPlannerModel))
+        .build();
+
+    let _response = engine.search_autonomous(
+        sift::AutonomousSearchRequest::new("./docs", "plan a bounded search")
+            .with_strategy("page-index-llm")
+            .with_planner_strategy(
+                AutonomousPlannerStrategy::model_driven().with_profile("local-planner-v1"),
+            ),
+    )?;
+
+    Ok(())
+}
+```
+
+`AutonomousSearchRequest`, `AutonomousSearchResponse`, and
+`AutonomousPlannerState` remain the stable records embedders can persist or
+exchange when they need to save root-task planning state, retained evidence,
+and planner selection.
+
+## Mode 6: Advanced Autonomous Execution Seam
+
+Use `Sift::search_autonomous_with` only when your application already owns the
 planning policy and wants Sift to lower planner-issued search decisions into
-the existing controller runtime.
+the existing controller runtime. Most embedders should prefer
+`Sift::search_autonomous`.
 
 ```rust
 use anyhow::Result;
@@ -319,6 +371,9 @@ Advanced builder methods such as `with_config`, `with_ignore`, and
 crate-root surface. Prefer request-local configuration unless you need that
 tighter integration.
 
+`with_generative_model` is the stable builder hook for supplying the local
+planner model used by built-in model-driven autonomous search.
+
 ## Status Boundary
 
 Supported now:
@@ -327,11 +382,13 @@ Supported now:
 - context assembly
 - single-turn traced search
 - deterministic multi-turn controller execution
+- built-in heuristic and model-driven autonomous runtime selection through
+  `search_autonomous`
+- custom planner injection through `search_autonomous_with`
 - protocol and latent emissions
 - synthetic local context artifacts
 
 Not shipped yet:
 
-- built-in heuristic and model-driven autonomous planner policies
 - a stable crate-root config type
 - a general-purpose interactive agentic CLI command

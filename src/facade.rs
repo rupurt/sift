@@ -520,6 +520,9 @@ impl Sift {
         })
     }
 
+    /// Advanced autonomous seam for embedders that already own a custom
+    /// planner and want Sift to lower its decisions through the shared
+    /// controller runtime.
     pub fn search_autonomous_with<P: AutonomousPlanner + ?Sized>(
         &self,
         request: AutonomousSearchRequest,
@@ -591,6 +594,13 @@ impl Sift {
         })
     }
 
+    /// Supported crate-root autonomous entry point.
+    ///
+    /// `search_autonomous` selects the built-in planner from
+    /// `request.planner_strategy` and returns both the planner trace and the
+    /// lowered search/controller trace in the public response contract, so
+    /// embedders do not need custom planner injection for the shipped
+    /// heuristic or model-driven modes.
     pub fn search_autonomous(
         &self,
         request: AutonomousSearchRequest,

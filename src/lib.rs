@@ -6,14 +6,18 @@
 //! - [`ContextAssemblyRequest`] and [`ContextAssemblyResponse`] for bounded evidence assembly
 //! - [`SearchTurnRequest`], [`SearchTurnResponse`], and [`SearchEmissionMode`] for turn-aware search control
 //! - [`SearchControllerRequest`] and [`SearchControllerResponse`] for deterministic multi-turn control
-//! - [`AutonomousSearchRequest`] and [`AutonomousSearchResponse`] for linear autonomous-planner contracts
-//! - [`AutonomousPlanner`], [`AutonomousPlannerTrace`], [`HeuristicAutonomousPlanner`], and [`ModelDrivenAutonomousPlanner`] for the library-first autonomous execution seam
+//! - [`AutonomousSearchRequest`] and [`AutonomousSearchResponse`] for supported built-in autonomous search contracts
+//! - [`AutonomousPlanner`], [`AutonomousPlannerTrace`], [`HeuristicAutonomousPlanner`], and [`ModelDrivenAutonomousPlanner`] for autonomous strategy selection and advanced custom-planner seams
 //! - [`Retriever`], [`Fusion`], and [`Reranking`] for supported strategy overrides
 //! - [`SearchResponse`], [`SearchHit`], [`ContextArtifact`], and [`ScoreConfidence`] for results and artifact metadata
 //!
 //! Everything under [`internal`] exists to support the bundled executable,
 //! benchmarks, and repository-internal tests. It is not part of the supported
 //! embedding contract and may change without notice.
+//!
+//! Use `Sift::search_autonomous` for the supported built-in autonomous entry
+//! point. `Sift::search_autonomous_with` remains available for advanced
+//! embedders that supply their own planner implementation.
 //!
 //! Repository-level usage notes for all supported modes live in `LIBRARY.md`.
 

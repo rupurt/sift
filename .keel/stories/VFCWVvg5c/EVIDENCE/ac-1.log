@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:45:55.670243948-07:00
+mode: manual
+---
+LIBRARY.md now explains autonomous planner configuration, strategy selection, traces, and how the supported autonomous mode fits alongside the other public library modes.

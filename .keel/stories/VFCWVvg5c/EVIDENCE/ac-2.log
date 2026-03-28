@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:45:55.698775998-07:00
+mode: manual
+---
+The guide and crate-root docs describe strategy-aware autonomous responses, including planner_strategy and planner_trace on AutonomousSearchResponse.
