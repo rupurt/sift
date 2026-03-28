@@ -4,9 +4,10 @@ Sift is designed using **Domain-Driven Design (DDD)** and **Hexagonal
 Architecture (Ports and Adapters)** principles. It is evolving from a
 single-pass hybrid retrieval engine into a **High-Energy Information Reactor**
 for hybrid and agentic search. Today the shipped runtime includes direct local
-search, deterministic turn-aware library APIs, and fixture-driven controller
-evaluation; autonomous planning and richer agent orchestration are the next
-architectural layer.
+search, deterministic turn-aware/controller APIs, a bounded linear autonomous
+planner runtime, autonomous/controller evaluation, and CLI agent mode through
+`sift search --agent`. The next architectural layer is richer persisted agent
+memory and branching or graph-structured search over the same substrate.
 
 ## Core Tenets
 
@@ -28,24 +29,27 @@ flowchart LR
     B --> C[PipelineExecution]
     D[LocalCorpusStorage] --> C
     C --> E[SearchResponse with SearchHit values]
+    C -. lowered into .-> F[Controller and Autonomous Runtime]
+    F --> G[Emit view, protocol, or latent output]
   end
 
-  subgraph Target ["Formal Agentic Layer"]
-    F[Turn-aware SearchIR] --> G[LoopExecution]
-    H[Turn or hybrid storage] --> G
-    G --> I[Emit view, protocol, or latent output]
+  subgraph Target ["Future Graph / Memory Layer"]
+    H[Graph or Branching SearchIR] --> I[Loop or Graph Execution]
+    J[Turn, evidence, or hybrid storage] --> I
+    I --> K[Emit view, protocol, or latent output]
   end
 
-  C -. reusable hybrid retrieval step .-> G
+  C -. reusable hybrid retrieval step .-> I
 ```
 
 ### 1. The Domain (`src/search/domain.rs`)
 Defines the vocabulary of retrieval centered on `Document` today, plus the core
 trait boundaries (`Expander`, `Retriever`, `Fuser`, `Reranker`,
 `GenerativeModel`, `Conversation`). The shipping domain also includes public
-turn-aware request and response contracts, retained-artifact records, and
-synthetic local-context artifacts. A richer first-class agent memory model is
-still planned beyond those DTOs.
+turn-aware and autonomous request/response contracts, retained-artifact
+records, planner traces, planner stop reasons, and synthetic local-context
+artifacts. A richer first-class agent memory model is still planned beyond
+those DTOs.
 
 ### 2. SearchIR (The Magnetic Field Configuration)
 The Intermediate Representation (IR) translates user queries into an executable
@@ -69,8 +73,9 @@ including remote corpora and future turn stores.
 Sift is being extended toward searching and surfacing **Agent Turns** and other
 intermediate artifacts that matter in coding workflows. The current codebase
 already exposes explicit turn requests, controller state, retained artifacts,
-and local synthetic context sources. What is not formalized yet is autonomous
-planning and a richer persisted turn model.
+planner state, planner traces, and local synthetic context sources. Linear
+autonomous planning is formalized now; what remains open is a richer persisted
+turn model and branching or graph-structured planning.
 
 ### Emission Modes
 The reactor is intended to expose configurable ports for different types of
@@ -87,9 +92,11 @@ Sift uses local LLMs (Qwen 2.5, Gemma 3) to understand and expand user intent, a
 - **SPLADE:** Predicts semantically related technical terms.
 - **Classification:** Categorizes queries (e.g., BUGFIX) to add intent-specific keywords.
 
-The next architectural layer after the current deterministic controller is an
-autonomous planner that can decompose queries into subqueries, decide when to
-continue, and manage context budgets without leaving the local runtime.
+The current architectural seam already supports a bounded autonomous planner
+that can decompose a root task into retrieval turns, decide when to continue,
+and manage context budgets without leaving the local runtime. The next layer is
+making that seam branchable and attaching richer persisted mission or turn
+memory to it.
 
 ## The Incremental File Cache (`src/cache/`)
 
@@ -114,13 +121,14 @@ Stores binary serialized assets, including extracted text, term frequencies, and
 - A composable hybrid retrieval core (`SearchPlan`, retrievers, fusion, reranking).
 - Trait seams for `SearchEngine`, `SearchIR`, `SearchExecution`, and `SearchStorage`.
 - Local generative model access and stateful `Conversation` hooks.
-- CLI surfaces for direct search and evaluation.
-- Library surfaces for `search`, `assemble_context`, `search_turn`, and `search_controller`.
+- CLI surfaces for direct search, `search --agent`, and evaluation.
+- Library surfaces for `search`, `assemble_context`, `search_turn`, `search_controller`, and `search_autonomous`.
+- A bounded linear autonomous planner runtime with heuristic and model-driven planner strategies.
+- Planner traces, stop reasons, and retained-artifact carryover in the public autonomous contracts.
 - `view`, `protocol`, and `latent` emission modes for turn-aware responses.
-- Fixture-driven agentic evaluation comparing controller runs against collapsed single-turn baselines.
+- Agentic evaluation comparing autonomous runs against planned-controller and collapsed single-turn baselines.
 
 ### Not formalized yet
-- Autonomous plan generation and query decomposition.
 - A first-class persisted `AgentTurn` domain model.
 - A graph IR beyond the current `SearchPlan` wrapper.
 - A general-purpose interactive agentic CLI command.

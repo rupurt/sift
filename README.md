@@ -5,10 +5,10 @@
 [![Release Process](https://img.shields.io/badge/Release-Process-green)](RELEASE.md)
 
 `sift` is a standalone Rust CLI and library for hybrid and agentic local search
-in development workflows. The shipped executable gives you direct single-turn
-search, evaluation, dataset, and prompt-optimization commands; the crate-root
-library facade already exposes deterministic turn-aware and controller-style
-search APIs for embedding.
+in development workflows. The shipped executable gives you direct search,
+planner-driven `search --agent`, evaluation, dataset, and prompt-optimization
+commands; the crate-root library facade exposes direct, controller, and
+autonomous search APIs for embedding.
 
 The core idea is simple: point `sift` at a directory, extract text on demand,
 and run a layered pipeline of expansion, retrieval, fusion, and reranking.
@@ -27,6 +27,7 @@ For project background and design rationale, read the introductory post:
 - **Layered pipeline:** Query Expansion -> Retrieval -> Fusion -> Reranking.
 - **Executable surface:** `search`, `eval`, `dataset`, `optimize`, and `config` are the supported CLI commands.
 - **Library surface:** `search`, `assemble_context`, `search_turn`, `search_controller`, and `search_autonomous` are supported at the crate root.
+- **Autonomous planning:** Linear autonomous planning and decomposition ship through `sift search --agent` and `Sift::search_autonomous`, with heuristic and model-driven planner strategies.
 - **Emission modes:** Turn-aware library calls can emit `view`, `protocol`, or `latent` responses.
 - **Supported inputs:** Text, HTML, PDF, and OOXML files (`.docx`, `.xlsx`, `.pptx`).
 
@@ -59,7 +60,7 @@ The executable currently exposes the following command groups:
 | Command | Purpose |
 |---------|---------|
 | `sift search [OPTIONS] [PATH] <QUERY>` | Direct single-turn search over a local corpus. |
-| `sift search [OPTIONS] [PATH] --agent <ROOT_TASK>` | Planner-driven search over a local corpus using the shared autonomous runtime. |
+| `sift search [OPTIONS] [PATH] --agent <ROOT_TASK>` | Planner-driven search over a local corpus using the shared autonomous runtime, with optional `--planner-strategy` and `--planner-profile` selection. |
 | `sift eval all` | Compare all registered retrieval strategies. |
 | `sift eval quality` | Emit a JSON quality report for one strategy, optionally against a baseline. |
 | `sift eval latency` | Emit a JSON latency report for one strategy. |
@@ -142,6 +143,10 @@ surface lives at the crate root and includes:
 - `ContextAssemblyRequest`, `ContextAssemblyResponse`
 - `SearchTurnRequest`, `SearchTurnResponse`
 - `SearchControllerRequest`, `SearchControllerResponse`
+- `AutonomousSearchRequest`, `AutonomousSearchResponse`
+- `AutonomousPlannerState`, `AutonomousPlannerStrategy`, `AutonomousPlannerStrategyKind`
+- `AutonomousPlannerTrace`, `AutonomousPlannerDecision`, `AutonomousPlannerStopReason`
+- `AutonomousPlanner`, `HeuristicAutonomousPlanner`, `ModelDrivenAutonomousPlanner`
 - `SearchEmission`, `SearchEmissionMode`
 - `SearchPlan`, `QueryExpansionPolicy`, `RetrieverPolicy`, `FusionPolicy`, `RerankingPolicy`
 - `Retriever`, `Fusion`, `Reranking`
@@ -152,8 +157,9 @@ benchmarks, and repository-internal tests. It is not part of the stable
 embedding contract.
 
 See [LIBRARY.md](LIBRARY.md) for the full embedding guide, including direct
-search, context assembly, protocol/latent emissions, local context injection,
-and deterministic multi-turn controller usage.
+search, context assembly, deterministic controller execution, supported
+autonomous search, protocol/latent emissions, local context injection, and the
+advanced custom-planner seam.
 
 ### Runnable Example Consumer
 
@@ -283,10 +289,11 @@ flowchart TD
   end
 ```
 
-Today the executable ships direct search plus evaluation-oriented agentic
-fixtures. The library already exposes deterministic turn-aware controller
-surfaces. Fully autonomous planning and decomposition remain the next formal
-layer.
+Today the executable ships direct search, planner-driven `search --agent`, and
+evaluation-oriented autonomous/controller benchmarks. The library exposes
+direct, controller, and supported autonomous surfaces over the same retrieval
+substrate. The next formal layer is branching or graph-structured autonomous
+search rather than first-generation linear autonomy.
 
 ## Performance & Scalability
 

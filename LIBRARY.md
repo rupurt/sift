@@ -15,7 +15,7 @@ The stable crate-root contract includes:
 - `AutonomousSearchRequest`, `AutonomousSearchResponse`
 - `AutonomousPlannerState`, `AutonomousPlannerStepCursor`, `AutonomousPlannerStrategy`, `AutonomousPlannerStrategyKind`
 - `AutonomousPlannerTrace`, `AutonomousPlannerTraceStep`, `AutonomousPlannerDecision`, `AutonomousPlannerAction`, `AutonomousPlannerStopReason`
-- `AutonomousPlanner`
+- `AutonomousPlanner`, `HeuristicAutonomousPlanner`, `ModelDrivenAutonomousPlanner`
 - `SearchEmission`, `SearchEmissionMode`
 - `SearchPlan`, `QueryExpansionPolicy`, `RetrieverPolicy`, `FusionPolicy`, `RerankingPolicy`
 - `Retriever`, `Fusion`, `Reranking`
@@ -226,9 +226,11 @@ fn main() -> Result<()> {
 Use this mode when you need:
 
 - built-in planner selection through `AutonomousPlannerStrategy`
+- the default heuristic planner when `planner_strategy` is omitted, or explicit
+  model-driven selection through `AutonomousPlannerStrategy::model_driven()`
 - a stable `AutonomousSearchResponse` carrying both `planner_trace` and the
   lowered `SearchTrace`
-- the same autonomous runtime contract that future CLI agent flows reuse
+- the same autonomous runtime contract that the shipped CLI agent flow reuses
 - a public crate-root surface that still coexists with direct search, context
   assembly, and explicit controller modes
 
@@ -365,6 +367,8 @@ query-cache state.
 Useful stable builder usage:
 
 - `Sift::builder().build()`
+- `Sift::builder().with_generative_model(...)` for built-in model-driven
+  autonomous planning
 
 Advanced builder methods such as `with_config`, `with_ignore`, and
 `with_embedder` exist, but some of them depend on types outside the stable
