@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:17:41.315373309-07:00
+mode: manual
+---
+Verified deduplicated follow-up query generation from retained evidence through tests in src/search/planner.rs and tests/autonomous_heuristic_planner_test.rs with cargo test --test autonomous_heuristic_planner_test and just check.

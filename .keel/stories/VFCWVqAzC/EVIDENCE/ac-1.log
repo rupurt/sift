@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:21:19.614016682-07:00
+mode: manual
+---
+Extended HeuristicAutonomousPlanner to emit explicit terminate decisions plus trace stop_reason values for StepLimitReached, NoFurtherQueries, and NoAdditionalEvidence; verified with cargo test --test autonomous_heuristic_planner_test and just check.

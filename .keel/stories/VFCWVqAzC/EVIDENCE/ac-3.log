@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:21:19.659475374-07:00
+mode: manual
+---
+The heuristic baseline remains model-free and local-first: src/search/planner.rs depends only on autonomous DTOs, retained artifacts, and tokenize helpers, with no generative-model, network, or daemon integration; verified by code review plus just check.

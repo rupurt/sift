@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T15:21:19.637419165-07:00
+mode: manual
+---
+Added deterministic stop-reason coverage in src/search/planner.rs and tests/autonomous_heuristic_planner_test.rs; repeated runs over the same request/evidence now assert identical planner traces and stop outcomes under cargo test --test autonomous_heuristic_planner_test and just check.

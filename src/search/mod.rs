@@ -4,6 +4,7 @@ pub mod corpus;
 pub mod domain;
 pub mod engine;
 pub mod legacy;
+pub mod planner;
 pub mod presentation;
 
 pub use adapters::render_search_response;
@@ -31,5 +32,6 @@ pub use domain::{
     StrategyPresetRegistry, ToolOutputInput, tokenize,
 };
 pub use engine::{SearchEngine, SearchEnvironment};
+pub use planner::HeuristicAutonomousPlanner;
 #[allow(unused_imports)]
 pub use presentation::*;
