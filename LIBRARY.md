@@ -1,0 +1,254 @@
+# Library Guide
+
+`sift` exposes its supported embedding surface at the crate root. This guide
+covers the public modes that are intended for embedders today.
+
+## Supported Public Surface
+
+The stable crate-root contract includes:
+
+- `Sift`, `SiftBuilder`
+- `SearchInput`, `SearchOptions`
+- `ContextAssemblyRequest`, `ContextAssemblyResponse`
+- `SearchTurnRequest`, `SearchTurnResponse`
+- `SearchControllerRequest`, `SearchControllerResponse`
+- `SearchEmission`, `SearchEmissionMode`
+- `SearchPlan`, `QueryExpansionPolicy`, `RetrieverPolicy`, `FusionPolicy`, `RerankingPolicy`
+- `Retriever`, `Fusion`, `Reranking`
+- `SearchResponse`, `SearchHit`, `ContextArtifact`, `ContextArtifactKind`, `ScoreConfidence`
+- `LocalContextSource`, `EnvironmentFactInput`, `ToolOutputInput`, `AgentTurnInput`
+- `GenerativeModel`, `Conversation`
+
+Everything under `sift::internal` is executable support code or repository
+plumbing and should be treated as unstable.
+
+## Mode 1: Direct Search
+
+Use `Sift::search` for standard one-shot retrieval.
+
+```rust
+use sift::{Fusion, Retriever, Reranking, SearchInput, SearchOptions, Sift};
+
+fn main() -> anyhow::Result<()> {
+    let engine = Sift::builder().build();
+
+    let response = engine.search(
+        SearchInput::new("./docs", "architecture decision").with_options(
+            SearchOptions::default()
+                .with_strategy("hybrid")
+                .with_retrievers(vec![Retriever::Bm25, Retriever::Vector])
+                .with_fusion(Fusion::Rrf)
+                .with_reranking(Reranking::None)
+                .with_limit(5)
+                .with_shortlist(8),
+        ),
+    )?;
+
+    for hit in response.hits {
+        println!("{} {}", hit.rank, hit.path);
+    }
+
+    Ok(())
+}
+```
+
+### Direct Search Knobs
+
+`SearchOptions` supports:
+
+- `with_strategy`
+- `with_intent`
+- `with_limit`
+- `with_shortlist`
+- `with_retrievers`
+- `with_fusion`
+- `with_reranking`
+- `with_verbose`
+- `with_cache_dir`
+- `with_local_context`
+
+There are also advanced model override setters such as `with_dense_model`,
+`with_rerank_model`, and `with_gemma_model`, but those currently depend on
+model spec types under `sift::internal`. Use them only if you accept tighter
+coupling to internal APIs.
+
+## Mode 2: Context Assembly
+
+Use `Sift::assemble_context` when you want retrieval plus a bounded retained
+evidence set for downstream tooling or controller logic.
+
+```rust
+use sift::{
+    ContextAssemblyBudget, ContextAssemblyRequest, SearchEmissionMode, Sift, ToolOutputInput,
+};
+
+fn main() -> anyhow::Result<()> {
+    let engine = Sift::builder().build();
+
+    let assembled = engine.assemble_context(
+        ContextAssemblyRequest::new("./docs", "telemetry")
+            .with_strategy("bm25")
+            .with_budget(ContextAssemblyBudget::new(2))
+            .with_emission_mode(SearchEmissionMode::Protocol)
+            .with_local_context(vec![sift::LocalContextSource::ToolOutput(
+                ToolOutputInput::new("rg", "call-1", "telemetry span waterfall"),
+            )]),
+    )?;
+
+    println!("hits: {}", assembled.response.hits.len());
+    println!("retained: {}", assembled.retained_artifacts.len());
+    Ok(())
+}
+```
+
+Use this mode when you need:
+
+- retrieved hits
+- a bounded retained-artifact list
+- explicit pruning counts
+- a protocol or latent emission derived from the same search
+
+## Mode 3: Single Turn with Explicit Emission
+
+Use `Sift::search_turn` when you need turn IDs, session IDs, traces, and an
+explicit emission mode.
+
+```rust
+use sift::{SearchEmissionMode, SearchTurnRequest, Sift};
+
+fn main() -> anyhow::Result<()> {
+    let engine = Sift::builder().build();
+
+    let turn = engine.search_turn(
+        SearchTurnRequest::new("./docs", "controller state")
+            .with_session_id("session-1")
+            .with_turn_id("turn-1")
+            .with_strategy("bm25")
+            .with_emission_mode(SearchEmissionMode::Protocol),
+    )?;
+
+    println!("turn {}", turn.turn.turn_id);
+    println!("results {}", turn.turn.result_count);
+    Ok(())
+}
+```
+
+### Emission Modes
+
+- `SearchEmissionMode::View`: Emits a standard `SearchResponse`.
+- `SearchEmissionMode::Protocol`: Emits `ProtocolSearchEmission` with turn and session metadata.
+- `SearchEmissionMode::Latent`: Emits `LatentSearchEmission` with ranking-oriented hit features.
+
+## Mode 4: Deterministic Multi-turn Controller
+
+Use `Sift::search_controller` when your application already knows the planned
+turns and wants Sift to execute them while managing retained evidence and
+producing inspectable traces.
+
+```rust
+use sift::{
+    FusionPolicy, QueryExpansionPolicy, RerankingPolicy, RetrieverPolicy, SearchControllerRequest,
+    SearchPlan, SearchTurnRequest, Sift,
+};
+
+fn main() -> anyhow::Result<()> {
+    let engine = Sift::builder().build();
+
+    let plan = SearchPlan {
+        name: "controller-lexical".to_string(),
+        query_expansion: QueryExpansionPolicy::None,
+        retrievers: vec![RetrieverPolicy::Bm25],
+        fusion: FusionPolicy::Rrf,
+        reranking: RerankingPolicy::None,
+    };
+
+    let response = engine.search_controller(
+        SearchControllerRequest::new(
+            plan,
+            vec![
+                SearchTurnRequest::new("./docs", "alpha").with_turn_id("turn-a"),
+                SearchTurnRequest::new("./docs", "beta").with_turn_id("turn-b"),
+            ],
+        )
+        .with_session_id("session-1")
+        .with_retained_artifact_limit(2),
+    )?;
+
+    println!("completed: {}", response.state.completed);
+    println!("turns: {}", response.turns.len());
+    Ok(())
+}
+```
+
+This mode gives you:
+
+- explicit turn sequencing
+- retained-artifact carryover between turns
+- pruning when the retained-artifact budget is exceeded
+- per-turn controller decisions in `SearchTrace`
+
+It is deterministic and plan-driven. It does not currently invent turns or do
+autonomous decomposition by itself.
+
+## Local Context Injection
+
+All request modes can inject synthetic context artifacts alongside filesystem
+documents:
+
+- `LocalContextSource::EnvironmentFact`
+- `LocalContextSource::ToolOutput`
+- `LocalContextSource::AgentTurn`
+
+That context is searchable and shows up with synthetic provenance in returned
+hits and traces.
+
+## Generative Model Access
+
+`Sift::generative` resolves the current strategy's generative model and returns
+the crate-root `GenerativeModel` trait:
+
+```rust
+use sift::{SearchOptions, Sift};
+
+fn main() -> anyhow::Result<()> {
+    let engine = Sift::builder().build();
+    let model = engine.generative(SearchOptions::default().with_strategy("page-index-llm"))?;
+    let reply = model.generate("Summarize the query intent: telemetry cache", 64)?;
+    println!("{reply}");
+    Ok(())
+}
+```
+
+The returned model also supports `start_conversation()` through the
+`Conversation` trait.
+
+## Builder Notes
+
+`Sift::builder()` gives you a reusable engine instance with shared telemetry and
+query-cache state.
+
+Useful stable builder usage:
+
+- `Sift::builder().build()`
+
+Advanced builder methods such as `with_config`, `with_ignore`, and
+`with_embedder` exist, but some of them depend on types outside the stable
+crate-root surface. Prefer request-local configuration unless you need that
+tighter integration.
+
+## Status Boundary
+
+Supported now:
+
+- direct search
+- context assembly
+- single-turn traced search
+- deterministic multi-turn controller execution
+- protocol and latent emissions
+- synthetic local context artifacts
+
+Not shipped yet:
+
+- autonomous turn planning
+- a stable crate-root config type
+- a general-purpose interactive agentic CLI command

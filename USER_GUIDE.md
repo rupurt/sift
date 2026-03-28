@@ -1,123 +1,126 @@
 # User Guide
 
-Welcome to **Sift**, the lightning-fast, standalone hybrid and agentic search
-tool for local retrieval workflows. This guide walks through the current hybrid
-feature set and shows where the agentic direction fits.
+Welcome to **Sift**, a standalone local search tool that combines hybrid
+retrieval with an emerging agentic controller layer.
 
-## Introduction
-
-Sift was built to bridge the "vocabulary gap" in technical documentation and
-code. It combines the speed of traditional lexical search (BM25) with the deep
-understanding of semantic vector search and LLM-based reranking.
-
-The shipped CLI is still a single-turn hybrid search experience. The agentic
-pivot is about making that retrieval core reusable inside a formal turn-based
-search runtime.
+The executable is centered on direct single-turn search today. The library and
+evaluation harnesses already expose deterministic turn-aware behavior for
+controller-style workflows.
 
 ## Getting Started
 
 ### Installation
 
-The fastest way to install Sift on macOS or Linux is via Homebrew:
+The fastest way to install Sift on macOS or Linux is:
 
 ```bash
 brew tap rupurt/homebrew-tap
 brew install sift
 ```
 
-For other platforms and installation methods, see the **[README.md](README.md#installation)**.
+For other installation methods, see [README.md](README.md#installation).
 
 ### Your First Search
-
-Point Sift at any directory and give it a query:
 
 ```bash
 sift search ./my-project "how do I handle authentication?"
 ```
 
-On the first run, Sift will extract and index your documents. Subsequent searches will be near-instant.
+On first run, Sift extracts and indexes the corpus into its transparent local
+cache. Repeated searches reuse those assets.
 
-## Core Concepts
+## Core Ideas
 
-### Hybrid Search
-Sift doesn't just look for exact words. It uses **Hybrid Information Retrieval (IR)**:
-1.  **Lexical (BM25):** Finds exact keyword matches.
-2.  **Semantic (Vector):** Finds related concepts using local machine learning models.
-3.  **Phrase:** High-precision exact string matching.
+### Hybrid Retrieval
 
-### Intent-Driven Expansion
-Sift can use a local LLM to expand your query before searching. This helps find documents that don't share the same exact words as your query but do share the same meaning.
+Sift combines:
 
-### Agentic Direction
-The current building blocks for agentic search are already visible:
+1. **BM25:** Lexical keyword retrieval.
+2. **Phrase matching:** Exact high-precision matches.
+3. **Vector retrieval:** Semantic similarity via local embeddings.
+4. **Reranking:** Optional semantic or structure-aware reranking.
 
-1.  **Intent input:** `--intent` lets you attach task context explicitly.
-2.  **Generative expansion:** HyDE, SPLADE, and classified expansion create richer search variants.
-3.  **Embeddable runtime seams:** The engine traits are being shaped so a turn-based controller can reuse the same retrieval step.
+### Agentic Status
 
-What is not yet formalized is a public multi-turn loop, turn-native storage, or
-protocol-style outputs.
+Agentic support in Sift currently shows up in three places:
 
-## Advanced Usage
+1. **Intent-aware search:** `--intent` lets you add task context to a search.
+2. **Turn-aware library APIs:** The crate root exposes `search_turn`,
+   `search_controller`, and protocol/latent emissions.
+3. **Fixture-driven controller evals:** `sift eval agentic` measures planned
+   multi-turn controller runs against a collapsed single-turn baseline.
 
-### Choosing a Strategy
-Sift comes with several built-in strategy presets. Use the `--strategy` flag to switch between them:
+What is not shipped yet is a general-purpose interactive agentic CLI command or
+an autonomous planner that invents turns on its own.
 
--   `page-index-hybrid` (Default): The best balance of quality and speed.
--   `page-index-llm`: Uses a local LLM for the highest precision reranking.
--   `bm25`: Extremely fast, keyword-only search.
--   `vector`: Pure semantic search.
+## Choosing a Strategy
+
+Useful built-in strategies:
+
+- `hybrid`: Default direct-search strategy.
+- `page-index-hybrid`: Current richer evaluation champion preset.
+- `page-index-llm`: HyDE plus Qwen reranking.
+- `bm25`: Fast lexical-only search.
+- `vector`: Semantic-only search.
+
+Examples:
 
 ```bash
-sift search --strategy page-index-llm "refactor core engine"
+sift search --strategy hybrid "refactor core engine"
+sift search --strategy page-index-hybrid "refactor core engine"
+sift search --strategy bm25 "service catalog"
 ```
 
-### Providing Intent
-If you know exactly what you are looking for, use the `--intent` flag to guide the search:
+## Useful Flags
+
+### Intent
 
 ```bash
 sift search --intent "I am looking for the trait definitions" "engine"
 ```
 
-### Filtering and Overrides
-You can manually override components of any search:
+### Manual Pipeline Overrides
 
 ```bash
-sift search --retrievers bm25 --limit 5 "query"
+sift search --retrievers bm25,phrase --reranking none --limit 5 "query"
 ```
 
-To use a specific reranking model families via CLI:
+### JSON Output
+
 ```bash
-sift search --reranking gemma "query"
-sift search --reranking llm "query"
+sift search --json "query"
 ```
 
-To customize specific model IDs, update your `sift.toml`.
+## Configuration
 
-Sift is "zero-config" by default, but you can customize its behavior using a `sift.toml` file.
+Sift works with no config, but you can customize it through `sift.toml` and
+`.siftignore`.
 
--   **Change Models:** Use a different embedding or reranking model from Hugging Face.
--   **Ignore Files:** Create a `.siftignore` file to skip large or irrelevant directories.
+- Change the default search strategy.
+- Point Sift at different embedding or reranking models.
+- Override generative prompts used by HyDE, SPLADE, and classified expansion.
+- Ignore noisy directories such as `target/` or build outputs.
 
-See the **[Configuration Guide](CONFIGURATION.md)** for full details.
+See [CONFIGURATION.md](CONFIGURATION.md) for the full configuration surface.
+
+## Evaluations
+
+Sift ships two evaluation families:
+
+- **Retrieval evals:** `sift eval all`, `sift eval quality`, `sift eval latency`
+- **Controller evals:** `sift eval agentic`
+
+See [EVALUATIONS.md](EVALUATIONS.md) for datasets, metrics, and report shapes.
 
 ## For Developers
 
-### Embedding Sift
-Sift is designed to be embedded as a Rust library. It provides a formal
-**Reactor Architecture** with traits for configuration (IR), execution, and
-storage, and those seams are the intended basis for future agentic runtimes.
-
--   **[WORLD.md](WORLD.md):** The conceptual world model and "physics" of Sift.
--   **[ARCHITECTURE.md](ARCHITECTURE.md):** Detailed look at the internal design.
--   **[RESEARCH.md](RESEARCH.md):** The vision for the modular engine.
--   **[examples/sift-embed](examples/sift-embed):** A runnable example of how to embed Sift in your own project.
+- [LIBRARY.md](LIBRARY.md): Supported crate-root embedding guide.
+- [ARCHITECTURE.md](ARCHITECTURE.md): Internal architecture and execution seams.
+- [WORLD.md](WORLD.md): Conceptual model and reactor metaphor.
+- [examples/sift-embed](examples/sift-embed): Runnable embedding example.
 
 ## Troubleshooting
 
--   **First-run Latency:** The first search in a large directory may take a few seconds as models are downloaded and documents are indexed.
--   **Cache Location:** Sift stores its cache in your standard OS cache directory (e.g., `~/.cache/sift` on Linux). You can clear this at any time to force a full re-index.
-
----
-
-*For more information, visit the [GitHub Repository](https://github.com/rupurt/sift).*
+- **First-run latency:** Initial searches may download models and build cache artifacts.
+- **Cache location:** By default Sift uses your OS cache directory, for example `~/.cache/sift` on Linux.
+- **Model access:** Some rerankers require gated Hugging Face model access through `HF_TOKEN`.

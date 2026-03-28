@@ -3,6 +3,7 @@
 //! Supported embedded API:
 //! - [`Sift`] and [`SiftBuilder`] for constructing a search engine instance
 //! - [`SearchInput`] and [`SearchOptions`] for issuing direct searches
+//! - [`ContextAssemblyRequest`] and [`ContextAssemblyResponse`] for bounded evidence assembly
 //! - [`SearchTurnRequest`], [`SearchTurnResponse`], and [`SearchEmissionMode`] for turn-aware search control
 //! - [`SearchControllerRequest`] and [`SearchControllerResponse`] for deterministic multi-turn control
 //! - [`Retriever`], [`Fusion`], and [`Reranking`] for supported strategy overrides
@@ -11,6 +12,8 @@
 //! Everything under [`internal`] exists to support the bundled executable,
 //! benchmarks, and repository-internal tests. It is not part of the supported
 //! embedding contract and may change without notice.
+//!
+//! Repository-level usage notes for all supported modes live in `LIBRARY.md`.
 
 mod cache;
 mod config;

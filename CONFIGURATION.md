@@ -1,211 +1,204 @@
 # Configuration Guide
 
-Sift is designed to be zero-config by default, but it can be customized via a
-`sift.toml` file or environment variables. The current configuration surface
-primarily controls the hybrid retrieval core; agentic orchestration is still a
-library/runtime concern rather than a first-class `sift.toml` section.
+Sift is zero-config by default, but you can customize the executable and the
+underlying retrieval substrate through `sift.toml`, CLI overrides, and
+environment variables.
+
+Today configuration is focused on retrieval behavior and model selection. The
+turn-aware controller surface is library-first; there is not yet a dedicated
+`[agentic]` section in `sift.toml`.
 
 ## Configuration Locations
 
-Sift looks for configuration in the following order, merging them together (local overrides system):
+Sift loads configuration in this order, later files overriding earlier ones:
 
-1.  **System-wide:** `/etc/sift.toml`
-2.  **User-specific:** `~/.config/sift/sift.toml` (or platform equivalent)
-3.  **Local Project:** `./sift.toml` (in the directory where you run `sift`)
+1. System-wide: `/etc/sift.toml`
+2. User-specific: `~/.config/sift/sift.toml` (or platform equivalent)
+3. Local project: `./sift.toml`
 
-You can view your effective configuration at any time by running:
+You can inspect the merged effective configuration with:
+
 ```bash
 sift config
 ```
 
----
+## Ignore Files (`.siftignore`)
 
-## Ignoring Files (`.siftignore`)
+Sift supports ignore rules using `gitignore`-style syntax. Ignore files are
+loaded from:
 
-Sift supports ignoring files using standard `gitignore` pattern syntax. This is useful for excluding large data directories, build artifacts, or sensitive files from being indexed and searched.
+1. System-wide: `/etc/siftignore`
+2. User-specific: `~/.config/sift/siftignore`
+3. Local project: `./.siftignore`
 
-Similar to configuration, `.siftignore` files are loaded from multiple locations:
+Example:
 
-1.  **System-wide:** `/etc/siftignore`
-2.  **User-specific:** `~/.config/sift/siftignore` (or platform equivalent)
-3.  **Local Project:** `./.siftignore` (in the directory where you run `sift`)
-
-**Example `.siftignore`:**
 ```ignore
-# Ignore build directories
 target/
 dist/
-
-# Ignore specific file types
 *.log
-*.tmp
-
-# Ignore a specific large data folder
 data/raw/
 ```
 
----
+## `sift.toml` Surface
 
-## Configuration Options (`sift.toml`)
-
-### `[search]` Section
+### `[search]`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `strategy` | String | `"page-index-hybrid"` | The named search strategy to use. |
-| `limit` | Integer | `10` | The maximum number of results to return. |
-| `shortlist` | Integer | `8` | The number of candidates passed into reranking. |
+| `strategy` | String | `"hybrid"` | Default search strategy for the executable and library builder defaults. |
+| `limit` | Integer | `10` | Maximum number of results returned. |
+| `shortlist` | Integer | `8` | Number of fused candidates passed to reranking. |
 
-#### Expansion Pipeline
-Before retrieval, Sift can expand your query to improve recall.
+`hybrid` is the default runtime strategy. `page-index-hybrid` is the richer
+benchmark champion preset used in comparative evaluation docs.
 
-| Policy | Description |
-|--------|-------------|
-| `none` | No expansion (default for simple searches). |
-| `synonym` | Simple rule-based synonym matching. |
-| `hyde` | **Hypothetical Document Embeddings.** Uses a local LLM to generate a "fake" answer and embeds that for semantic retrieval. |
-| `splade` | **Sparse Lexical and Expansion.** Predicts technical terms semantically related to the query. |
-| `classified` | Identifies technical intent (e.g., BUGFIX) and adds category-specific keywords. |
+### Built-in Strategies
 
-#### Current Built-In Strategies
-These presets define the current single-turn retrieval core. Agentic search will
-orchestrate these same primitives over multiple turns rather than replacing
-them.
+The current registry exposes the following named plans:
 
-- **`page-index-hybrid`** (default): Our champion strategy. Combines BM25, Phrase matching, and Vector search, followed by Position-Aware reranking. Defaults to **SPLADE** expansion.
-- **`page-index-llm`**: Combines BM25, Phrase matching, and Vector search, followed by a **Qwen-based LLM reranker**. Defaults to **HyDE** expansion.
-- **`page-index-jina`**: Uses the specialized **Jina Reranker v3** for high-precision ranking. Defaults to **SPLADE** expansion.
-- **`page-index-gemma`**: Uses the **Gemma 3** family of models for deep semantic reranking.
-- **`page-index-splade`**: Uses SPLADE generative expansion for broader keyword recall.
-- **`page-index-classified`**: Uses intent-based classification to expand technical queries.
-- **`page-index`**: Lexical-focused strategy (inspired by qmd). Uses BM25 and Phrase matching with Position-Aware reranking (no vectors).
-- **`bm25`**: Lexical search only. Fast and strictly keyword-based.
-- **`vector`**: Semantic search only. Uses dense embeddings.
-- **`legacy-hybrid`**: Simple BM25 + Vector fusion (no phrase matching or structural bonuses).
+- `lexical`: BM25-only lexical search.
+- `bm25`: Same execution plan as `lexical`, but reported under the `bm25` name.
+- `vector`: Dense-vector-only semantic search.
+- `hybrid`: BM25 + vector fusion with no reranking.
+- `legacy-hybrid`: `page-index-hybrid` retrieval stack without expansion.
+- `page-index-hybrid`: SPLADE expansion + BM25 + phrase + vector + position-aware reranking.
+- `page-index-llm`: HyDE expansion + BM25 + phrase + vector + Qwen reranking.
+- `page-index-qwen`: No expansion + BM25 + phrase + vector + Qwen reranking.
+- `page-index-splade`: SPLADE expansion + BM25 + phrase + vector + position-aware reranking.
+- `page-index-classified`: Classified expansion + BM25 + phrase + vector + position-aware reranking.
+- `page-index-jina`: SPLADE expansion + BM25 + phrase + vector + Jina reranking.
+- `page-index-gemma`: SPLADE expansion + BM25 + phrase + vector + Gemma reranking.
 
-#### Search Strategy Matrix
-The table below details exactly how each built-in strategy is configured across the search pipeline. These presets are interpreted by the `EngineFactory` to construct a modular `SearchEngine` instance.
+### Strategy Matrix
 
 | Strategy | Expansion | Retrievers | Fusion | Reranking |
 |----------|-----------|------------|--------|-----------|
-| `page-index-hybrid` (default) | `splade` | `bm25, phrase, vector` | `rrf` | `position-aware` |
-| `page-index-llm` | `hyde` | `bm25, phrase, vector` | `rrf` | `llm` |
-| `page-index-jina` | `splade` | `bm25, phrase, vector` | `rrf` | `jina` |
-| `page-index-gemma` | `splade` | `bm25, phrase, vector` | `rrf` | `gemma` |
-| `page-index-splade` | `splade` | `bm25, phrase, vector` | `rrf` | `position-aware` |
-| `page-index-classified` | `classified` | `bm25, phrase, vector` | `rrf` | `position-aware` |
-| `page-index` | `none` | `bm25, phrase` | `rrf` | `position-aware` |
+| `lexical` | `none` | `bm25` | `rrf` | `none` |
 | `bm25` | `none` | `bm25` | `rrf` | `none` |
 | `vector` | `none` | `vector` | `rrf` | `none` |
-| `legacy-hybrid` | `none` | `bm25, vector` | `rrf` | `none` |
+| `hybrid` | `none` | `bm25, vector` | `rrf` | `none` |
+| `legacy-hybrid` | `none` | `bm25, phrase, vector` | `rrf` | `position-aware` |
+| `page-index-hybrid` | `splade` | `bm25, phrase, vector` | `rrf` | `position-aware` |
+| `page-index-llm` | `hyde` | `bm25, phrase, vector` | `rrf` | `llm` |
 | `page-index-qwen` | `none` | `bm25, phrase, vector` | `rrf` | `llm` |
+| `page-index-splade` | `splade` | `bm25, phrase, vector` | `rrf` | `position-aware` |
+| `page-index-classified` | `classified` | `bm25, phrase, vector` | `rrf` | `position-aware` |
+| `page-index-jina` | `splade` | `bm25, phrase, vector` | `rrf` | `jina` |
+| `page-index-gemma` | `splade` | `bm25, phrase, vector` | `rrf` | `gemma` |
 
-#### Agentic Execution Status
-- There is no first-class `agentic` strategy or controller section in configuration yet.
-- Current agentic-adjacent controls are the existing intent, retriever, fusion, reranking, and model overrides.
-- Future agentic controllers should reuse these presets as their retrieval substrate rather than introducing a separate hardcoded search stack.
+### CLI Overrides
 
----
-
-## Library Engine Configuration
-
-When embedding `sift` as a library, consumers can bypass the standard `sift.toml` and construct engines directly using the `EngineFactory` or by providing custom implementations of the `SearchIR`, `SearchExecution`, and `SearchStorage` traits.
-
-```rust
-let engine = EngineFactory::default()
-    .build("hybrid", storage, Some(embedder), Some(cache), Some(reranker))?;
-```
-
----
-
-## Decoupled Execution (CLI Overrides)
-
-You can override the components of any strategy directly from the CLI:
+The executable can override parts of the configured strategy per request:
 
 ```bash
-sift search --intent "fix the bug" --retrievers bm25,phrase --reranking gemma "my query"
+sift search --intent "find the trait definition" --retrievers bm25,phrase --reranking none "engine"
 ```
 
-### Override Flags
-- `--intent`: Explicitly provide search intent/context to guide expansion.
-- `--retrievers`: Comma-separated list (`bm25`, `phrase`, `vector`).
-- `--fusion`: Currently only `rrf` is supported.
-- `--reranking`: `none`, `position-aware`, `llm`, `jina`, or `gemma`.
-- `--shortlist`: Number of fused candidates passed to reranking.
-- `--model-id`: Override the embedding model ID.
-- `--rerank-model-id`: Override the LLM rerank model ID (Qwen).
+Available overrides:
 
-`shortlist` controls how many fused candidates are scored by the reranker. It does **not** cap the final output size.
-Higher values can improve reranking quality but increase CPU latency for `page-index-llm`; lower values are usually faster and better for interactive use.
-`limit` controls how many search results are returned.
-If `shortlist` is smaller than `limit`, results beyond the reranked shortlist are filled with the highest-scoring fused results that were not reranked.
-If `shortlist` is larger than `limit`, reranking runs on a wider pool and still returns only the top `limit` final results.
+- `--intent`
+- `--retrievers bm25,phrase,vector`
+- `--fusion rrf`
+- `--reranking none|position-aware|llm|jina|gemma`
+- `--limit`
+- `--shortlist`
+- `--model-id`
+- `--model-revision`
+- `--rerank-model-id`
+- `--rerank-revision`
+- `--max-length`
 
----
+`shortlist` controls how many fused candidates reach reranking. It does not set
+the final number of returned results. `limit` controls the final output size.
 
-### `[embedding]` Section
-*Previously `[model]`, which is still supported for backward compatibility.*
+The executable does not currently expose a raw `--expansion` flag. Expansion is
+selected indirectly through the chosen strategy. If you need an explicit custom
+expansion policy, use an explicit `SearchPlan` through the library surface.
 
-These settings control the local machine learning model used for semantic vector search.
+### `[embedding]`
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `model_id` | String | `"sentence-transformers/all-MiniLM-L6-v2"` | HuggingFace model ID to download and run. |
-| `model_revision` | String | `"main"` | The specific git revision/branch of the model. |
-| `max_length` | Integer | `40` | Maximum sequence length (tokens) for embedding. |
-
----
-
-### `[rerank]` Section
-
-These settings control the local LLM model used for semantic reranking (Qwen).
+`[model]` is still accepted for backward compatibility, but `[embedding]` is
+the preferred section name.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `model_id` | String | `"Qwen/Qwen2.5-0.5B-Instruct"` | HuggingFace model ID for the reranker. |
-| `model_revision` | String | `"main"` | The specific git revision/branch of the rerank model. |
-| `max_length` | Integer | `512` | Maximum sequence length (tokens) for reranking. |
+| `model_id` | String | `"sentence-transformers/all-MiniLM-L6-v2"` | Embedding model ID. |
+| `model_revision` | String | `"main"` | Embedding model revision. |
+| `max_length` | Integer | `40` | Max sequence length for embedding. |
 
----
-
-### `[gemma]` Section
-
-These settings control the local Gemma 3 model used for semantic reranking.
+### `[rerank]`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `model_id` | String | `"google/gemma-3-1b-it"` | HuggingFace model ID for the gemma reranker. |
-| `model_revision` | String | `"main"` | The specific git revision/branch of the gemma model. |
-| `max_length` | Integer | `512` | Maximum sequence length (tokens) for reranking. |
+| `model_id` | String | `"Qwen/Qwen2.5-0.5B-Instruct"` | Qwen reranker model ID. |
+| `model_revision` | String | `"main"` | Qwen reranker revision. |
+| `max_length` | Integer | `512` | Max sequence length for reranking. |
 
----
+### `[gemma]`
 
-## Ranking & Reranking
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `model_id` | String | `"google/gemma-3-1b-it"` | Gemma reranker model ID. |
+| `model_revision` | String | `"main"` | Gemma reranker revision. |
+| `max_length` | Integer | `512` | Max sequence length for reranking. |
 
-### Position-Aware Reranking
-Applies "soft bonuses" to prioritizing structural matches:
-- **Filename Bonus (+0.05):** Added if the query matches the file name.
-- **Heading/Location Bonus (+0.02):** Added if the query matches a structural label (e.g., a PDF Page or HTML Heading).
+### `[prompts]`
 
-### LLM Reranking (Qwen)
-Performs a deep semantic pass over the top candidates. It prompts a local LLM to evaluate the relevance of each document to the query, providing the highest accuracy but with more computational overhead.
+Prompt overrides are optional and are consumed by generative expansion and the
+optimizer.
 
-### Gemma Reranking
-Uses the **Gemma 3** family of models for semantic reranking. Similar to the Qwen-based reranker, it performs deep evaluation of document relevance but leverages the latest Gemma architectures for improved reasoning.
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `hyde` | String | unset | Override the HyDE system prompt. |
+| `splade` | String | unset | Override the SPLADE system prompt. |
+| `classified` | String | unset | Override the classified-expansion system prompt. |
 
----
+## Ranking Notes
+
+### Position-aware Reranking
+
+This reranker adds structural bonuses such as filename and heading matches.
+
+### Qwen / Gemma / Jina Reranking
+
+These rerankers perform deeper semantic scoring on the shortlist. They improve
+quality but typically cost more latency than `position-aware` or `none`.
+
+## Agentic Status in Configuration
+
+- There is no first-class `agentic` strategy or `[agentic]` controller section yet.
+- Controller budgets, retained artifacts, and emission modes are exposed
+  through the library request types rather than `sift.toml`.
+- Agentic evaluations reuse the configured retrieval substrate instead of
+  introducing a separate hidden stack.
+
+## Library Configuration Notes
+
+The stable embedding contract is documented in [LIBRARY.md](LIBRARY.md). The
+short version is:
+
+- Use `SearchOptions` to configure direct searches.
+- Use `ContextAssemblyRequest` to build retained evidence for downstream tools.
+- Use `SearchTurnRequest` for a single turn with explicit emission mode.
+- Use `SearchControllerRequest` for deterministic multi-turn execution.
+
+Some builder methods and option setters accept `sift::internal` types, such as
+internal model specs or loaded config structs. Those are useful for advanced
+embedding, but they are tighter couplings than the crate-root request/response
+surface.
 
 ## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `SIFT_CACHE` | Root directory for all sift state (defaults to standard OS cache dir). |
-| `SIFT_BLOBS_CACHE` | Specific override for the blob store. |
-| `SIFT_MANIFESTS_CACHE` | Specific override for the project manifests. |
-| `SIFT_MODELS_CACHE` | Specific override for downloaded ML models. |
+| `SIFT_CACHE` | Root directory for all Sift state. |
+| `SIFT_BLOBS_CACHE` | Override for the blob store. |
+| `SIFT_MANIFESTS_CACHE` | Override for project manifests. |
+| `SIFT_MODELS_CACHE` | Override for downloaded models. |
 | `SIFT_DENSE_DEVICE` | Dense embedding device override: `cpu` or `cuda`. |
-| `SIFT_LLM_DEVICE` | Default device override for Candle-backed LLM paths: `cpu` or `cuda`. |
-| `SIFT_QWEN_DEVICE` | Qwen-specific device override: `cpu` or `cuda`. |
-| `SIFT_JINA_DEVICE` | Jina-specific device override: `cpu` or `cuda`. |
-| `SIFT_GEMMA_DEVICE` | Gemma-specific device override: `cpu` or `cuda`. |
-| `HF_TOKEN` | Hugging Face API token for downloading gated models (e.g., Jina Reranker v3 and Gemma 3). |
+| `SIFT_LLM_DEVICE` | Default Candle-backed LLM device override: `cpu` or `cuda`. |
+| `SIFT_QWEN_DEVICE` | Qwen-specific device override. |
+| `SIFT_JINA_DEVICE` | Jina-specific device override. |
+| `SIFT_GEMMA_DEVICE` | Gemma-specific device override. |
+| `HF_TOKEN` | Hugging Face token for gated model downloads. |

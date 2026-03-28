@@ -4,37 +4,31 @@
 [![Planning Board](https://img.shields.io/badge/Keel-Board-blue)](.keel/README.md)
 [![Release Process](https://img.shields.io/badge/Release-Process-green)](RELEASE.md)
 
-`sift` is a standalone Rust CLI and library for **Hybrid and Agentic Search**
-in local development workflows. Today it ships a lightning-fast hybrid retrieval
-core for raw local corpora without a long-running daemon, plus the architectural
-seams needed to grow that core into a local search subagent.
+`sift` is a standalone Rust CLI and library for hybrid and agentic local search
+in development workflows. The shipped executable gives you direct single-turn
+search, evaluation, dataset, and prompt-optimization commands; the crate-root
+library facade already exposes deterministic turn-aware and controller-style
+search APIs for embedding.
 
 The core idea is simple: point `sift` at a directory, extract text on demand,
-and run a layered search pipeline (Expansion, Retrieval, Fusion, Reranking).
-That pipeline is the current execution core. The next layer is agentic
-orchestration: repeated turns over the same retrieval core with explicit context
-management, query decomposition, and richer emissions for other tools.
+and run a layered pipeline of expansion, retrieval, fusion, and reranking.
+Agentic behavior in Sift is built on top of that same retrieval substrate
+rather than replacing it with a separate service or daemon.
 
-For the project background and design rationale, read the introductory post:
+For project background and design rationale, read the introductory post:
 [`Sift: Local Hybrid Search Without the Infrastructure Tax`](https://www.alexdk.com/blog/introducing-sift).
 
 ## Current Contract
 
-- **Single Rust Binary:** No external database, daemon, or long-running service.
-- **Pure-Rust Toolchain:** No C++ dependencies, enabling easy static binary distribution.
-- **High Performance:** SIMD-accelerated scoring and memory-mapped I/O for 
-  ultra-fast retrieval on large corpora.
-- **Default Retrieval Strategy:** Uses the `page-index-hybrid` champion preset (Lexical + Semantic).
-- **Layered Pipeline:** Query Expansion -> Retrieval -> Fusion -> Reranking.
-- **Execution Direction:** Single-turn search is shipped today; turn-based agentic orchestration is the next formal layer.
-- **Heuristic Incremental Caching:** Uses `mtime`, `inode`, and `size` to bypass 
-  extraction and hashing for unchanged files.
-- **Fully Processed Assets:** Cache blobs contain text, term stats, and pre-computed
-  dense vector embeddings, enabling search at dot-product speeds.
-- **Inference & Reranking:** Runs locally through Candle with support for 
-  both dense embeddings and advanced LLM reranking (e.g., Qwen2.5).
-- **Agentic Scaffolding:** The library already exposes local `GenerativeModel` / `Conversation` hooks for turn-based controllers.
-- **Supported Inputs:** Text, HTML, PDF, and OOXML files (`.docx`, `.xlsx`, `.pptx`).
+- **Single Rust binary:** No external database, daemon, or long-running service.
+- **Local-first retrieval:** Search runs over local corpora with transparent caching in standard user cache directories.
+- **Default interactive strategy:** The default config strategy is `hybrid`.
+- **Current champion preset:** `page-index-hybrid` is the richer benchmark preset for comparative evaluation.
+- **Layered pipeline:** Query Expansion -> Retrieval -> Fusion -> Reranking.
+- **Executable surface:** `search`, `eval`, `dataset`, `optimize`, and `config` are the supported CLI commands.
+- **Library surface:** `search`, `assemble_context`, `search_turn`, and `search_controller` are supported at the crate root.
+- **Emission modes:** Turn-aware library calls can emit `view`, `protocol`, or `latent` responses.
+- **Supported inputs:** Text, HTML, PDF, and OOXML files (`.docx`, `.xlsx`, `.pptx`).
 
 ## Installation
 
@@ -58,19 +52,94 @@ Download the latest pre-built binaries and installers for your platform from the
 - **macOS:** `.tar.gz` archives plus the cross-platform shell installer
 - **Windows:** `.zip` archives, `.msi`, and the PowerShell installer
 
+## CLI Interface
+
+The executable currently exposes the following command groups:
+
+| Command | Purpose |
+|---------|---------|
+| `sift search [OPTIONS] [PATH] <QUERY>` | Direct single-turn search over a local corpus. |
+| `sift eval all` | Compare all registered retrieval strategies. |
+| `sift eval quality` | Emit a JSON quality report for one strategy, optionally against a baseline. |
+| `sift eval latency` | Emit a JSON latency report for one strategy. |
+| `sift eval agentic` | Run planned multi-turn controller fixtures and compare them against a collapsed single-turn baseline. |
+| `sift dataset download|materialize` | Manage evaluation datasets such as SciFact. |
+| `sift optimize` | Tune prompt templates used by generative expansion. |
+| `sift config` | Print the merged effective configuration. |
+
+There is not yet a general-purpose `sift agentic` interactive CLI command. The
+turn-aware controller surface is library-first today, while the executable
+exposes agentic behavior primarily through `eval agentic`.
+
+## Search Examples
+
+Search with the default configured strategy (`hybrid` unless overridden in
+`sift.toml`):
+
+```bash
+sift search tests/fixtures/rich-docs "architecture decision"
+```
+
+Run the current benchmark champion preset explicitly:
+
+```bash
+sift search --strategy page-index-hybrid tests/fixtures/rich-docs "architecture decision"
+```
+
+Use a simpler lexical-only plan:
+
+```bash
+sift search --strategy bm25 "service catalog"
+```
+
+Use a vector-only plan:
+
+```bash
+sift search --strategy vector "architecture"
+```
+
+Override individual pipeline stages:
+
+```bash
+sift search --retrievers bm25,phrase --reranking none "query"
+```
+
+Emit JSON instead of text:
+
+```bash
+sift search --json "query"
+```
+
+### Verbose Mode
+
+Trace the pipeline and timings at different levels:
+
+- `-v`: Phase timings
+- `-vv`: Detailed retriever timings and cache traces
+- `-vvv`: Granular internal scoring data
+
 ## Embedded Library
 
-`sift` can also be embedded from another Rust project. The supported library
-contract lives at the crate root:
+`sift` can also be embedded from another Rust project. The supported public
+surface lives at the crate root and includes:
 
 - `Sift`, `SiftBuilder`
 - `SearchInput`, `SearchOptions`
+- `ContextAssemblyRequest`, `ContextAssemblyResponse`
+- `SearchTurnRequest`, `SearchTurnResponse`
+- `SearchControllerRequest`, `SearchControllerResponse`
+- `SearchEmission`, `SearchEmissionMode`
+- `SearchPlan`, `QueryExpansionPolicy`, `RetrieverPolicy`, `FusionPolicy`, `RerankingPolicy`
 - `Retriever`, `Fusion`, `Reranking`
-- `SearchResponse`, `SearchHit`, `ScoreConfidence`
+- `SearchResponse`, `SearchHit`, `ContextArtifact`, `ContextArtifactKind`, `ScoreConfidence`
 
 Everything under `sift::internal` exists to support the bundled executable,
-benchmarks, and repository-internal tests. It is not part of the supported
-embedding contract and may change without notice.
+benchmarks, and repository-internal tests. It is not part of the stable
+embedding contract.
+
+See [LIBRARY.md](LIBRARY.md) for the full embedding guide, including direct
+search, context assembly, protocol/latent emissions, local context injection,
+and deterministic multi-turn controller usage.
 
 ### Runnable Example Consumer
 
@@ -82,10 +151,10 @@ From the repo root:
 
 ```bash
 just embed-build
-just embed-search tests/fixtures/rich-docs "architecture decision"
+just embed-sift tests/fixtures/rich-docs "architecture decision"
 ```
 
-The embedded example supports the same shape directly:
+You can also run the example directly:
 
 ```bash
 cargo run --manifest-path examples/sift-embed/Cargo.toml -- search "agentic search"
@@ -94,7 +163,7 @@ cargo run --manifest-path examples/sift-embed/Cargo.toml -- search tests/fixture
 
 If `PATH` is omitted, `sift-embed search "<term>"` searches the current
 directory. See [`examples/sift-embed/README.md`](examples/sift-embed/README.md)
-for the full runnable example notes.
+for the runnable example notes.
 
 ### Add The Dependency
 
@@ -116,46 +185,41 @@ sift = { path = "../sift" }
 ### Minimal Embedding Example
 
 ```rust
-use sift::{Retriever, Reranking, SearchInput, SearchOptions, Sift};
+use sift::{Fusion, Retriever, Reranking, SearchInput, SearchOptions, Sift};
 
 fn main() -> anyhow::Result<()> {
     let sift = Sift::builder().build();
 
     let response = sift.search(
-        SearchInput::new("./docs", "agentic search")
-            .with_options(
-                SearchOptions::default()
-                    .with_strategy("bm25")
-                    .with_retrievers(vec![Retriever::Bm25])
-                    .with_reranking(Reranking::None)
-                    .with_limit(5)
-                    .with_shortlist(5),
-            ),
+        SearchInput::new("./docs", "agentic search").with_options(
+            SearchOptions::default()
+                .with_strategy("bm25")
+                .with_retrievers(vec![Retriever::Bm25])
+                .with_fusion(Fusion::Rrf)
+                .with_reranking(Reranking::None)
+                .with_limit(5)
+                .with_shortlist(5),
+        ),
     )?;
 
-    for hit in response.results {
-        println!("{} {}", hit.rank, hit.path.display());
+    for hit in response.hits {
+        println!("{} {}", hit.rank, hit.path);
     }
 
     Ok(())
 }
 ```
 
-Embedders should consume `SearchResponse` directly and own their own rendering.
-Helpers under `sift::internal` are executable support code, not stable library
-API.
-
 ## How Sift Works
 
 At runtime, `sift` orchestrates a high-performance asset pipeline and retrieval
-runtime that can be invoked directly or wrapped by a future turn-based search
-controller:
+runtime that can be invoked directly or wrapped by a turn-aware controller:
 
 ```mermaid
 flowchart TD
   A[CLI parse] --> B[Resolve PATH + QUERY]
   B --> C[Directory Walk]
-  
+
   subgraph Pipeline ["Optimized Asset Pipeline"]
     C1{Heuristic Hit?} -->|Yes| C2[Mapped I/O: Load Document Blob]
     C1 -->|No| C3[BLAKE3 Hash + Check CAS]
@@ -171,22 +235,22 @@ flowchart TD
   subgraph Strategy ["Hybrid Retrieval Core"]
     D --> J{Execution Path}
     J -->|Direct| E{Expansion}
-    J -->|Agentic Loop| A0[Plan Turn / Manage Context]
+    J -->|Turn-aware| A0[Plan Turn / Manage Context]
     A0 --> E
     E -->|None| E1[Direct Query]
     E -->|HyDE| E2[LLM: Hypothetical Answer]
     E -->|SPLADE| E3[LLM: Generative Expansion]
     E -->|Classified| E4[LLM: Intent Classification]
-    
+
     E1 --> F{Retrievers}
     E2 --> F
     E3 --> F
     E4 --> F
-    
+
     F -->|Lexical| F1[BM25]
     F -->|Exact| F2[Phrase]
     F -->|Semantic| F3[Vector - SIMD Dot Product]
-    
+
     subgraph QueryCache ["Query Embedding Cache"]
       F3
     end
@@ -199,57 +263,33 @@ flowchart TD
     H -->|Advanced| H2[LLM - Deep Semantic Pass]
     H1 --> K{Emission}
     H2 --> K
-    K -->|CLI| I[Colorized CLI Output]
-    K -->|Library| I2[Structured SearchResponse]
+    K -->|CLI| I[Text or JSON search output]
+    K -->|Library| I2[Structured response or emission]
     K -.->|Need More Evidence| A0
   end
 ```
 
-Today the shipped CLI uses the direct path. The agentic loop in the diagram is
-the formal product direction and already has partial library/runtime scaffolding
-in the codebase.
+Today the executable ships direct search plus evaluation-oriented agentic
+fixtures. The library already exposes deterministic turn-aware controller
+surfaces. Fully autonomous planning and decomposition remain the next formal
+layer.
 
 ## Performance & Scalability
 
 `sift` is optimized for speed without sacrificing its stateless UX:
-- **Zero-Inference Search:** On repeated queries, neural network inference is bypassed entirely by loading pre-computed embeddings and reusing query embeddings from the session cache.
-- **SIMD Acceleration:** Vector similarity calculations use hardware-specific SIMD instructions for a ~7x speedup over standard scalar implementations.
-- **Mapped I/O:** Document retrieval from the global cache uses `mmap` to minimize system call overhead and leverage OS-level paging.
-- **Fast Path Heuristics:** Filesystem metadata checks happen in microseconds, allowing `sift` to skip hashing for unchanged files.
 
-## Search Examples
+- **Zero-inference repeat search:** Reuses cached document blobs and query embeddings where possible.
+- **SIMD acceleration:** Vector similarity calculations use hardware-specific SIMD instructions.
+- **Mapped I/O:** Uses `mmap` for document blob reads.
+- **Fast-path heuristics:** Filesystem metadata checks allow unchanged files to bypass hashing and extraction.
 
-The default strategy (champion alias `page-index-hybrid`) is used automatically:
+## Documentation Map
 
-```bash
-sift search tests/fixtures/rich-docs "architecture decision"
-```
-
-Force a specific strategy or override components:
-
-```bash
-# Lexical only (no vectors)
-sift search --strategy page-index "service catalog"
-
-# Semantic only (vectors)
-sift search --strategy vector "architecture"
-
-# Custom mix
-sift search --retrievers bm25,vector --reranking none "query"
-```
-
-### Verbose Mode
-Trace the pipeline and timings at different levels:
-- `-v`: Phase timings (Loading, Retrieval, etc.)
-- `-vv`: Detailed retriever timings and cache hit/miss traces.
-- `-vvv`: Granular internal scoring data.
-
-## Configuration & Customization
-
-- **[USER_GUIDE.md](USER_GUIDE.md):** The comprehensive guide to getting started and mastering Sift.
-- **[CONFIGURATION.md](CONFIGURATION.md):** Technical guide to `sift.toml`, available strategies, and environment variables.
-- **[EVALUATIONS.md](EVALUATIONS.md):** How to manage datasets and run quality/latency evaluations.
-- **[ARCHITECTURE.md](ARCHITECTURE.md):** Deep dive into the hexagonal modular engine and asset pipeline.
+- **[USER_GUIDE.md](USER_GUIDE.md):** End-user guide for direct search workflows.
+- **[CONFIGURATION.md](CONFIGURATION.md):** `sift.toml`, strategies, prompts, and environment variables.
+- **[EVALUATIONS.md](EVALUATIONS.md):** Retrieval and agentic evaluation workflows.
+- **[LIBRARY.md](LIBRARY.md):** Crate-root embedding guide for all supported library modes.
+- **[ARCHITECTURE.md](ARCHITECTURE.md):** Architecture, execution seams, and implementation status.
 
 ## License
 

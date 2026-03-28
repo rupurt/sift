@@ -3,9 +3,10 @@
 Sift is designed using **Domain-Driven Design (DDD)** and **Hexagonal
 Architecture (Ports and Adapters)** principles. It is evolving from a
 single-pass hybrid retrieval engine into a **High-Energy Information Reactor**
-for hybrid and agentic search. Today the shipped runtime searches local files;
-the architecture is being extended toward turn-based search controllers and
-agent-facing emissions.
+for hybrid and agentic search. Today the shipped runtime includes direct local
+search, deterministic turn-aware library APIs, and fixture-driven controller
+evaluation; autonomous planning and richer agent orchestration are the next
+architectural layer.
 
 ## Core Tenets
 
@@ -41,8 +42,10 @@ flowchart LR
 ### 1. The Domain (`src/search/domain.rs`)
 Defines the vocabulary of retrieval centered on `Document` today, plus the core
 trait boundaries (`Expander`, `Retriever`, `Fuser`, `Reranker`,
-`GenerativeModel`, `Conversation`). A first-class `AgentTurn` model is planned
-by ADR but is not yet implemented in the shipping domain.
+`GenerativeModel`, `Conversation`). The shipping domain also includes public
+turn-aware request and response contracts, retained-artifact records, and
+synthetic local-context artifacts. A richer first-class agent memory model is
+still planned beyond those DTOs.
 
 ### 2. SearchIR (The Magnetic Field Configuration)
 The Intermediate Representation (IR) translates user queries into an executable
@@ -65,15 +68,16 @@ including remote corpora and future turn stores.
 
 Sift is being extended toward searching and surfacing **Agent Turns** and other
 intermediate artifacts that matter in coding workflows. The current codebase
-already exposes some of the required primitives, but the full turn protocol is
-not formalized yet.
+already exposes explicit turn requests, controller state, retained artifacts,
+and local synthetic context sources. What is not formalized yet is autonomous
+planning and a richer persisted turn model.
 
 ### Emission Modes
 The reactor is intended to expose configurable ports for different types of
 output:
-- **Visual Emission (implemented):** Rendered, highlighted file results for the CLI and `SearchResponse`.
-- **Protocol Emission (planned):** Structured domain records for agentic consumers.
-- **Latent Emission (planned):** Raw embeddings or related feature vectors for external systems.
+- **Visual Emission (implemented):** `SearchResponse` style results for the CLI and library.
+- **Protocol Emission (implemented):** Structured turn-aware records through `SearchEmissionMode::Protocol`.
+- **Latent Emission (implemented):** Ranking-oriented latent hits through `SearchEmissionMode::Latent`.
 
 ## Intent-Driven Retrieval (Catalysis)
 
@@ -83,9 +87,9 @@ Sift uses local LLMs (Qwen 2.5, Gemma 3) to understand and expand user intent, a
 - **SPLADE:** Predicts semantically related technical terms.
 - **Classification:** Categorizes queries (e.g., BUGFIX) to add intent-specific keywords.
 
-The next architectural layer is an explicit search controller that can decompose
-queries into subqueries, iterate over retrieval turns, and manage context
-budgets without leaving the local runtime.
+The next architectural layer after the current deterministic controller is an
+autonomous planner that can decompose queries into subqueries, decide when to
+continue, and manage context budgets without leaving the local runtime.
 
 ## The Incremental File Cache (`src/cache/`)
 
@@ -110,13 +114,16 @@ Stores binary serialized assets, including extracted text, term frequencies, and
 - A composable hybrid retrieval core (`SearchPlan`, retrievers, fusion, reranking).
 - Trait seams for `SearchEngine`, `SearchIR`, `SearchExecution`, and `SearchStorage`.
 - Local generative model access and stateful `Conversation` hooks.
-- Library and CLI surfaces for human-readable file search results.
+- CLI surfaces for direct search and evaluation.
+- Library surfaces for `search`, `assemble_context`, `search_turn`, and `search_controller`.
+- `view`, `protocol`, and `latent` emission modes for turn-aware responses.
+- Fixture-driven agentic evaluation comparing controller runs against collapsed single-turn baselines.
 
 ### Not formalized yet
-- A first-class `AgentTurn` domain model.
+- Autonomous plan generation and query decomposition.
+- A first-class persisted `AgentTurn` domain model.
 - A graph IR beyond the current `SearchPlan` wrapper.
-- A multi-turn search harness that performs decomposition, iteration, and context pruning.
-- Explicit `emit_turns` / `emit_latent` style emission ports.
+- A general-purpose interactive agentic CLI command.
 
 ## Adapters (`src/search/adapters/`)
 
