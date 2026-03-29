@@ -204,8 +204,7 @@ fn agentic_harness_runs_planned_multi_turn_fixtures_from_repo_local_files() {
         "planned-controller"
     );
     assert_eq!(
-        report_json["comparison"]["delta_graph_vs_autonomous"]["graph"]
-            ["average_frontier_expansion_cost"],
+        report_json["comparison"]["delta_graph_vs_autonomous"]["graph"]["average_frontier_expansion_cost"],
         1.0
     );
     assert!(

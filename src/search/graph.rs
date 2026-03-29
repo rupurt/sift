@@ -236,7 +236,8 @@ pub fn replay_graph_decision(
 
             ensure_branch_exists(state, branch_id, step, "fork")?;
             ensure_node_exists(state, node_id, step, "fork")?;
-            let parent_branch_index = branch_index(state, branch_id).expect("validated parent branch");
+            let parent_branch_index =
+                branch_index(state, branch_id).expect("validated parent branch");
 
             if branch_index(state, target_branch_id).is_some() {
                 return Err(AutonomousGraphTraceContractError::new(
@@ -289,7 +290,9 @@ pub fn replay_graph_decision(
                 AutonomousGraphBranchState::new(target_branch_id, target_node_id)
                     .with_status(AutonomousGraphBranchStatus::Pending)
                     .with_retained_artifacts(
-                        state.branches[parent_branch_index].retained_artifacts.clone(),
+                        state.branches[parent_branch_index]
+                            .retained_artifacts
+                            .clone(),
                     ),
             );
             state.frontier.push(AutonomousGraphFrontierEntry::new(

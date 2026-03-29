@@ -491,7 +491,8 @@ impl HeuristicAutonomousPlanner {
             .into_iter()
             .take(request.state.step_limit)
             .collect::<Vec<_>>();
-        let stop_reason = self.graph_stop_reason(request, candidate_count, selected.len(), &episode);
+        let stop_reason =
+            self.graph_stop_reason(request, candidate_count, selected.len(), &episode);
         let mut steps = Vec::new();
 
         let first = &selected[0];

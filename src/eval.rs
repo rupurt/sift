@@ -1113,10 +1113,8 @@ pub fn run_agentic_evaluation(
             expected_documents_satisfied(&task.expected_final_documents, &graph_final_documents);
         let graph_final_recall_at_10 =
             recall_against_expected(&graph_final_documents, &task.expected_final_documents);
-        let graph_retained_evidence_efficiency = retained_evidence_efficiency(
-            &graph_final_documents,
-            &task.expected_final_documents,
-        );
+        let graph_retained_evidence_efficiency =
+            retained_evidence_efficiency(&graph_final_documents, &task.expected_final_documents);
         let graph_metrics = summarize_graph_planner_trace(
             &graph_response.planner_trace,
             &graph_final_documents,
@@ -2110,7 +2108,11 @@ fn branch_efficiency(
     turns_executed: usize,
 ) -> f64 {
     if turns_executed == 0 {
-        return if expected_documents.is_empty() { 1.0 } else { 0.0 };
+        return if expected_documents.is_empty() {
+            1.0
+        } else {
+            0.0
+        };
     }
 
     let expected: HashSet<_> = expected_documents.iter().map(String::as_str).collect();

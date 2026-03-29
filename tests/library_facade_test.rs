@@ -67,16 +67,18 @@ impl AutonomousPlanner for InvalidGraphPlanner {
     fn plan(&self, request: &AutonomousSearchRequest) -> anyhow::Result<AutonomousPlannerTrace> {
         Ok(
             AutonomousPlannerTrace::new(request.planner_strategy.clone())
-                .with_steps(vec![AutonomousPlannerTraceStep::new(
-                    sift::AutonomousPlannerStepCursor::new("step-1", 1),
-                )
-                .with_decisions(vec![
-                    AutonomousPlannerDecision::new(AutonomousPlannerAction::Select)
-                        .with_branch_id("branch-root")
-                        .with_node_id("step-1")
-                        .with_frontier_id("frontier-missing")
-                        .with_rationale("select an impossible frontier"),
-                ])])
+                .with_steps(vec![
+                    AutonomousPlannerTraceStep::new(sift::AutonomousPlannerStepCursor::new(
+                        "step-1", 1,
+                    ))
+                    .with_decisions(vec![
+                        AutonomousPlannerDecision::new(AutonomousPlannerAction::Select)
+                            .with_branch_id("branch-root")
+                            .with_node_id("step-1")
+                            .with_frontier_id("frontier-missing")
+                            .with_rationale("select an impossible frontier"),
+                    ]),
+                ])
                 .with_completed(true)
                 .with_stop_reason(AutonomousPlannerStopReason::NoFurtherQueries),
         )
@@ -918,14 +920,16 @@ fn built_in_autonomous_runtime_executes_bounded_graph_mode() {
                 .with_limit(1)
                 .with_shortlist(1)
                 .with_retained_artifact_limit(1)
-                .with_state(sift::AutonomousPlannerState::new(2).with_retained_artifacts(vec![
-                    retained_artifact(
-                        "seed-evidence",
-                        "context/seed.txt",
-                        "beta evidence carryover",
-                        "fork a follow-up graph branch",
-                    ),
-                ])),
+                .with_state(
+                    sift::AutonomousPlannerState::new(2).with_retained_artifacts(vec![
+                        retained_artifact(
+                            "seed-evidence",
+                            "context/seed.txt",
+                            "beta evidence carryover",
+                            "fork a follow-up graph branch",
+                        ),
+                    ]),
+                ),
         )
         .expect("built-in graph autonomous search");
 
@@ -982,9 +986,7 @@ fn graph_autonomous_runtime_surfaces_explicit_trace_contract_errors() {
         .expect_err("invalid graph trace should fail explicitly");
 
     assert!(
-        error
-            .to_string()
-            .contains("graph trace contract error"),
+        error.to_string().contains("graph trace contract error"),
         "unexpected graph runtime error: {error}"
     );
 }

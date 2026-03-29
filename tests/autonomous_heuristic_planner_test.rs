@@ -194,14 +194,18 @@ fn heuristic_graph_planner_forks_and_prioritizes_a_bounded_frontier() {
     let planner = HeuristicAutonomousPlanner::default();
     let request = AutonomousSearchRequest::new("./docs", "alpha runtime")
         .with_mode(AutonomousSearchMode::Graph)
-        .with_state(AutonomousPlannerState::new(2).with_retained_artifacts(vec![retained_artifact(
-            "artifact-1",
-            "context/seed.txt",
-            "beta evidence carryover",
-            "explore the beta evidence branch",
-        )]));
+        .with_state(AutonomousPlannerState::new(2).with_retained_artifacts(vec![
+            retained_artifact(
+                "artifact-1",
+                "context/seed.txt",
+                "beta evidence carryover",
+                "explore the beta evidence branch",
+            ),
+        ]));
 
-    let trace = planner.plan(&request).expect("heuristic graph planner trace");
+    let trace = planner
+        .plan(&request)
+        .expect("heuristic graph planner trace");
 
     assert_eq!(trace.steps.len(), 2);
     assert!(trace.completed);
@@ -267,7 +271,9 @@ fn heuristic_graph_planner_reports_step_limit_when_branch_expansion_is_truncated
             ),
         ]));
 
-    let trace = planner.plan(&request).expect("heuristic graph planner trace");
+    let trace = planner
+        .plan(&request)
+        .expect("heuristic graph planner trace");
 
     assert_eq!(trace.steps.len(), 1);
     assert_eq!(
@@ -291,7 +297,9 @@ fn heuristic_graph_planner_stops_immediately_when_step_budget_is_zero() {
         .with_mode(AutonomousSearchMode::Graph)
         .with_state(AutonomousPlannerState::new(0));
 
-    let trace = planner.plan(&request).expect("heuristic graph planner trace");
+    let trace = planner
+        .plan(&request)
+        .expect("heuristic graph planner trace");
 
     assert!(trace.steps.is_empty());
     assert!(trace.completed);
