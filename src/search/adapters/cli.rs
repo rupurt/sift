@@ -61,10 +61,19 @@ fn render_autonomous_text_response(response: &AutonomousSearchResponse) -> Resul
     let mut output = String::new();
     writeln!(
         &mut output,
+        "mode: {}",
+        autonomous_search_mode_label(response.mode)
+    )?;
+    writeln!(
+        &mut output,
         "planner: {}",
         planner_strategy_kind_label(response.planner_strategy.kind)
     )?;
     writeln!(&mut output, "turns: {}", response.turns.len())?;
+    if let Some(graph_episode) = &response.state.graph_episode {
+        writeln!(&mut output, "branches: {}", graph_episode.branches.len())?;
+        writeln!(&mut output, "frontier: {}", graph_episode.frontier.len())?;
+    }
     if let Some(stop_reason) = response.planner_trace.stop_reason {
         writeln!(
             &mut output,
@@ -97,6 +106,13 @@ fn planner_strategy_kind_label(kind: AutonomousPlannerStrategyKind) -> &'static 
     match kind {
         AutonomousPlannerStrategyKind::Heuristic => "heuristic",
         AutonomousPlannerStrategyKind::ModelDriven => "model-driven",
+    }
+}
+
+fn autonomous_search_mode_label(mode: AutonomousSearchMode) -> &'static str {
+    match mode {
+        AutonomousSearchMode::Linear => "linear",
+        AutonomousSearchMode::Graph => "graph",
     }
 }
 

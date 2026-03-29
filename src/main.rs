@@ -23,8 +23,8 @@ use sift::internal::{
     system::Telemetry,
 };
 use sift::{
-    AutonomousPlannerStrategy, AutonomousPlannerStrategyKind, AutonomousSearchRequest, Fusion,
-    Reranking, Retriever, SearchInput, SearchOptions, Sift,
+    AutonomousPlannerStrategy, AutonomousPlannerStrategyKind, AutonomousSearchMode,
+    AutonomousSearchRequest, Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift,
 };
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
@@ -69,6 +69,7 @@ mod search_cli_tests {
             request.planner_strategy,
             AutonomousPlannerStrategy::heuristic()
         );
+        assert_eq!(request.mode, AutonomousSearchMode::Linear);
     }
 
     #[test]
@@ -95,6 +96,35 @@ mod search_cli_tests {
         assert_eq!(
             request.planner_strategy,
             AutonomousPlannerStrategy::model_driven().with_profile("local-planner-v1")
+        );
+    }
+
+    #[test]
+    fn agent_search_can_select_graph_mode() {
+        let cli = Cli::try_parse_from([
+            "sift",
+            "search",
+            "--agent",
+            "Search Me",
+            "--agent-mode",
+            "graph",
+            "./docs",
+        ])
+        .expect("parse graph agent search command");
+
+        let Commands::Search(search) = cli.command else {
+            panic!("expected search command");
+        };
+
+        let request = search
+            .to_autonomous_request()
+            .expect("build graph autonomous request");
+        assert_eq!(request.path, PathBuf::from("./docs"));
+        assert_eq!(request.root_task, "Search Me");
+        assert_eq!(request.mode, AutonomousSearchMode::Graph);
+        assert_eq!(
+            request.planner_strategy,
+            AutonomousPlannerStrategy::heuristic()
         );
     }
 }
@@ -163,6 +193,10 @@ struct SearchCommand {
     #[arg(long, value_name = "ROOT_TASK")]
     /// Run the shared autonomous planner runtime with ROOT_TASK.
     agent: Option<String>,
+
+    #[arg(long, value_enum, requires = "agent")]
+    /// Autonomous runtime mode for agent search.
+    agent_mode: Option<SearchAgentMode>,
 
     #[arg(long, value_enum, requires = "agent")]
     /// Built-in planner strategy for agent mode.
@@ -269,6 +303,23 @@ enum SearchReranking {
     Gemma,
 }
 
+#[derive(clap::ValueEnum, Clone, Copy)]
+enum SearchAgentMode {
+    #[value(name = "linear")]
+    Linear,
+    #[value(name = "graph")]
+    Graph,
+}
+
+impl From<SearchAgentMode> for AutonomousSearchMode {
+    fn from(value: SearchAgentMode) -> Self {
+        match value {
+            SearchAgentMode::Linear => AutonomousSearchMode::Linear,
+            SearchAgentMode::Graph => AutonomousSearchMode::Graph,
+        }
+    }
+}
+
 impl From<SearchReranking> for Reranking {
     fn from(value: SearchReranking) -> Self {
         match value {
@@ -352,6 +403,11 @@ impl SearchCommand {
         let (path, root_task) = self.resolve_agent_target()?;
         let mut request = AutonomousSearchRequest::new(path, root_task)
             .with_planner_strategy(self.resolve_agent_planner_strategy())
+            .with_mode(
+                self.agent_mode
+                    .map(Into::into)
+                    .unwrap_or(AutonomousSearchMode::Linear),
+            )
             .with_verbose(self.verbose);
 
         if let Some(strategy) = &self.strategy {
@@ -411,7 +467,7 @@ impl SearchCommand {
         }
 
         bail!(
-            "agent search currently supports --strategy, --planner-strategy, --planner-profile, --intent, --limit, --shortlist, --json, and verbosity flags; unsupported with --agent: {}",
+            "agent search currently supports --strategy, --agent-mode, --planner-strategy, --planner-profile, --intent, --limit, --shortlist, --json, and verbosity flags; unsupported with --agent: {}",
             unsupported.join(", ")
         )
     }

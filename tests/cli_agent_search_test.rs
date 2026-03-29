@@ -21,6 +21,8 @@ fn search_agent_json_exposes_planner_metadata_and_trace() {
             "--json",
             "--agent",
             "find alpha runtime details",
+            "--agent-mode",
+            "graph",
             corpus.path().to_str().expect("utf8 corpus path"),
         ])
         .output()
@@ -34,10 +36,11 @@ fn search_agent_json_exposes_planner_metadata_and_trace() {
 
     let parsed: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("parse agent json output");
+    assert_eq!(parsed["mode"], "graph");
     assert_eq!(parsed["planner_strategy"]["kind"], "heuristic");
     assert_eq!(
         parsed["planner_trace"]["steps"][0]["decisions"][0]["action"],
-        "search"
+        "fork"
     );
     assert_eq!(
         parsed["trace"]["turns"][0]["query"],
@@ -56,6 +59,8 @@ fn search_agent_text_exposes_planner_summary() {
             "bm25",
             "--agent",
             "find alpha runtime details",
+            "--agent-mode",
+            "graph",
             corpus.path().to_str().expect("utf8 corpus path"),
         ])
         .output()
@@ -68,7 +73,10 @@ fn search_agent_text_exposes_planner_summary() {
     );
 
     let stdout = String::from_utf8(output.stdout).expect("utf8 agent text output");
+    assert!(stdout.contains("mode: graph"));
     assert!(stdout.contains("planner: heuristic"));
+    assert!(stdout.contains("branches: 2"));
+    assert!(stdout.contains("frontier: 0"));
     assert!(stdout.contains("turns: 1"));
     assert!(stdout.contains("stop: no-further-queries"));
     assert!(stdout.contains("alpha.txt"));
