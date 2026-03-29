@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T18:15:23.983758977-07:00
+mode: manual
+---
+Invalid graph traces are isolated to graph mode: the linear autonomous request path still defaults to AutonomousSearchMode::Linear, existing linear facade and CLI tests remain green, and just check confirms no regression in tests/library_facade_test.rs, tests/cli_agent_search_test.rs, and tests/autonomous_planner_contract_test.rs.

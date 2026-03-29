@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T18:15:18.952055587-07:00
+mode: manual
+---
+Graph validation failures surface explicit contract errors in src/search/graph.rs via AutonomousGraphTraceContractError and AutonomousGraphTraceContractErrorKind. replay_graph_trace returns these errors instead of repairing invalid state, and replay_graph_trace_rejects_missing_frontier_references asserts the behavior. just check passes.
