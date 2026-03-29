@@ -365,18 +365,36 @@ pub struct AutonomousStopReasonCount {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GraphAutonomousMetrics {
+    pub average_frontier_expansion_cost: f64,
+    pub average_merge_actions: f64,
+    pub average_prune_actions: f64,
+    pub average_branch_efficiency: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GraphAutonomousTaskMetrics {
+    pub frontier_expansion_cost: usize,
+    pub merge_actions: usize,
+    pub prune_actions: usize,
+    pub branch_efficiency: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AutonomousEvaluationMetrics {
     pub task_success_rate: f64,
     pub average_final_recall: f64,
     pub average_turns: f64,
     pub average_retained_evidence_efficiency: f64,
     pub stop_reasons: Vec<AutonomousStopReasonCount>,
+    pub graph: Option<GraphAutonomousMetrics>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AutonomousTaskEvaluation {
     pub task_id: String,
     pub root_task: String,
+    pub mode: crate::search::AutonomousSearchMode,
     pub success: bool,
     pub turns_executed: usize,
     pub latency_ms: f64,
@@ -387,10 +405,12 @@ pub struct AutonomousTaskEvaluation {
     pub stop_reason: Option<crate::search::AutonomousPlannerStopReason>,
     pub planner_trace: crate::search::AutonomousPlannerTrace,
     pub trace: crate::search::SearchTrace,
+    pub graph: Option<GraphAutonomousTaskMetrics>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AutonomousEvaluationReport {
+    pub mode: crate::search::AutonomousSearchMode,
     pub planner_strategy: crate::search::AutonomousPlannerStrategy,
     pub metrics: AutonomousEvaluationMetrics,
     pub tasks: Vec<AutonomousTaskEvaluation>,
@@ -416,12 +436,14 @@ pub struct AgenticComparisonMetrics {
     pub average_final_recall: f64,
     pub average_turns: f64,
     pub average_retained_evidence_efficiency: Option<f64>,
+    pub graph: Option<GraphAutonomousMetrics>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AgenticComparisonRun {
     pub strategy: String,
     pub mode: String,
+    pub autonomous_mode: Option<crate::search::AutonomousSearchMode>,
     pub planner_strategy: Option<crate::search::AutonomousPlannerStrategy>,
     pub metrics: AgenticComparisonMetrics,
     pub latency_ms: LatencyMetrics,
@@ -435,21 +457,37 @@ pub struct AgenticTaskComparison {
     pub collapsed_query: String,
     pub expected_final_documents: Vec<String>,
     pub autonomous_final_documents: Vec<String>,
+    pub graph_final_documents: Vec<String>,
     pub planned_controller_final_documents: Vec<String>,
     pub baseline_final_documents: Vec<String>,
     pub autonomous_success: bool,
+    pub graph_success: bool,
     pub planned_controller_success: bool,
     pub baseline_success: bool,
     pub autonomous_final_recall_at_10: f64,
+    pub graph_final_recall_at_10: f64,
     pub planned_controller_final_recall_at_10: f64,
     pub baseline_final_recall_at_10: f64,
     pub autonomous_latency_ms: f64,
+    pub graph_latency_ms: f64,
     pub planned_controller_latency_ms: f64,
     pub baseline_latency_ms: f64,
     pub autonomous_turns: usize,
+    pub graph_turns: usize,
     pub planned_controller_turns: usize,
     pub autonomous_stop_reason: Option<crate::search::AutonomousPlannerStopReason>,
+    pub graph_stop_reason: Option<crate::search::AutonomousPlannerStopReason>,
     pub autonomous_retained_evidence_efficiency: f64,
+    pub graph_retained_evidence_efficiency: f64,
+    pub graph_metrics: Option<GraphAutonomousTaskMetrics>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GraphComparisonDelta {
+    pub average_frontier_expansion_cost: f64,
+    pub average_merge_actions: f64,
+    pub average_prune_actions: f64,
+    pub average_branch_efficiency: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -461,6 +499,7 @@ pub struct AgenticComparisonDelta {
     pub p50_latency_ms: f64,
     pub p90_latency_ms: f64,
     pub max_latency_ms: f64,
+    pub graph: Option<GraphComparisonDelta>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -469,9 +508,13 @@ pub struct AgenticComparisonReport {
     pub baseline_query_mode: String,
     pub planned_controller: AgenticComparisonRun,
     pub autonomous: AgenticComparisonRun,
+    pub graph: AgenticComparisonRun,
     pub baseline: AgenticComparisonRun,
     pub delta_vs_planned_controller: AgenticComparisonDelta,
     pub delta_vs_baseline: AgenticComparisonDelta,
+    pub delta_graph_vs_autonomous: AgenticComparisonDelta,
+    pub delta_graph_vs_planned_controller: AgenticComparisonDelta,
+    pub delta_graph_vs_baseline: AgenticComparisonDelta,
     pub tasks: Vec<AgenticTaskComparison>,
 }
 
@@ -481,6 +524,7 @@ pub struct AgenticEvaluationReport {
     pub metrics: AgenticEvaluationMetrics,
     pub tasks: Vec<AgenticTaskEvaluation>,
     pub autonomous: AutonomousEvaluationReport,
+    pub graph: AutonomousEvaluationReport,
     pub comparison: AgenticComparisonReport,
 }
 
@@ -866,6 +910,7 @@ pub fn run_agentic_evaluation(
 
     let mut task_results = Vec::new();
     let mut autonomous_task_results = Vec::new();
+    let mut graph_task_results = Vec::new();
     let mut planned_controller_successes = 0_usize;
     let mut planned_controller_turns = 0_usize;
     let mut planned_controller_prune_actions = 0_usize;
@@ -879,6 +924,16 @@ pub fn run_agentic_evaluation(
     let mut autonomous_retained_evidence_efficiency_sum = 0.0;
     let mut autonomous_stop_reasons = Vec::new();
     let mut autonomous_timings = Vec::new();
+    let mut graph_task_successes = 0_usize;
+    let mut graph_final_recall_sum = 0.0;
+    let mut graph_turns = 0_usize;
+    let mut graph_retained_evidence_efficiency_sum = 0.0;
+    let mut graph_stop_reasons = Vec::new();
+    let mut graph_timings = Vec::new();
+    let mut graph_frontier_expansion_sum = 0.0;
+    let mut graph_merge_actions_sum = 0.0;
+    let mut graph_prune_actions_sum = 0.0;
+    let mut graph_branch_efficiency_sum = 0.0;
     let mut baseline_task_successes = 0_usize;
     let mut baseline_final_recall_sum = 0.0;
     let mut baseline_timings = Vec::new();
@@ -1019,6 +1074,7 @@ pub fn run_agentic_evaluation(
         autonomous_task_results.push(AutonomousTaskEvaluation {
             task_id: task.id.clone(),
             root_task: root_task.clone(),
+            mode: crate::search::AutonomousSearchMode::Linear,
             success: autonomous_success,
             turns_executed: autonomous_response.turns.len(),
             latency_ms: autonomous_latency_ms,
@@ -1029,6 +1085,71 @@ pub fn run_agentic_evaluation(
             stop_reason: autonomous_response.planner_trace.stop_reason,
             planner_trace: autonomous_response.planner_trace.clone(),
             trace: autonomous_response.trace.clone(),
+            graph: None,
+        });
+
+        let graph_started = Instant::now();
+        let graph_response = engine.search_autonomous(
+            crate::search::AutonomousSearchRequest::new(&request.corpus_dir, root_task.clone())
+                .with_session_id(format!("{}-graph", task.id))
+                .with_mode(crate::search::AutonomousSearchMode::Graph)
+                .with_strategy(request.strategy.clone())
+                .with_planner_strategy(request.planner_strategy.clone())
+                .with_step_limit(task.turns.len().max(1))
+                .with_limit(10)
+                .with_shortlist(request.shortlist)
+                .with_verbose(request.verbose)
+                .with_emission_mode(crate::search::SearchEmissionMode::Protocol)
+                .with_retained_artifact_limit(request.retained_artifact_limit),
+        )?;
+        let graph_latency_ms = graph_started.elapsed().as_secs_f64() * 1000.0;
+        let graph_final_documents: Vec<_> = graph_response
+            .state
+            .retained_artifacts
+            .iter()
+            .map(|evidence| search_path_to_document_id(&evidence.path))
+            .collect();
+        let graph_success =
+            expected_documents_satisfied(&task.expected_final_documents, &graph_final_documents);
+        let graph_final_recall_at_10 =
+            recall_against_expected(&graph_final_documents, &task.expected_final_documents);
+        let graph_retained_evidence_efficiency = retained_evidence_efficiency(
+            &graph_final_documents,
+            &task.expected_final_documents,
+        );
+        let graph_metrics = summarize_graph_planner_trace(
+            &graph_response.planner_trace,
+            &graph_final_documents,
+            &task.expected_final_documents,
+            graph_response.turns.len(),
+        );
+        if graph_success {
+            graph_task_successes += 1;
+        }
+        graph_final_recall_sum += graph_final_recall_at_10;
+        graph_turns += graph_response.turns.len();
+        graph_retained_evidence_efficiency_sum += graph_retained_evidence_efficiency;
+        graph_stop_reasons.push(graph_response.planner_trace.stop_reason);
+        graph_timings.push(graph_latency_ms);
+        graph_frontier_expansion_sum += graph_metrics.frontier_expansion_cost as f64;
+        graph_merge_actions_sum += graph_metrics.merge_actions as f64;
+        graph_prune_actions_sum += graph_metrics.prune_actions as f64;
+        graph_branch_efficiency_sum += graph_metrics.branch_efficiency;
+        graph_task_results.push(AutonomousTaskEvaluation {
+            task_id: task.id.clone(),
+            root_task: root_task.clone(),
+            mode: crate::search::AutonomousSearchMode::Graph,
+            success: graph_success,
+            turns_executed: graph_response.turns.len(),
+            latency_ms: graph_latency_ms,
+            final_documents: graph_final_documents.clone(),
+            expected_final_documents: task.expected_final_documents.clone(),
+            final_recall_at_10: graph_final_recall_at_10,
+            retained_evidence_efficiency: graph_retained_evidence_efficiency,
+            stop_reason: graph_response.planner_trace.stop_reason,
+            planner_trace: graph_response.planner_trace.clone(),
+            trace: graph_response.trace.clone(),
+            graph: Some(graph_metrics.clone()),
         });
 
         let baseline_started = Instant::now();
@@ -1074,24 +1195,32 @@ pub fn run_agentic_evaluation(
             collapsed_query,
             expected_final_documents: task.expected_final_documents.clone(),
             autonomous_final_documents,
+            graph_final_documents,
             planned_controller_final_documents: task_results
                 .last()
                 .map(|task| task.final_documents.clone())
                 .unwrap_or_default(),
             baseline_final_documents,
             autonomous_success,
+            graph_success,
             planned_controller_success: success,
             baseline_success,
             autonomous_final_recall_at_10,
+            graph_final_recall_at_10,
             planned_controller_final_recall_at_10: final_recall_at_10,
             baseline_final_recall_at_10,
             autonomous_latency_ms,
+            graph_latency_ms,
             planned_controller_latency_ms,
             baseline_latency_ms,
             autonomous_turns: autonomous_response.turns.len(),
+            graph_turns: graph_response.turns.len(),
             planned_controller_turns: response.turns.len(),
             autonomous_stop_reason: autonomous_response.planner_trace.stop_reason,
+            graph_stop_reason: graph_response.planner_trace.stop_reason,
             autonomous_retained_evidence_efficiency,
+            graph_retained_evidence_efficiency,
+            graph_metrics: Some(graph_metrics),
         });
     }
 
@@ -1117,15 +1246,27 @@ pub fn run_agentic_evaluation(
     let autonomous_average_retained_evidence_efficiency =
         autonomous_retained_evidence_efficiency_sum / task_count;
     let autonomous_stop_reasons = summarize_autonomous_stop_reasons(&autonomous_stop_reasons);
+    let graph_average_final_recall = graph_final_recall_sum / task_count;
+    let graph_average_retained_evidence_efficiency =
+        graph_retained_evidence_efficiency_sum / task_count;
+    let graph_stop_reasons = summarize_autonomous_stop_reasons(&graph_stop_reasons);
+    let graph_summary_metrics = GraphAutonomousMetrics {
+        average_frontier_expansion_cost: graph_frontier_expansion_sum / task_count,
+        average_merge_actions: graph_merge_actions_sum / task_count,
+        average_prune_actions: graph_prune_actions_sum / task_count,
+        average_branch_efficiency: graph_branch_efficiency_sum / task_count,
+    };
     let planned_controller_run = AgenticComparisonRun {
         strategy: request.strategy.clone(),
         mode: "planned-controller".to_string(),
+        autonomous_mode: None,
         planner_strategy: None,
         metrics: AgenticComparisonMetrics {
             task_success_rate: planned_controller_successes as f64 / task_count,
             average_final_recall,
             average_turns: planned_controller_turns as f64 / task_count,
             average_retained_evidence_efficiency: None,
+            graph: None,
         },
         latency_ms: summarize_latencies(&planned_controller_timings),
         stop_reasons: Vec::new(),
@@ -1133,6 +1274,7 @@ pub fn run_agentic_evaluation(
     let autonomous_run = AgenticComparisonRun {
         strategy: request.strategy.clone(),
         mode: "autonomous-planner".to_string(),
+        autonomous_mode: Some(crate::search::AutonomousSearchMode::Linear),
         planner_strategy: Some(request.planner_strategy.clone()),
         metrics: AgenticComparisonMetrics {
             task_success_rate: autonomous_task_successes as f64 / task_count,
@@ -1141,19 +1283,37 @@ pub fn run_agentic_evaluation(
             average_retained_evidence_efficiency: Some(
                 autonomous_average_retained_evidence_efficiency,
             ),
+            graph: None,
         },
         latency_ms: summarize_latencies(&autonomous_timings),
         stop_reasons: autonomous_stop_reasons.clone(),
     };
+    let graph_run = AgenticComparisonRun {
+        strategy: request.strategy.clone(),
+        mode: "graph-autonomous-planner".to_string(),
+        autonomous_mode: Some(crate::search::AutonomousSearchMode::Graph),
+        planner_strategy: Some(request.planner_strategy.clone()),
+        metrics: AgenticComparisonMetrics {
+            task_success_rate: graph_task_successes as f64 / task_count,
+            average_final_recall: graph_average_final_recall,
+            average_turns: graph_turns as f64 / task_count,
+            average_retained_evidence_efficiency: Some(graph_average_retained_evidence_efficiency),
+            graph: Some(graph_summary_metrics.clone()),
+        },
+        latency_ms: summarize_latencies(&graph_timings),
+        stop_reasons: graph_stop_reasons.clone(),
+    };
     let baseline_run = AgenticComparisonRun {
         strategy: baseline_strategy.clone(),
         mode: "collapsed-single-turn".to_string(),
+        autonomous_mode: None,
         planner_strategy: None,
         metrics: AgenticComparisonMetrics {
             task_success_rate: baseline_task_successes as f64 / task_count,
             average_final_recall: baseline_final_recall_sum / task_count,
             average_turns: 1.0,
             average_retained_evidence_efficiency: None,
+            graph: None,
         },
         latency_ms: summarize_latencies(&baseline_timings),
         stop_reasons: Vec::new(),
@@ -1161,6 +1321,10 @@ pub fn run_agentic_evaluation(
     let delta_vs_planned_controller =
         build_agentic_comparison_delta(&autonomous_run, &planned_controller_run);
     let delta_vs_baseline = build_agentic_comparison_delta(&autonomous_run, &baseline_run);
+    let delta_graph_vs_autonomous = build_agentic_comparison_delta(&graph_run, &autonomous_run);
+    let delta_graph_vs_planned_controller =
+        build_agentic_comparison_delta(&graph_run, &planned_controller_run);
+    let delta_graph_vs_baseline = build_agentic_comparison_delta(&graph_run, &baseline_run);
 
     Ok(AgenticEvaluationReport {
         metadata,
@@ -1173,6 +1337,7 @@ pub fn run_agentic_evaluation(
         },
         tasks: task_results,
         autonomous: AutonomousEvaluationReport {
+            mode: crate::search::AutonomousSearchMode::Linear,
             planner_strategy: request.planner_strategy.clone(),
             metrics: AutonomousEvaluationMetrics {
                 task_success_rate: autonomous_run.metrics.task_success_rate,
@@ -1181,17 +1346,35 @@ pub fn run_agentic_evaluation(
                 average_retained_evidence_efficiency:
                     autonomous_average_retained_evidence_efficiency,
                 stop_reasons: autonomous_stop_reasons,
+                graph: None,
             },
             tasks: autonomous_task_results,
+        },
+        graph: AutonomousEvaluationReport {
+            mode: crate::search::AutonomousSearchMode::Graph,
+            planner_strategy: request.planner_strategy.clone(),
+            metrics: AutonomousEvaluationMetrics {
+                task_success_rate: graph_run.metrics.task_success_rate,
+                average_final_recall: graph_average_final_recall,
+                average_turns: graph_run.metrics.average_turns,
+                average_retained_evidence_efficiency: graph_average_retained_evidence_efficiency,
+                stop_reasons: graph_stop_reasons,
+                graph: Some(graph_summary_metrics.clone()),
+            },
+            tasks: graph_task_results,
         },
         comparison: AgenticComparisonReport {
             baseline_strategy,
             baseline_query_mode: "concatenate-planned-turn-queries".to_string(),
             planned_controller: planned_controller_run.clone(),
             autonomous: autonomous_run.clone(),
+            graph: graph_run,
             baseline: baseline_run,
             delta_vs_planned_controller,
             delta_vs_baseline,
+            delta_graph_vs_autonomous,
+            delta_graph_vs_planned_controller,
+            delta_graph_vs_baseline,
             tasks: task_comparisons,
         },
     })
@@ -1850,6 +2033,56 @@ fn build_agentic_comparison_delta(
         p50_latency_ms: left.latency_ms.p50_ms - right.latency_ms.p50_ms,
         p90_latency_ms: left.latency_ms.p90_ms - right.latency_ms.p90_ms,
         max_latency_ms: left.latency_ms.max_ms - right.latency_ms.max_ms,
+        graph: match (&left.metrics.graph, &right.metrics.graph) {
+            (Some(left), Some(right)) => Some(GraphComparisonDelta {
+                average_frontier_expansion_cost: left.average_frontier_expansion_cost
+                    - right.average_frontier_expansion_cost,
+                average_merge_actions: left.average_merge_actions - right.average_merge_actions,
+                average_prune_actions: left.average_prune_actions - right.average_prune_actions,
+                average_branch_efficiency: left.average_branch_efficiency
+                    - right.average_branch_efficiency,
+            }),
+            (Some(left), None) => Some(GraphComparisonDelta {
+                average_frontier_expansion_cost: left.average_frontier_expansion_cost,
+                average_merge_actions: left.average_merge_actions,
+                average_prune_actions: left.average_prune_actions,
+                average_branch_efficiency: left.average_branch_efficiency,
+            }),
+            (None, Some(right)) => Some(GraphComparisonDelta {
+                average_frontier_expansion_cost: -right.average_frontier_expansion_cost,
+                average_merge_actions: -right.average_merge_actions,
+                average_prune_actions: -right.average_prune_actions,
+                average_branch_efficiency: -right.average_branch_efficiency,
+            }),
+            (None, None) => None,
+        },
+    }
+}
+
+fn summarize_graph_planner_trace(
+    trace: &crate::search::AutonomousPlannerTrace,
+    final_documents: &[String],
+    expected_documents: &[String],
+    turns_executed: usize,
+) -> GraphAutonomousTaskMetrics {
+    let mut frontier_expansion_cost = 0_usize;
+    let mut merge_actions = 0_usize;
+    let mut prune_actions = 0_usize;
+
+    for decision in trace.steps.iter().flat_map(|step| step.decisions.iter()) {
+        match decision.action {
+            crate::search::AutonomousPlannerAction::Fork => frontier_expansion_cost += 1,
+            crate::search::AutonomousPlannerAction::Merge => merge_actions += 1,
+            crate::search::AutonomousPlannerAction::Prune => prune_actions += 1,
+            _ => {}
+        }
+    }
+
+    GraphAutonomousTaskMetrics {
+        frontier_expansion_cost,
+        merge_actions,
+        prune_actions,
+        branch_efficiency: branch_efficiency(final_documents, expected_documents, turns_executed),
     }
 }
 
@@ -1869,6 +2102,24 @@ fn retained_evidence_efficiency(final_documents: &[String], expected_documents: 
         .count();
 
     hits as f64 / final_documents.len() as f64
+}
+
+fn branch_efficiency(
+    final_documents: &[String],
+    expected_documents: &[String],
+    turns_executed: usize,
+) -> f64 {
+    if turns_executed == 0 {
+        return if expected_documents.is_empty() { 1.0 } else { 0.0 };
+    }
+
+    let expected: HashSet<_> = expected_documents.iter().map(String::as_str).collect();
+    let hits = final_documents
+        .iter()
+        .filter(|document| expected.contains(document.as_str()))
+        .count();
+
+    hits as f64 / turns_executed as f64
 }
 
 fn summarize_autonomous_stop_reasons(
