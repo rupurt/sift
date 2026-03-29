@@ -2,8 +2,8 @@ use sift::{
     AcquisitionAdapterKind, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
     AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerState,
     AutonomousPlannerStopReason, AutonomousPlannerStrategy, AutonomousPlannerStrategyKind,
-    AutonomousSearchRequest, ContextArtifactKind, EnvironmentFactInput, HeuristicAutonomousPlanner,
-    LocalContextSource, RetainedArtifact, ToolOutputInput,
+    AutonomousSearchMode, AutonomousSearchRequest, ContextArtifactKind, EnvironmentFactInput,
+    HeuristicAutonomousPlanner, LocalContextSource, RetainedArtifact, ToolOutputInput,
 };
 
 fn retained_artifact(
@@ -187,6 +187,118 @@ fn heuristic_planner_is_deterministic_for_same_request_and_evidence() {
         .expect("second heuristic planner trace");
 
     assert_eq!(first, second);
+}
+
+#[test]
+fn heuristic_graph_planner_forks_and_prioritizes_a_bounded_frontier() {
+    let planner = HeuristicAutonomousPlanner::default();
+    let request = AutonomousSearchRequest::new("./docs", "alpha runtime")
+        .with_mode(AutonomousSearchMode::Graph)
+        .with_state(AutonomousPlannerState::new(2).with_retained_artifacts(vec![retained_artifact(
+            "artifact-1",
+            "context/seed.txt",
+            "beta evidence carryover",
+            "explore the beta evidence branch",
+        )]));
+
+    let trace = planner.plan(&request).expect("heuristic graph planner trace");
+
+    assert_eq!(trace.steps.len(), 2);
+    assert!(trace.completed);
+    assert_eq!(
+        trace.steps[0]
+            .decisions
+            .iter()
+            .filter(|decision| decision.action == AutonomousPlannerAction::Fork)
+            .count(),
+        2
+    );
+    assert_eq!(
+        trace.steps[0].decisions[2].action,
+        AutonomousPlannerAction::Select
+    );
+    assert_eq!(
+        trace.steps[0].decisions[3].action,
+        AutonomousPlannerAction::Search
+    );
+    assert_eq!(
+        trace.steps[1].decisions[0].action,
+        AutonomousPlannerAction::Select
+    );
+    assert_eq!(
+        trace.steps[1].decisions[1].action,
+        AutonomousPlannerAction::Search
+    );
+    assert_eq!(
+        trace.steps[1].decisions[2].action,
+        AutonomousPlannerAction::Terminate
+    );
+    assert_eq!(
+        trace.steps[0].decisions[3].query.as_deref(),
+        Some("alpha runtime")
+    );
+    assert_eq!(
+        trace.steps[1].decisions[1].query.as_deref(),
+        Some("beta evidence carryover context seed")
+    );
+    assert_eq!(
+        trace.stop_reason,
+        Some(AutonomousPlannerStopReason::NoAdditionalEvidence)
+    );
+}
+
+#[test]
+fn heuristic_graph_planner_reports_step_limit_when_branch_expansion_is_truncated() {
+    let planner = HeuristicAutonomousPlanner::default();
+    let request = AutonomousSearchRequest::new("./docs", "alpha runtime")
+        .with_mode(AutonomousSearchMode::Graph)
+        .with_state(AutonomousPlannerState::new(1).with_retained_artifacts(vec![
+            retained_artifact(
+                "artifact-1",
+                "context/seed.txt",
+                "beta evidence carryover",
+                "explore the beta evidence branch",
+            ),
+            retained_artifact(
+                "artifact-2",
+                "context/seed-2.txt",
+                "gamma fallback branch",
+                "explore the gamma branch",
+            ),
+        ]));
+
+    let trace = planner.plan(&request).expect("heuristic graph planner trace");
+
+    assert_eq!(trace.steps.len(), 1);
+    assert_eq!(
+        trace.steps[0]
+            .decisions
+            .last()
+            .expect("terminal graph decision")
+            .stop_reason,
+        Some(AutonomousPlannerStopReason::StepLimitReached)
+    );
+    assert_eq!(
+        trace.stop_reason,
+        Some(AutonomousPlannerStopReason::StepLimitReached)
+    );
+}
+
+#[test]
+fn heuristic_graph_planner_stops_immediately_when_step_budget_is_zero() {
+    let planner = HeuristicAutonomousPlanner::default();
+    let request = AutonomousSearchRequest::new("./docs", "alpha runtime")
+        .with_mode(AutonomousSearchMode::Graph)
+        .with_state(AutonomousPlannerState::new(0));
+
+    let trace = planner.plan(&request).expect("heuristic graph planner trace");
+
+    assert!(trace.steps.is_empty());
+    assert!(trace.completed);
+    assert_eq!(
+        trace.stop_reason,
+        Some(AutonomousPlannerStopReason::StepLimitReached)
+    );
 }
 
 #[test]
