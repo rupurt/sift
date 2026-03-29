@@ -27,7 +27,7 @@ For project background and design rationale, read the introductory post:
 - **Layered pipeline:** Query Expansion -> Retrieval -> Fusion -> Reranking.
 - **Executable surface:** `search`, `eval`, `dataset`, `optimize`, and `config` are the supported CLI commands.
 - **Library surface:** `search`, `assemble_context`, `search_turn`, `search_controller`, and `search_autonomous` are supported at the crate root.
-- **Autonomous planning:** Linear autonomous planning and decomposition ship through `sift search --agent` and `Sift::search_autonomous`, with heuristic and model-driven planner strategies.
+- **Autonomous planning:** Bounded linear and graph autonomous planning ship through `sift search --agent` and `Sift::search_autonomous`, with heuristic and model-driven planner strategies.
 - **Emission modes:** Turn-aware library calls can emit `view`, `protocol`, or `latent` responses.
 - **Supported inputs:** Text, HTML, PDF, and OOXML files (`.docx`, `.xlsx`, `.pptx`).
 
@@ -60,11 +60,11 @@ The executable currently exposes the following command groups:
 | Command | Purpose |
 |---------|---------|
 | `sift search [OPTIONS] [PATH] <QUERY>` | Direct single-turn search over a local corpus. |
-| `sift search [OPTIONS] [PATH] --agent <ROOT_TASK>` | Planner-driven search over a local corpus using the shared autonomous runtime, with optional `--planner-strategy` and `--planner-profile` selection. |
+| `sift search [OPTIONS] [PATH] --agent <ROOT_TASK>` | Planner-driven search over a local corpus using the shared autonomous runtime, with optional `--agent-mode linear|graph`, `--planner-strategy`, and `--planner-profile` selection. |
 | `sift eval all` | Compare all registered retrieval strategies. |
 | `sift eval quality` | Emit a JSON quality report for one strategy, optionally against a baseline. |
 | `sift eval latency` | Emit a JSON latency report for one strategy. |
-| `sift eval agentic` | Benchmark autonomous planner runs, planned controller fixtures, and collapsed single-turn baselines. |
+| `sift eval agentic` | Benchmark linear autonomous, graph autonomous, planned controller, and collapsed single-turn baselines. |
 | `sift dataset download` / `sift dataset materialize` | Manage evaluation datasets such as SciFact. |
 | `sift optimize` | Tune prompt templates used by generative expansion. |
 | `sift config` | Print the merged effective configuration. |
@@ -106,6 +106,13 @@ Run the supported autonomous planner runtime from the CLI:
 sift search --strategy bm25 tests/fixtures/rich-docs --agent "find the cache invalidation path"
 ```
 
+Switch the shared autonomous runtime into bounded graph mode:
+
+```bash
+sift search --strategy bm25 tests/fixtures/rich-docs \
+  --agent "find the cache invalidation path" --agent-mode graph
+```
+
 Select the built-in model-driven planner explicitly:
 
 ```bash
@@ -144,9 +151,10 @@ surface lives at the crate root and includes:
 - `SearchTurnRequest`, `SearchTurnResponse`
 - `SearchControllerRequest`, `SearchControllerResponse`
 - `AutonomousSearchRequest`, `AutonomousSearchResponse`
-- `AutonomousPlannerState`, `AutonomousPlannerStrategy`, `AutonomousPlannerStrategyKind`
+- `AutonomousSearchMode`, `AutonomousPlannerState`, `AutonomousPlannerStrategy`, `AutonomousPlannerStrategyKind`
 - `AutonomousPlannerTrace`, `AutonomousPlannerDecision`, `AutonomousPlannerStopReason`
 - `AutonomousPlanner`, `HeuristicAutonomousPlanner`, `ModelDrivenAutonomousPlanner`
+- `AutonomousGraphEpisodeState`, `AutonomousGraphNode`, `AutonomousGraphEdge`, `AutonomousGraphFrontierEntry`, `replay_graph_trace`
 - `SearchEmission`, `SearchEmissionMode`
 - `SearchPlan`, `QueryExpansionPolicy`, `RetrieverPolicy`, `FusionPolicy`, `RerankingPolicy`
 - `Retriever`, `Fusion`, `Reranking`
@@ -289,11 +297,12 @@ flowchart TD
   end
 ```
 
-Today the executable ships direct search, planner-driven `search --agent`, and
-evaluation-oriented autonomous/controller benchmarks. The library exposes
-direct, controller, and supported autonomous surfaces over the same retrieval
-substrate. The next formal layer is branching or graph-structured autonomous
-search rather than first-generation linear autonomy.
+Today the executable ships direct search, planner-driven `search --agent`, a
+bounded graph mode, and evaluation-oriented autonomous/controller benchmarks.
+The library exposes direct, controller, and supported autonomous surfaces over
+the same retrieval substrate. The next formal layer is richer persisted agent
+memory and more adaptive graph execution over the shipped bounded graph
+contract.
 
 ## Performance & Scalability
 

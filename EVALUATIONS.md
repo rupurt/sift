@@ -113,10 +113,11 @@ just sift eval all --dataset scifact --query-limit 10
 
 ## Agentic Evaluations
 
-`eval agentic` now benchmarks the built-in autonomous planner alongside the
-existing planned controller path. For each fixture it runs:
+`eval agentic` now benchmarks the built-in linear and graph autonomous planner
+paths alongside the existing planned controller path. For each fixture it runs:
 
-- the built-in autonomous planner from the fixture root task
+- the built-in linear autonomous planner from the fixture root task
+- the built-in graph autonomous planner from the fixture root task
 - the planned multi-turn controller path from the ordered fixture turns
 - a collapsed single-turn baseline formed by concatenating the planned queries
 
@@ -148,28 +149,33 @@ The agentic report includes:
 - `average_final_recall`
 - `average_turns`
 - `average_prune_actions`
-- an `autonomous` block with planner strategy, task success/final recall, turn
-  counts, retained-evidence efficiency, and stop-reason summaries
+- an `autonomous` block for the linear autonomous run
+- a `graph` block for the bounded graph autonomous run
+- graph-specific metrics such as frontier expansion cost, merge or prune
+  counts, and branch efficiency
 - per-task planned-controller traces and per-turn recall
-- retained final documents for both the planned-controller and autonomous runs
-- a comparison block covering autonomous-planner, planned-controller, and
-  collapsed-single-turn runs
-- latency, turn-count, and retained-evidence-efficiency deltas for the
-  autonomous run versus both baselines
+- retained final documents for the planned-controller, linear autonomous, and
+  graph autonomous runs
+- a comparison block covering linear autonomy, graph autonomy,
+  planned-controller, and collapsed-single-turn runs
+- latency, turn-count, retained-evidence-efficiency, and graph-metric deltas
+  for the graph run versus the linear and baseline runs
 
 Each task comparison records:
 
 - the autonomous root task
 - the collapsed baseline query
 - expected final documents
-- autonomous final documents
+- linear autonomous final documents
+- graph autonomous final documents
 - planned-controller final documents
 - baseline final documents
-- success/failure for all three runs
-- final recall for all three runs
-- per-task latency for all three runs
-- autonomous stop reason
-- autonomous retained-evidence efficiency
+- success/failure for all four runs
+- final recall for all four runs
+- per-task latency for all four runs
+- linear and graph stop reasons
+- linear and graph retained-evidence efficiency
+- per-task graph metrics such as frontier expansion cost
 
 ### What `eval agentic` Does Not Measure Yet
 
@@ -181,7 +187,7 @@ not yet measure:
 - end-user answer usefulness after retrieval
 
 Those are the next evaluation families to add once the controller grows beyond
-planned fixtures and into autonomous planning or answer generation.
+bounded local graph retrieval and into answer generation.
 
 ## GPU-Backed Evaluation Runs
 

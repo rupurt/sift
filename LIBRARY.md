@@ -13,9 +13,10 @@ The stable crate-root contract includes:
 - `SearchTurnRequest`, `SearchTurnResponse`
 - `SearchControllerRequest`, `SearchControllerResponse`
 - `AutonomousSearchRequest`, `AutonomousSearchResponse`
-- `AutonomousPlannerState`, `AutonomousPlannerStepCursor`, `AutonomousPlannerStrategy`, `AutonomousPlannerStrategyKind`
+- `AutonomousSearchMode`, `AutonomousPlannerState`, `AutonomousPlannerStepCursor`, `AutonomousPlannerStrategy`, `AutonomousPlannerStrategyKind`
 - `AutonomousPlannerTrace`, `AutonomousPlannerTraceStep`, `AutonomousPlannerDecision`, `AutonomousPlannerAction`, `AutonomousPlannerStopReason`
 - `AutonomousPlanner`, `HeuristicAutonomousPlanner`, `ModelDrivenAutonomousPlanner`
+- graph episode DTOs and replay helpers (`AutonomousGraphEpisodeState`, `AutonomousGraphNode`, `AutonomousGraphEdge`, `AutonomousGraphFrontierEntry`, `replay_graph_trace`)
 - `SearchEmission`, `SearchEmissionMode`
 - `SearchPlan`, `QueryExpansionPolicy`, `RetrieverPolicy`, `FusionPolicy`, `RerankingPolicy`
 - `Retriever`, `Fusion`, `Reranking`
@@ -198,23 +199,28 @@ autonomous decomposition by itself.
 
 Use `Sift::search_autonomous` when you want the supported built-in autonomous
 runtime. It selects the shipped planner from
-`AutonomousSearchRequest::planner_strategy` and does not require custom planner
+`AutonomousSearchRequest::planner_strategy`, chooses linear or graph mode from
+`AutonomousSearchRequest::mode`, and does not require custom planner
 injection.
 
 ```rust
 use anyhow::Result;
-use sift::{AutonomousPlannerStrategy, AutonomousSearchRequest, Sift};
+use sift::{
+    AutonomousPlannerStrategy, AutonomousSearchMode, AutonomousSearchRequest, Sift,
+};
 
 fn main() -> Result<()> {
     let engine = Sift::builder().build();
     let response = engine.search_autonomous(
         AutonomousSearchRequest::new("./docs", "find the cache invalidation path")
             .with_strategy("hybrid")
+            .with_mode(AutonomousSearchMode::Graph)
             .with_planner_strategy(AutonomousPlannerStrategy::heuristic())
             .with_step_limit(3),
     )?;
 
     assert_eq!(response.planner_strategy, AutonomousPlannerStrategy::heuristic());
+    assert_eq!(response.mode, AutonomousSearchMode::Graph);
     assert_eq!(
         response.planner_trace.planner_strategy,
         AutonomousPlannerStrategy::heuristic()
@@ -226,6 +232,7 @@ fn main() -> Result<()> {
 Use this mode when you need:
 
 - built-in planner selection through `AutonomousPlannerStrategy`
+- additive linear or graph runtime selection through `AutonomousSearchMode`
 - the default heuristic planner when `planner_strategy` is omitted, or explicit
   model-driven selection through `AutonomousPlannerStrategy::model_driven()`
 - a stable `AutonomousSearchResponse` carrying both `planner_trace` and the
@@ -274,7 +281,7 @@ fn main() -> anyhow::Result<()> {
 `AutonomousSearchRequest`, `AutonomousSearchResponse`, and
 `AutonomousPlannerState` remain the stable records embedders can persist or
 exchange when they need to save root-task planning state, retained evidence,
-and planner selection.
+graph episode state, and planner selection.
 
 ## Mode 6: Advanced Autonomous Execution Seam
 
@@ -317,6 +324,7 @@ fn main() -> Result<()> {
     let engine = Sift::builder().build();
     let response = engine.search_autonomous_with(
         AutonomousSearchRequest::new("./docs", "find the alpha details")
+            .with_mode(sift::AutonomousSearchMode::Graph)
             .with_strategy("bm25"),
         &SingleStepPlanner,
     )?;
@@ -388,6 +396,7 @@ Supported now:
 - deterministic multi-turn controller execution
 - built-in heuristic and model-driven autonomous runtime selection through
   `search_autonomous`
+- additive linear/graph mode selection through `AutonomousSearchMode`
 - custom planner injection through `search_autonomous_with`
 - protocol and latent emissions
 - synthetic local context artifacts

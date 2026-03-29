@@ -46,15 +46,16 @@ Agentic support in Sift currently shows up in four places:
 
 1. **Intent-aware search:** `--intent` lets you add task context to a search.
 2. **Planner-driven CLI search:** `sift search --agent` runs the shared
-   autonomous runtime from the executable.
+   autonomous runtime from the executable, and `--agent-mode graph` switches it
+   into bounded graph search.
 3. **Turn-aware library APIs:** The crate root exposes `search_turn`,
    `search_controller`, `search_autonomous`, and protocol/latent emissions.
 4. **Fixture-driven autonomous/controller evals:** `sift eval agentic`
-   benchmarks autonomous planner runs, planned multi-turn controller runs, and
-   collapsed single-turn baselines.
+   benchmarks linear autonomy, graph autonomy, planned multi-turn controller
+   runs, and collapsed single-turn baselines.
 
-What is not shipped yet is a general-purpose interactive agent shell or
-branching/graph autonomous search.
+What is not shipped yet is a general-purpose interactive agent shell or richer
+persisted agent memory above the bounded graph runtime.
 
 ## Choosing a Strategy
 
@@ -86,6 +87,11 @@ sift search --intent "I am looking for the trait definitions" "engine"
 
 ```bash
 sift search --strategy bm25 ./my-project --agent "find the cache invalidation path"
+```
+
+```bash
+sift search --strategy bm25 ./my-project \
+  --agent "find the cache invalidation path" --agent-mode graph
 ```
 
 Swap to the model-driven planner when you have a local planner profile wired

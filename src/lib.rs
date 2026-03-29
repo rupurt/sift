@@ -6,8 +6,9 @@
 //! - [`ContextAssemblyRequest`] and [`ContextAssemblyResponse`] for bounded evidence assembly
 //! - [`SearchTurnRequest`], [`SearchTurnResponse`], and [`SearchEmissionMode`] for turn-aware search control
 //! - [`SearchControllerRequest`] and [`SearchControllerResponse`] for deterministic multi-turn control
-//! - [`AutonomousSearchRequest`] and [`AutonomousSearchResponse`] for supported built-in autonomous search contracts
+//! - [`AutonomousSearchRequest`], [`AutonomousSearchResponse`], and [`AutonomousSearchMode`] for supported built-in autonomous search contracts
 //! - [`AutonomousPlanner`], [`AutonomousPlannerTrace`], [`HeuristicAutonomousPlanner`], and [`ModelDrivenAutonomousPlanner`] for autonomous strategy selection and advanced custom-planner seams
+//! - graph episode DTOs and replay helpers for bounded graph search state inspection
 //! - [`Retriever`], [`Fusion`], and [`Reranking`] for supported strategy overrides
 //! - [`SearchResponse`], [`SearchHit`], [`ContextArtifact`], and [`ScoreConfidence`] for results and artifact metadata
 //!
@@ -16,8 +17,9 @@
 //! embedding contract and may change without notice.
 //!
 //! Use `Sift::search_autonomous` for the supported built-in autonomous entry
-//! point. `Sift::search_autonomous_with` remains available for advanced
-//! embedders that supply their own planner implementation.
+//! point; select linear or graph mode through [`AutonomousSearchMode`].
+//! `Sift::search_autonomous_with` remains available for advanced embedders
+//! that supply their own planner implementation.
 //!
 //! Repository-level usage notes for all supported modes live in `LIBRARY.md`.
 

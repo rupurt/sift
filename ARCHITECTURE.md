@@ -4,10 +4,11 @@ Sift is designed using **Domain-Driven Design (DDD)** and **Hexagonal
 Architecture (Ports and Adapters)** principles. It is evolving from a
 single-pass hybrid retrieval engine into a **High-Energy Information Reactor**
 for hybrid and agentic search. Today the shipped runtime includes direct local
-search, deterministic turn-aware/controller APIs, a bounded linear autonomous
-planner runtime, autonomous/controller evaluation, and CLI agent mode through
-`sift search --agent`. The next architectural layer is richer persisted agent
-memory and branching or graph-structured search over the same substrate.
+search, deterministic turn-aware/controller APIs, bounded linear and graph
+autonomous planner runtimes, autonomous/controller evaluation, and CLI agent
+mode through `sift search --agent`. The next architectural layer is richer
+persisted agent memory and more adaptive graph execution over the same
+substrate.
 
 ## Core Tenets
 
@@ -47,9 +48,9 @@ Defines the vocabulary of retrieval centered on `Document` today, plus the core
 trait boundaries (`Expander`, `Retriever`, `Fuser`, `Reranker`,
 `GenerativeModel`, `Conversation`). The shipping domain also includes public
 turn-aware and autonomous request/response contracts, retained-artifact
-records, planner traces, planner stop reasons, and synthetic local-context
-artifacts. A richer first-class agent memory model is still planned beyond
-those DTOs.
+records, bounded graph episode state, planner traces, planner stop reasons,
+and synthetic local-context artifacts. A richer first-class agent memory model
+is still planned beyond those DTOs.
 
 ### 2. SearchIR (The Magnetic Field Configuration)
 The Intermediate Representation (IR) translates user queries into an executable
@@ -73,9 +74,10 @@ including remote corpora and future turn stores.
 Sift is being extended toward searching and surfacing **Agent Turns** and other
 intermediate artifacts that matter in coding workflows. The current codebase
 already exposes explicit turn requests, controller state, retained artifacts,
-planner state, planner traces, and local synthetic context sources. Linear
-autonomous planning is formalized now; what remains open is a richer persisted
-turn model and branching or graph-structured planning.
+planner state, bounded graph episode state, planner traces, and local
+synthetic context sources. Bounded linear and graph autonomous planning are
+formalized now; what remains open is a richer persisted turn model and more
+adaptive graph execution.
 
 ### Emission Modes
 The reactor is intended to expose configurable ports for different types of
@@ -92,11 +94,11 @@ Sift uses local LLMs (Qwen 2.5, Gemma 3) to understand and expand user intent, a
 - **SPLADE:** Predicts semantically related technical terms.
 - **Classification:** Categorizes queries (e.g., BUGFIX) to add intent-specific keywords.
 
-The current architectural seam already supports a bounded autonomous planner
-that can decompose a root task into retrieval turns, decide when to continue,
-and manage context budgets without leaving the local runtime. The next layer is
-making that seam branchable and attaching richer persisted mission or turn
-memory to it.
+The current architectural seam already supports bounded autonomous planners
+that can decompose a root task into retrieval turns, branch across an explicit
+frontier, decide when to continue, and manage context budgets without leaving
+the local runtime. The next layer is attaching richer persisted mission or
+turn memory and a more expressive graph IR to that shipped seam.
 
 ## The Incremental File Cache (`src/cache/`)
 
@@ -123,14 +125,14 @@ Stores binary serialized assets, including extracted text, term frequencies, and
 - Local generative model access and stateful `Conversation` hooks.
 - CLI surfaces for direct search, `search --agent`, and evaluation.
 - Library surfaces for `search`, `assemble_context`, `search_turn`, `search_controller`, and `search_autonomous`.
-- A bounded linear autonomous planner runtime with heuristic and model-driven planner strategies.
-- Planner traces, stop reasons, and retained-artifact carryover in the public autonomous contracts.
+- Bounded linear and graph autonomous planner runtimes with heuristic and model-driven planner strategies.
+- Planner traces, graph replay helpers, stop reasons, and retained-artifact carryover in the public autonomous contracts.
 - `view`, `protocol`, and `latent` emission modes for turn-aware responses.
-- Agentic evaluation comparing autonomous runs against planned-controller and collapsed single-turn baselines.
+- Agentic evaluation comparing linear autonomy, graph autonomy, planned-controller, and collapsed single-turn baselines.
 
 ### Not formalized yet
 - A first-class persisted `AgentTurn` domain model.
-- A graph IR beyond the current `SearchPlan` wrapper.
+- A richer graph IR beyond the current bounded graph episode contract.
 - A general-purpose interactive agentic CLI command.
 
 ## Adapters (`src/search/adapters/`)
