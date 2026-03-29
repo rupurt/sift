@@ -2,7 +2,7 @@ use sift::{
     AcquisitionAdapterKind, AgentTurnInput, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
     AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerDecision,
     AutonomousPlannerStopReason, AutonomousPlannerStrategy, AutonomousPlannerTrace,
-    AutonomousPlannerTraceStep, AutonomousSearchRequest, ContextArtifactKind,
+    AutonomousPlannerTraceStep, AutonomousSearchMode, AutonomousSearchRequest, ContextArtifactKind,
     ContextAssemblyBudget, ContextAssemblyRequest, Conversation, EnvironmentFactInput, Fusion,
     FusionPolicy, GenerativeModel, QueryExpansionPolicy, Reranking, RerankingPolicy,
     RetainedArtifact, Retriever, RetrieverPolicy, SearchControllerAction, SearchControllerRequest,
@@ -11,6 +11,7 @@ use sift::{
 };
 
 struct SingleStepPlanner;
+struct InvalidGraphPlanner;
 
 struct EmptyConversation;
 
@@ -58,6 +59,26 @@ impl AutonomousPlanner for SingleStepPlanner {
                 ])
                 .with_completed(true)
                 .with_stop_reason(AutonomousPlannerStopReason::GoalSatisfied),
+        )
+    }
+}
+
+impl AutonomousPlanner for InvalidGraphPlanner {
+    fn plan(&self, request: &AutonomousSearchRequest) -> anyhow::Result<AutonomousPlannerTrace> {
+        Ok(
+            AutonomousPlannerTrace::new(request.planner_strategy.clone())
+                .with_steps(vec![AutonomousPlannerTraceStep::new(
+                    sift::AutonomousPlannerStepCursor::new("step-1", 1),
+                )
+                .with_decisions(vec![
+                    AutonomousPlannerDecision::new(AutonomousPlannerAction::Select)
+                        .with_branch_id("branch-root")
+                        .with_node_id("step-1")
+                        .with_frontier_id("frontier-missing")
+                        .with_rationale("select an impossible frontier"),
+                ])])
+                .with_completed(true)
+                .with_stop_reason(AutonomousPlannerStopReason::NoFurtherQueries),
         )
     }
 }
@@ -871,5 +892,223 @@ fn built_in_autonomous_runtime_reports_unavailable_model_driven_profiles() {
         error
             .to_string()
             .contains("failed to resolve model-driven planner profile")
+    );
+}
+
+#[test]
+fn built_in_autonomous_runtime_executes_bounded_graph_mode() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(
+        corpus.path().join("alpha.txt"),
+        "alpha runtime details for the graph root branch",
+    )
+    .expect("write alpha corpus file");
+    std::fs::write(
+        corpus.path().join("beta.txt"),
+        "beta evidence carryover details for the graph follow up branch",
+    )
+    .expect("write beta corpus file");
+
+    let engine = Sift::builder().build();
+    let response = engine
+        .search_autonomous(
+            AutonomousSearchRequest::new(corpus.path(), "alpha runtime")
+                .with_mode(AutonomousSearchMode::Graph)
+                .with_strategy("bm25")
+                .with_limit(1)
+                .with_shortlist(1)
+                .with_retained_artifact_limit(1)
+                .with_state(sift::AutonomousPlannerState::new(2).with_retained_artifacts(vec![
+                    retained_artifact(
+                        "seed-evidence",
+                        "context/seed.txt",
+                        "beta evidence carryover",
+                        "fork a follow-up graph branch",
+                    ),
+                ])),
+        )
+        .expect("built-in graph autonomous search");
+
+    assert_eq!(response.mode, AutonomousSearchMode::Graph);
+    assert_eq!(response.turns.len(), 2);
+    assert_eq!(response.turns[0].turn.turn_id, "turn-1");
+    assert_eq!(response.turns[1].turn.turn_id, "turn-2");
+    assert!(response.state.completed);
+
+    let graph_episode = response
+        .state
+        .graph_episode
+        .as_ref()
+        .expect("graph episode state");
+    assert_eq!(graph_episode.root_node_id.as_deref(), Some("step-1"));
+    assert_eq!(graph_episode.branches.len(), 3);
+    assert!(graph_episode.frontier.is_empty());
+    assert_eq!(graph_episode.active_branch_id.as_deref(), Some("branch-3"));
+    assert!(
+        graph_episode
+            .branches
+            .iter()
+            .find(|branch| branch.branch_id == "branch-3")
+            .expect("graph follow-up branch")
+            .retained_artifacts[0]
+            .path
+            .ends_with("beta.txt")
+    );
+    assert!(
+        response.trace.turns[1]
+            .decisions
+            .iter()
+            .any(|decision| decision.action == SearchControllerAction::Prune),
+        "branch-local retained evidence should still honor the bounded controller budget"
+    );
+}
+
+#[test]
+fn graph_autonomous_runtime_surfaces_explicit_trace_contract_errors() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(corpus.path().join("alpha.txt"), "alpha runtime details")
+        .expect("write alpha corpus file");
+
+    let engine = Sift::builder().build();
+    let error = engine
+        .search_autonomous_with(
+            AutonomousSearchRequest::new(corpus.path(), "find alpha details")
+                .with_mode(AutonomousSearchMode::Graph)
+                .with_strategy("bm25")
+                .with_limit(1)
+                .with_shortlist(1),
+            &InvalidGraphPlanner,
+        )
+        .expect_err("invalid graph trace should fail explicitly");
+
+    assert!(
+        error
+            .to_string()
+            .contains("graph trace contract error"),
+        "unexpected graph runtime error: {error}"
+    );
+}
+
+#[test]
+fn built_in_graph_autonomous_runtime_routes_model_driven_strategy_selection() {
+    let corpus = tempfile::tempdir().expect("temp corpus");
+    std::fs::write(
+        corpus.path().join("alpha.txt"),
+        "alpha runtime details for the model driven graph branch",
+    )
+    .expect("write alpha corpus file");
+
+    let model_output = r#"{
+        "steps": [
+            {
+                "step": {
+                    "step_id": "step-1",
+                    "parent_step_id": null,
+                    "sequence": 1
+                },
+                "decisions": [
+                    {
+                        "action": "fork",
+                        "rationale": "model-driven planner forked the strongest graph branch",
+                        "query": "alpha runtime details",
+                        "turn_id": null,
+                        "branch_id": "branch-root",
+                        "node_id": "step-1",
+                        "target_branch_id": "branch-a",
+                        "target_node_id": "node-a",
+                        "edge_id": "edge-a",
+                        "edge_kind": "child",
+                        "frontier_id": "frontier-a",
+                        "next_step": {
+                            "step_id": "node-a",
+                            "parent_step_id": "step-1",
+                            "sequence": 2
+                        },
+                        "stop_reason": null
+                    },
+                    {
+                        "action": "select",
+                        "rationale": "choose the forked graph branch",
+                        "query": null,
+                        "turn_id": null,
+                        "branch_id": "branch-a",
+                        "node_id": "node-a",
+                        "target_branch_id": null,
+                        "target_node_id": null,
+                        "edge_id": null,
+                        "edge_kind": null,
+                        "frontier_id": "frontier-a",
+                        "next_step": null,
+                        "stop_reason": null
+                    },
+                    {
+                        "action": "search",
+                        "rationale": "execute the forked branch query",
+                        "query": "alpha runtime details",
+                        "turn_id": "turn-md-graph-1",
+                        "branch_id": "branch-a",
+                        "node_id": "node-a",
+                        "target_branch_id": null,
+                        "target_node_id": null,
+                        "edge_id": null,
+                        "edge_kind": null,
+                        "frontier_id": null,
+                        "next_step": null,
+                        "stop_reason": null
+                    },
+                    {
+                        "action": "terminate",
+                        "rationale": "the graph branch satisfied the root task",
+                        "query": null,
+                        "turn_id": null,
+                        "branch_id": "branch-a",
+                        "node_id": null,
+                        "target_branch_id": null,
+                        "target_node_id": null,
+                        "edge_id": null,
+                        "edge_kind": null,
+                        "frontier_id": null,
+                        "next_step": null,
+                        "stop_reason": "goal-satisfied"
+                    }
+                ]
+            }
+        ],
+        "completed": true,
+        "stop_reason": "goal-satisfied"
+    }"#;
+
+    let engine = Sift::builder()
+        .with_generative_model(std::sync::Arc::new(StaticGenerativeModel {
+            output: model_output.to_string(),
+        }))
+        .build();
+    let response = engine
+        .search_autonomous(
+            AutonomousSearchRequest::new(corpus.path(), "find alpha details")
+                .with_mode(AutonomousSearchMode::Graph)
+                .with_strategy("bm25")
+                .with_planner_strategy(
+                    AutonomousPlannerStrategy::model_driven().with_profile("local-planner-v1"),
+                )
+                .with_limit(1)
+                .with_shortlist(1),
+        )
+        .expect("model-driven graph autonomous search");
+
+    assert_eq!(response.mode, AutonomousSearchMode::Graph);
+    assert_eq!(response.turns.len(), 1);
+    assert_eq!(response.turns[0].turn.turn_id, "turn-md-graph-1");
+    assert_eq!(
+        response.planner_strategy,
+        AutonomousPlannerStrategy::model_driven().with_profile("local-planner-v1")
+    );
+    assert_eq!(
+        response.planner_trace.steps[0].decisions[0].action,
+        AutonomousPlannerAction::Fork
+    );
+    assert_eq!(
+        response.planner_trace.stop_reason,
+        Some(AutonomousPlannerStopReason::GoalSatisfied)
     );
 }

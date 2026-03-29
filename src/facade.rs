@@ -11,17 +11,19 @@ use crate::search::adapters::qwen::QwenModelSpec;
 pub use crate::search::domain::{Conversation, GenerativeModel};
 use crate::search::engine::SearchEngine;
 use crate::search::{
-    AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerStopReason,
-    AutonomousPlannerStrategyKind, AutonomousPlannerTrace, AutonomousSearchRequest,
-    AutonomousSearchResponse, Bm25Index, ContextAssemblyBudget, ContextAssemblyRequest,
-    ContextAssemblyResponse, Embedder, FusionPolicy, HeuristicAutonomousPlanner,
-    LatentSearchEmission, LatentSearchHit, LocalFileCorpusRepository, ModelDrivenAutonomousPlanner,
-    ProtocolSearchEmission, QueryEmbeddingCache, RerankingPolicy, RetrieverPolicy,
-    SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
+    AutonomousGraphBranchState, AutonomousGraphBranchStatus, AutonomousGraphEpisodeState,
+    AutonomousGraphNode, AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerStopReason,
+    AutonomousPlannerStrategyKind, AutonomousPlannerTrace, AutonomousSearchMode,
+    AutonomousSearchRequest, AutonomousSearchResponse, Bm25Index, ContextAssemblyBudget,
+    ContextAssemblyRequest, ContextAssemblyResponse, Embedder, FusionPolicy,
+    HeuristicAutonomousPlanner, LatentSearchEmission, LatentSearchHit, LocalFileCorpusRepository,
+    ModelDrivenAutonomousPlanner, ProtocolSearchEmission, QueryEmbeddingCache, RerankingPolicy,
+    RetrieverPolicy, SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
     SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode,
     SearchEnvironment, SearchPlan, SearchRequest, SearchResponse, SearchServiceBuilder,
     SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse, SearchTurnTrace,
-    StrategyPresetRegistry, load_search_corpus, run_search_with_plan,
+    StrategyPresetRegistry, load_search_corpus, replay_graph_decision, replay_graph_trace,
+    run_search_with_plan,
 };
 use crate::system::Telemetry;
 
@@ -172,6 +174,13 @@ pub struct Sift {
 struct BoundedRetainedArtifacts {
     retained: Vec<crate::search::RetainedArtifact>,
     pruned: usize,
+}
+
+#[derive(Debug, Clone)]
+struct GraphSearchTurnContext {
+    sequence: usize,
+    continue_more: bool,
+    previous_turn_id: Option<String>,
 }
 
 impl Sift {
@@ -528,6 +537,7 @@ impl Sift {
         request: AutonomousSearchRequest,
         planner: &P,
     ) -> Result<AutonomousSearchResponse> {
+        let request = self.normalize_autonomous_request(request);
         let plan = self.resolve_autonomous_plan(&request)?;
         let mut planner_trace = planner.plan(&request)?;
 
@@ -541,12 +551,16 @@ impl Sift {
             planner_trace.session_id = request.session_id.clone();
         }
 
+        if request.mode == AutonomousSearchMode::Graph {
+            return self.search_graph_autonomous(request, plan, planner_trace);
+        }
+
         let turns = self.lower_autonomous_turns(&request, &planner_trace)?;
         let state = if turns.is_empty() {
             if !Self::planner_trace_completed(&planner_trace) {
                 bail!("planner trace must emit a search decision or mark the episode complete");
             }
-            self.derive_autonomous_state(&request, &planner_trace, None)
+            self.derive_autonomous_state(&request, &planner_trace, None, None)
         } else {
             let mut controller_request = SearchControllerRequest::new(plan.clone(), turns)
                 .with_state(
@@ -563,9 +577,11 @@ impl Sift {
                 &request,
                 &planner_trace,
                 Some(&controller_response.state),
+                None,
             );
             return Ok(AutonomousSearchResponse {
                 root_task: request.root_task,
+                mode: request.mode,
                 planner_strategy: request.planner_strategy,
                 plan,
                 state,
@@ -578,6 +594,7 @@ impl Sift {
         let completed = state.completed;
         Ok(AutonomousSearchResponse {
             root_task: request.root_task,
+            mode: request.mode,
             planner_strategy: request.planner_strategy,
             plan,
             state,
@@ -586,6 +603,108 @@ impl Sift {
             trace: SearchTrace {
                 session_id: planner_trace.session_id.clone(),
                 turns: Vec::new(),
+                completed,
+                termination_reason: planner_trace
+                    .stop_reason
+                    .map(Self::format_autonomous_stop_reason),
+            },
+        })
+    }
+
+    fn normalize_autonomous_request(
+        &self,
+        mut request: AutonomousSearchRequest,
+    ) -> AutonomousSearchRequest {
+        if request.mode == AutonomousSearchMode::Graph && request.state.graph_episode.is_none() {
+            let seeded_graph_episode = Self::seed_graph_episode(&request);
+            request.state = request.state.with_graph_episode(seeded_graph_episode);
+        }
+        request
+    }
+
+    fn seed_graph_episode(request: &AutonomousSearchRequest) -> AutonomousGraphEpisodeState {
+        let root_node_id = request.state.current_step.step_id.clone();
+        let root_branch_id = "branch-root".to_string();
+
+        AutonomousGraphEpisodeState::new()
+            .with_root_node_id(root_node_id.clone())
+            .with_active_branch_id(root_branch_id.clone())
+            .with_nodes(vec![
+                AutonomousGraphNode::new(
+                    root_node_id.clone(),
+                    root_branch_id.clone(),
+                    request.state.current_step.clone(),
+                )
+                .with_query(request.root_task.clone()),
+            ])
+            .with_branches(vec![
+                AutonomousGraphBranchState::new(root_branch_id, root_node_id)
+                    .with_status(AutonomousGraphBranchStatus::Active)
+                    .with_retained_artifacts(request.state.retained_artifacts.clone()),
+            ])
+    }
+
+    fn search_graph_autonomous(
+        &self,
+        request: AutonomousSearchRequest,
+        plan: SearchPlan,
+        planner_trace: AutonomousPlannerTrace,
+    ) -> Result<AutonomousSearchResponse> {
+        let mut graph_episode = request
+            .state
+            .graph_episode
+            .clone()
+            .unwrap_or_else(|| Self::seed_graph_episode(&request));
+        replay_graph_trace(&graph_episode, &planner_trace)
+            .map_err(|error| anyhow!(error.to_string()))?;
+        let total_searches = Self::count_autonomous_search_turns(&planner_trace);
+        let mut completed_searches = 0usize;
+        let mut previous_turn_id = None;
+        let mut turns = Vec::new();
+        let mut trace_turns = Vec::new();
+
+        for step in &planner_trace.steps {
+            for decision in &step.decisions {
+                replay_graph_decision(&mut graph_episode, &step.step, decision)
+                    .map_err(|error| anyhow!(error.to_string()))?;
+
+                if decision.action != AutonomousPlannerAction::Search {
+                    continue;
+                }
+
+                completed_searches += 1;
+                let turn_response = self.execute_graph_search_turn(
+                    &request,
+                    &plan,
+                    &mut graph_episode,
+                    decision,
+                    GraphSearchTurnContext {
+                        sequence: completed_searches,
+                        continue_more: completed_searches < total_searches,
+                        previous_turn_id: previous_turn_id.clone(),
+                    },
+                )?;
+                previous_turn_id = Some(turn_response.turn.turn_id.clone());
+                trace_turns.push(turn_response.trace.turns[0].clone());
+                turns.push(turn_response);
+            }
+        }
+
+        let state =
+            self.derive_autonomous_state(&request, &planner_trace, None, Some(graph_episode));
+        let completed = state.completed;
+
+        Ok(AutonomousSearchResponse {
+            root_task: request.root_task,
+            mode: request.mode,
+            planner_strategy: request.planner_strategy,
+            plan,
+            state,
+            turns,
+            planner_trace: planner_trace.clone(),
+            trace: SearchTrace {
+                session_id: planner_trace.session_id.clone(),
+                turns: trace_turns,
                 completed,
                 termination_reason: planner_trace
                     .stop_reason
@@ -866,6 +985,169 @@ impl Sift {
         }
     }
 
+    fn execute_graph_search_turn(
+        &self,
+        request: &AutonomousSearchRequest,
+        plan: &SearchPlan,
+        graph_episode: &mut AutonomousGraphEpisodeState,
+        decision: &crate::search::AutonomousPlannerDecision,
+        context: GraphSearchTurnContext,
+    ) -> Result<SearchTurnResponse> {
+        let GraphSearchTurnContext {
+            sequence,
+            continue_more,
+            previous_turn_id,
+        } = context;
+        let branch_id = decision
+            .branch_id
+            .as_ref()
+            .ok_or_else(|| anyhow!("graph search decisions require branch_id"))?;
+        let node_id = decision
+            .node_id
+            .as_ref()
+            .ok_or_else(|| anyhow!("graph search decisions require node_id"))?;
+        let query = decision
+            .query
+            .clone()
+            .ok_or_else(|| anyhow!("graph search decisions require a query"))?;
+        let branch_index = graph_episode
+            .branches
+            .iter()
+            .position(|branch| branch.branch_id == *branch_id)
+            .ok_or_else(|| {
+                anyhow!("graph search decision references unknown branch '{branch_id}'")
+            })?;
+        let node_index = graph_episode
+            .nodes
+            .iter()
+            .position(|node| node.node_id == *node_id)
+            .ok_or_else(|| anyhow!("graph search decision references unknown node '{node_id}'"))?;
+
+        let mut turn_request = SearchTurnRequest::new(&request.path, query)
+            .with_turn_id(
+                decision
+                    .turn_id
+                    .clone()
+                    .unwrap_or_else(|| format!("turn-{sequence}")),
+            )
+            .with_sequence(sequence)
+            .with_strategy(plan.name.clone())
+            .with_plan(plan.clone())
+            .with_intent_opt(request.intent.clone())
+            .with_verbose(request.verbose)
+            .with_emission_mode(request.emission_mode)
+            .with_retained_artifacts(
+                graph_episode.branches[branch_index]
+                    .retained_artifacts
+                    .clone(),
+            )
+            .with_local_context(request.local_context.clone());
+
+        if let Some(session_id) = &request.session_id {
+            turn_request = turn_request.with_session_id(session_id.clone());
+        }
+        if let Some(parent_turn_id) = previous_turn_id {
+            turn_request = turn_request.with_parent_turn_id(parent_turn_id);
+        }
+        if let Some(limit) = request.limit {
+            turn_request = turn_request.with_limit(limit);
+        }
+        if let Some(shortlist) = request.shortlist {
+            turn_request = turn_request.with_shortlist(shortlist);
+        }
+
+        let assembly = self.assemble_context_with_plan(
+            ContextAssemblyRequest::new(&turn_request.path, turn_request.query.clone())
+                .with_strategy(plan.name.clone())
+                .with_intent_opt(turn_request.intent.clone())
+                .with_limit(turn_request.limit.unwrap_or(self.config.search.limit))
+                .with_shortlist(
+                    turn_request
+                        .shortlist
+                        .unwrap_or(self.config.search.shortlist),
+                )
+                .with_emission_mode(turn_request.emission_mode)
+                .with_local_context(turn_request.local_context.clone())
+                .with_retained_artifacts(turn_request.retained_artifacts.clone())
+                .with_budget(ContextAssemblyBudget::new(
+                    request.retained_artifact_limit.max(1),
+                )),
+            Some(plan.clone()),
+            &turn_request.turn_id,
+            turn_request.session_id.clone(),
+        )?;
+
+        graph_episode.active_branch_id = Some(branch_id.clone());
+        graph_episode.branches[branch_index].head_node_id = node_id.clone();
+        graph_episode.branches[branch_index].retained_artifacts =
+            assembly.retained_artifacts.clone();
+        graph_episode.nodes[node_index].query = Some(turn_request.query.clone());
+        graph_episode.nodes[node_index].turn_id = Some(turn_request.turn_id.clone());
+
+        let mut decisions = vec![
+            SearchControllerDecision::new(SearchControllerAction::Retrieve).with_rationale(
+                format!(
+                    "executed graph branch {} node {} through the shared {} plan",
+                    branch_id, node_id, plan.name
+                ),
+            ),
+        ];
+
+        if !assembly.retained_artifacts.is_empty() {
+            decisions.push(
+                SearchControllerDecision::new(SearchControllerAction::Retain).with_rationale(
+                    format!(
+                        "retained {} branch-local evidence item(s) for {}",
+                        assembly.retained_artifacts.len(),
+                        branch_id
+                    ),
+                ),
+            );
+        }
+        if assembly.pruned_artifacts > 0 {
+            decisions.push(
+                SearchControllerDecision::new(SearchControllerAction::Prune).with_rationale(
+                    format!(
+                        "pruned {} branch-local evidence item(s) to preserve the graph budget",
+                        assembly.pruned_artifacts
+                    ),
+                ),
+            );
+        }
+        decisions.push(
+            SearchControllerDecision::new(SearchControllerAction::Emit).with_rationale(format!(
+                "emitted {} result(s) for graph branch {}",
+                assembly.response.hits.len(),
+                branch_id
+            )),
+        );
+        decisions.push(
+            SearchControllerDecision::new(if continue_more {
+                SearchControllerAction::Continue
+            } else {
+                SearchControllerAction::Terminate
+            })
+            .with_rationale(if continue_more {
+                "continuing to the next bounded graph search turn"
+            } else {
+                "completed the bounded graph search turn budget"
+            }),
+        );
+
+        Ok(self.build_turn_response(
+            &turn_request,
+            plan,
+            assembly,
+            decisions,
+            !continue_more,
+            if continue_more {
+                None
+            } else {
+                Some("graph runtime executed all planned graph search turns".to_string())
+            },
+        ))
+    }
+
     fn lower_autonomous_turns(
         &self,
         request: &AutonomousSearchRequest,
@@ -930,6 +1212,7 @@ impl Sift {
         request: &AutonomousSearchRequest,
         planner_trace: &AutonomousPlannerTrace,
         controller_state: Option<&SearchControllerState>,
+        graph_episode: Option<AutonomousGraphEpisodeState>,
     ) -> crate::search::AutonomousPlannerState {
         let current_step = planner_trace
             .steps
@@ -942,14 +1225,32 @@ impl Sift {
             })
             .or_else(|| planner_trace.steps.last().map(|step| step.step.clone()))
             .unwrap_or_else(|| request.state.current_step.clone());
+        let retained_artifacts = graph_episode
+            .as_ref()
+            .and_then(|episode| {
+                episode.active_branch_id.as_ref().and_then(|branch_id| {
+                    episode
+                        .branches
+                        .iter()
+                        .find(|branch| branch.branch_id == *branch_id)
+                        .map(|branch| branch.retained_artifacts.clone())
+                })
+            })
+            .or_else(|| controller_state.map(|state| state.retained_artifacts.clone()))
+            .unwrap_or_else(|| request.state.retained_artifacts.clone());
+        let graph_completed = graph_episode
+            .as_ref()
+            .map(|episode| episode.completed)
+            .unwrap_or(false);
 
         crate::search::AutonomousPlannerState {
             current_step,
             step_limit: request.state.step_limit,
-            retained_artifacts: controller_state
-                .map(|state| state.retained_artifacts.clone())
-                .unwrap_or_else(|| request.state.retained_artifacts.clone()),
-            completed: Self::planner_trace_completed(planner_trace) || request.state.completed,
+            retained_artifacts,
+            graph_episode: graph_episode.or_else(|| request.state.graph_episode.clone()),
+            completed: Self::planner_trace_completed(planner_trace)
+                || request.state.completed
+                || graph_completed,
         }
     }
 
