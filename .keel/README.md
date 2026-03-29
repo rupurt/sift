@@ -132,6 +132,34 @@
 | [Promote Autonomous Library Entry Point](epics/VFC7H4pFw/voyages/VFCWCm3Mc/) | done |
 | [Add Agent Search CLI Surface](epics/VFC7H4pFw/voyages/VFCWG2tZd/) | done |
 
+### [Graph Episode Contract and Replay](epics/VFD8KR44d/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Define Graph Episode Contracts](epics/VFD8KR44d/voyages/VFD8TQUTj/) | planned |
+| [Validate Replayable Graph Traces](epics/VFD8KR44d/voyages/VFD8TQyTg/) | planned |
+
+### [Frontier Runtime and Episode Memory](epics/VFD8NgvJl/) (draft)
+
+| Voyage | Status |
+|--------|--------|
+| [Build Frontier Runtime and Branch-Local Evidence](epics/VFD8NgvJl/voyages/VFD8TRPTh/) | draft |
+| [Add Merge and Prune Execution Semantics](epics/VFD8NgvJl/voyages/VFD8TRwUu/) | draft |
+
+### [Graph Planner Strategies](epics/VFD8ORnLV/) (draft)
+
+| Voyage | Status |
+|--------|--------|
+| [Ship Heuristic Graph Planner Baseline](epics/VFD8ORnLV/voyages/VFD8TSJVM/) | draft |
+| [Add Model-Driven Graph Planner Strategy](epics/VFD8ORnLV/voyages/VFD8TSlWa/) | draft |
+
+### [Graph Evaluation and Supported Surface](epics/VFD8P8CO4/) (draft)
+
+| Voyage | Status |
+|--------|--------|
+| [Benchmark Graph Search Against Linear Baselines](epics/VFD8P8CO4/voyages/VFD8TTCXY/) | draft |
+| [Promote Graph Search Library and CLI Surface](epics/VFD8P8CO4/voyages/VFD8TThXk/) | draft |
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |
