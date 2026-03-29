@@ -500,6 +500,206 @@ impl Default for AutonomousPlannerStrategy {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ValueEnum, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum AutonomousSearchMode {
+    #[default]
+    Linear,
+    Graph,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AutonomousGraphBranchStatus {
+    Pending,
+    Active,
+    Completed,
+    Merged,
+    Pruned,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AutonomousGraphEdgeKind {
+    Root,
+    Child,
+    Sibling,
+    Merge,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutonomousGraphNode {
+    pub node_id: String,
+    pub branch_id: String,
+    pub step: AutonomousPlannerStepCursor,
+    pub query: Option<String>,
+    pub turn_id: Option<String>,
+}
+
+impl AutonomousGraphNode {
+    pub fn new(
+        node_id: impl Into<String>,
+        branch_id: impl Into<String>,
+        step: AutonomousPlannerStepCursor,
+    ) -> Self {
+        Self {
+            node_id: node_id.into(),
+            branch_id: branch_id.into(),
+            step,
+            query: None,
+            turn_id: None,
+        }
+    }
+
+    pub fn with_query(mut self, query: impl Into<String>) -> Self {
+        self.query = Some(query.into());
+        self
+    }
+
+    pub fn with_turn_id(mut self, turn_id: impl Into<String>) -> Self {
+        self.turn_id = Some(turn_id.into());
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutonomousGraphEdge {
+    pub edge_id: String,
+    pub from_node_id: String,
+    pub to_node_id: String,
+    pub kind: AutonomousGraphEdgeKind,
+}
+
+impl AutonomousGraphEdge {
+    pub fn new(
+        edge_id: impl Into<String>,
+        from_node_id: impl Into<String>,
+        to_node_id: impl Into<String>,
+        kind: AutonomousGraphEdgeKind,
+    ) -> Self {
+        Self {
+            edge_id: edge_id.into(),
+            from_node_id: from_node_id.into(),
+            to_node_id: to_node_id.into(),
+            kind,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutonomousGraphFrontierEntry {
+    pub frontier_id: String,
+    pub branch_id: String,
+    pub node_id: String,
+    pub priority: usize,
+}
+
+impl AutonomousGraphFrontierEntry {
+    pub fn new(
+        frontier_id: impl Into<String>,
+        branch_id: impl Into<String>,
+        node_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            frontier_id: frontier_id.into(),
+            branch_id: branch_id.into(),
+            node_id: node_id.into(),
+            priority: 0,
+        }
+    }
+
+    pub fn with_priority(mut self, priority: usize) -> Self {
+        self.priority = priority;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutonomousGraphBranchState {
+    pub branch_id: String,
+    pub status: AutonomousGraphBranchStatus,
+    pub head_node_id: String,
+    pub retained_artifacts: Vec<RetainedArtifact>,
+}
+
+impl AutonomousGraphBranchState {
+    pub fn new(branch_id: impl Into<String>, head_node_id: impl Into<String>) -> Self {
+        Self {
+            branch_id: branch_id.into(),
+            status: AutonomousGraphBranchStatus::Pending,
+            head_node_id: head_node_id.into(),
+            retained_artifacts: Vec::new(),
+        }
+    }
+
+    pub fn with_status(mut self, status: AutonomousGraphBranchStatus) -> Self {
+        self.status = status;
+        self
+    }
+
+    pub fn with_head_node_id(mut self, head_node_id: impl Into<String>) -> Self {
+        self.head_node_id = head_node_id.into();
+        self
+    }
+
+    pub fn with_retained_artifacts(mut self, retained_artifacts: Vec<RetainedArtifact>) -> Self {
+        self.retained_artifacts = retained_artifacts;
+        self
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AutonomousGraphEpisodeState {
+    pub root_node_id: Option<String>,
+    pub active_branch_id: Option<String>,
+    pub frontier: Vec<AutonomousGraphFrontierEntry>,
+    pub branches: Vec<AutonomousGraphBranchState>,
+    pub nodes: Vec<AutonomousGraphNode>,
+    pub edges: Vec<AutonomousGraphEdge>,
+    pub completed: bool,
+}
+
+impl AutonomousGraphEpisodeState {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_root_node_id(mut self, root_node_id: impl Into<String>) -> Self {
+        self.root_node_id = Some(root_node_id.into());
+        self
+    }
+
+    pub fn with_active_branch_id(mut self, active_branch_id: impl Into<String>) -> Self {
+        self.active_branch_id = Some(active_branch_id.into());
+        self
+    }
+
+    pub fn with_frontier(mut self, frontier: Vec<AutonomousGraphFrontierEntry>) -> Self {
+        self.frontier = frontier;
+        self
+    }
+
+    pub fn with_branches(mut self, branches: Vec<AutonomousGraphBranchState>) -> Self {
+        self.branches = branches;
+        self
+    }
+
+    pub fn with_nodes(mut self, nodes: Vec<AutonomousGraphNode>) -> Self {
+        self.nodes = nodes;
+        self
+    }
+
+    pub fn with_edges(mut self, edges: Vec<AutonomousGraphEdge>) -> Self {
+        self.edges = edges;
+        self
+    }
+
+    pub fn with_completed(mut self, completed: bool) -> Self {
+        self.completed = completed;
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct AutonomousPlannerStepCursor {
     pub step_id: String,
@@ -531,6 +731,7 @@ pub struct AutonomousPlannerState {
     pub current_step: AutonomousPlannerStepCursor,
     pub step_limit: usize,
     pub retained_artifacts: Vec<RetainedArtifact>,
+    pub graph_episode: Option<AutonomousGraphEpisodeState>,
     pub completed: bool,
 }
 
@@ -540,6 +741,7 @@ impl AutonomousPlannerState {
             current_step: AutonomousPlannerStepCursor::first(),
             step_limit,
             retained_artifacts: Vec::new(),
+            graph_episode: None,
             completed: false,
         }
     }
@@ -559,6 +761,11 @@ impl AutonomousPlannerState {
         self
     }
 
+    pub fn with_graph_episode(mut self, graph_episode: AutonomousGraphEpisodeState) -> Self {
+        self.graph_episode = Some(graph_episode);
+        self
+    }
+
     pub fn with_completed(mut self, completed: bool) -> Self {
         self.completed = completed;
         self
@@ -570,6 +777,7 @@ pub struct AutonomousSearchRequest {
     pub session_id: Option<String>,
     pub path: PathBuf,
     pub root_task: String,
+    pub mode: AutonomousSearchMode,
     pub intent: Option<String>,
     pub strategy: Option<String>,
     pub plan: Option<SearchPlan>,
@@ -589,6 +797,7 @@ impl AutonomousSearchRequest {
             session_id: None,
             path: path.as_ref().to_path_buf(),
             root_task: root_task.into(),
+            mode: AutonomousSearchMode::Linear,
             intent: None,
             strategy: None,
             plan: None,
@@ -618,6 +827,11 @@ impl AutonomousSearchRequest {
         self
     }
 
+    pub fn with_mode(mut self, mode: AutonomousSearchMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
     pub fn with_strategy(mut self, strategy: impl Into<String>) -> Self {
         self.strategy = Some(strategy.into());
         self
@@ -635,6 +849,11 @@ impl AutonomousSearchRequest {
 
     pub fn with_state(mut self, state: AutonomousPlannerState) -> Self {
         self.state = state;
+        self
+    }
+
+    pub fn with_graph_episode(mut self, graph_episode: AutonomousGraphEpisodeState) -> Self {
+        self.state = self.state.with_graph_episode(graph_episode);
         self
     }
 
@@ -678,6 +897,10 @@ impl AutonomousSearchRequest {
 #[serde(rename_all = "kebab-case")]
 pub enum AutonomousPlannerAction {
     Search,
+    Fork,
+    Select,
+    Merge,
+    Prune,
     Continue,
     Terminate,
 }
@@ -697,6 +920,13 @@ pub struct AutonomousPlannerDecision {
     pub rationale: Option<String>,
     pub query: Option<String>,
     pub turn_id: Option<String>,
+    pub branch_id: Option<String>,
+    pub node_id: Option<String>,
+    pub target_branch_id: Option<String>,
+    pub target_node_id: Option<String>,
+    pub edge_id: Option<String>,
+    pub edge_kind: Option<AutonomousGraphEdgeKind>,
+    pub frontier_id: Option<String>,
     pub next_step: Option<AutonomousPlannerStepCursor>,
     pub stop_reason: Option<AutonomousPlannerStopReason>,
 }
@@ -708,6 +938,13 @@ impl AutonomousPlannerDecision {
             rationale: None,
             query: None,
             turn_id: None,
+            branch_id: None,
+            node_id: None,
+            target_branch_id: None,
+            target_node_id: None,
+            edge_id: None,
+            edge_kind: None,
+            frontier_id: None,
             next_step: None,
             stop_reason: None,
         }
@@ -725,6 +962,41 @@ impl AutonomousPlannerDecision {
 
     pub fn with_turn_id(mut self, turn_id: impl Into<String>) -> Self {
         self.turn_id = Some(turn_id.into());
+        self
+    }
+
+    pub fn with_branch_id(mut self, branch_id: impl Into<String>) -> Self {
+        self.branch_id = Some(branch_id.into());
+        self
+    }
+
+    pub fn with_node_id(mut self, node_id: impl Into<String>) -> Self {
+        self.node_id = Some(node_id.into());
+        self
+    }
+
+    pub fn with_target_branch_id(mut self, target_branch_id: impl Into<String>) -> Self {
+        self.target_branch_id = Some(target_branch_id.into());
+        self
+    }
+
+    pub fn with_target_node_id(mut self, target_node_id: impl Into<String>) -> Self {
+        self.target_node_id = Some(target_node_id.into());
+        self
+    }
+
+    pub fn with_edge_id(mut self, edge_id: impl Into<String>) -> Self {
+        self.edge_id = Some(edge_id.into());
+        self
+    }
+
+    pub fn with_edge_kind(mut self, edge_kind: AutonomousGraphEdgeKind) -> Self {
+        self.edge_kind = Some(edge_kind);
+        self
+    }
+
+    pub fn with_frontier_id(mut self, frontier_id: impl Into<String>) -> Self {
+        self.frontier_id = Some(frontier_id.into());
         self
     }
 
@@ -996,6 +1268,7 @@ pub struct SearchControllerResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AutonomousSearchResponse {
     pub root_task: String,
+    pub mode: AutonomousSearchMode,
     pub planner_strategy: AutonomousPlannerStrategy,
     pub plan: SearchPlan,
     pub state: AutonomousPlannerState,

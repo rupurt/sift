@@ -3,6 +3,7 @@ pub mod application;
 pub mod corpus;
 pub mod domain;
 pub mod engine;
+pub mod graph;
 pub mod legacy;
 pub mod planner;
 pub mod presentation;
@@ -15,23 +16,30 @@ pub use application::{
 pub use corpus::load_search_corpus;
 pub use domain::{
     AcquisitionAdapterKind, AgentTurnInput, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
-    AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerDecision, AutonomousPlannerState,
-    AutonomousPlannerStepCursor, AutonomousPlannerStopReason, AutonomousPlannerStrategy,
-    AutonomousPlannerStrategyKind, AutonomousPlannerTrace, AutonomousPlannerTraceStep,
-    AutonomousSearchRequest, AutonomousSearchResponse, Bm25Index, CachedEmbedder, Candidate,
-    CandidateList, ContextArtifact, ContextArtifactKind, ContextAssemblyBudget,
-    ContextAssemblyRequest, ContextAssemblyResponse, ContributorScore, Conversation,
-    CorpusLoadRequest, CorpusRepository, Embedder, EnvironmentFactInput, Expander, Fuser,
-    FusionPolicy, GenerativeModel, LatentSearchEmission, LatentSearchHit, LoadedCorpus,
-    LocalContextSource, OutputFormat, PreparedCorpus, ProtocolSearchEmission, QueryEmbeddingCache,
-    QueryExpansionPolicy, QueryVariant, Reranker, RerankingPolicy, RetainedArtifact, Retriever,
-    RetrieverPolicy, ScoreConfidence, SearchControllerAction, SearchControllerDecision,
-    SearchControllerRequest, SearchControllerResponse, SearchControllerState, SearchEmission,
-    SearchEmissionMode, SearchHit, SearchPlan, SearchRequest, SearchResponse, SearchTelemetry,
-    SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse, SearchTurnTrace,
-    StrategyPresetRegistry, ToolOutputInput, tokenize,
+    AutonomousGraphBranchState, AutonomousGraphBranchStatus, AutonomousGraphEdge,
+    AutonomousGraphEdgeKind, AutonomousGraphEpisodeState, AutonomousGraphFrontierEntry,
+    AutonomousGraphNode, AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerDecision,
+    AutonomousPlannerState, AutonomousPlannerStepCursor, AutonomousPlannerStopReason,
+    AutonomousPlannerStrategy, AutonomousPlannerStrategyKind, AutonomousPlannerTrace,
+    AutonomousPlannerTraceStep, AutonomousSearchMode, AutonomousSearchRequest,
+    AutonomousSearchResponse, Bm25Index, CachedEmbedder, Candidate, CandidateList, ContextArtifact,
+    ContextArtifactKind, ContextAssemblyBudget, ContextAssemblyRequest, ContextAssemblyResponse,
+    ContributorScore, Conversation, CorpusLoadRequest, CorpusRepository, Embedder,
+    EnvironmentFactInput, Expander, Fuser, FusionPolicy, GenerativeModel, LatentSearchEmission,
+    LatentSearchHit, LoadedCorpus, LocalContextSource, OutputFormat, PreparedCorpus,
+    ProtocolSearchEmission, QueryEmbeddingCache, QueryExpansionPolicy, QueryVariant, Reranker,
+    RerankingPolicy, RetainedArtifact, Retriever, RetrieverPolicy, ScoreConfidence,
+    SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
+    SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode, SearchHit,
+    SearchPlan, SearchRequest, SearchResponse, SearchTelemetry, SearchTrace, SearchTurn,
+    SearchTurnRequest, SearchTurnResponse, SearchTurnTrace, StrategyPresetRegistry,
+    ToolOutputInput, tokenize,
 };
 pub use engine::{SearchEngine, SearchEnvironment};
+pub use graph::{
+    AutonomousGraphTraceContractError, AutonomousGraphTraceContractErrorKind,
+    replay_graph_decision, replay_graph_trace,
+};
 pub use planner::{HeuristicAutonomousPlanner, ModelDrivenAutonomousPlanner};
 #[allow(unused_imports)]
 pub use presentation::*;

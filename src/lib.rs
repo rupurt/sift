@@ -40,18 +40,22 @@ pub use crate::facade::{
 };
 pub use crate::search::{
     AcquisitionAdapterKind, AgentTurnInput, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
+    AutonomousGraphBranchState, AutonomousGraphBranchStatus, AutonomousGraphEdge,
+    AutonomousGraphEdgeKind, AutonomousGraphEpisodeState, AutonomousGraphFrontierEntry,
+    AutonomousGraphNode, AutonomousGraphTraceContractError, AutonomousGraphTraceContractErrorKind,
     AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerDecision, AutonomousPlannerState,
     AutonomousPlannerStepCursor, AutonomousPlannerStopReason, AutonomousPlannerStrategy,
     AutonomousPlannerStrategyKind, AutonomousPlannerTrace, AutonomousPlannerTraceStep,
-    AutonomousSearchRequest, AutonomousSearchResponse, ContextArtifact, ContextArtifactKind,
-    ContextAssemblyBudget, ContextAssemblyRequest, ContextAssemblyResponse, CorpusLoadRequest,
-    EnvironmentFactInput, FusionPolicy, HeuristicAutonomousPlanner, LatentSearchEmission,
-    LatentSearchHit, LocalContextSource, ModelDrivenAutonomousPlanner, ProtocolSearchEmission,
-    QueryExpansionPolicy, RerankingPolicy, RetainedArtifact, RetrieverPolicy, ScoreConfidence,
-    SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
-    SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode, SearchHit,
-    SearchPlan, SearchResponse, SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse,
-    SearchTurnTrace, ToolOutputInput,
+    AutonomousSearchMode, AutonomousSearchRequest, AutonomousSearchResponse, ContextArtifact,
+    ContextArtifactKind, ContextAssemblyBudget, ContextAssemblyRequest, ContextAssemblyResponse,
+    CorpusLoadRequest, EnvironmentFactInput, FusionPolicy, HeuristicAutonomousPlanner,
+    LatentSearchEmission, LatentSearchHit, LocalContextSource, ModelDrivenAutonomousPlanner,
+    ProtocolSearchEmission, QueryExpansionPolicy, RerankingPolicy, RetainedArtifact,
+    RetrieverPolicy, ScoreConfidence, SearchControllerAction, SearchControllerDecision,
+    SearchControllerRequest, SearchControllerResponse, SearchControllerState, SearchEmission,
+    SearchEmissionMode, SearchHit, SearchPlan, SearchResponse, SearchTrace, SearchTurn,
+    SearchTurnRequest, SearchTurnResponse, SearchTurnTrace, ToolOutputInput, replay_graph_decision,
+    replay_graph_trace,
 };
 
 #[doc(hidden)]
