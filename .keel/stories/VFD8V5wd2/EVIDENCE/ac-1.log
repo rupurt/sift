@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T18:14:59.859244898-07:00
+mode: manual
+---
+Extended graph decision semantics in src/search/domain.rs: AutonomousPlannerAction now includes fork/select/merge/prune and AutonomousPlannerDecision carries branch_id, node_id, target_branch_id, target_node_id, edge_id, edge_kind, and frontier_id. AutonomousGraphEdgeKind explicitly encodes root/child/sibling/merge relationships. Verified by tests/autonomous_planner_contract_test.rs and just check.

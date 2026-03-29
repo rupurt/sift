@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T18:15:02.828659231-07:00
+mode: manual
+---
+The graph contract stays additive: AutonomousSearchMode defaults to linear, existing AutonomousSearchRequest/Response remain the public surface, and the linear autonomous/library/CLI paths continue to pass under just check, including tests/library_facade_test.rs and tests/cli_agent_search_test.rs.
