@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T18:15:05.687754298-07:00
+mode: manual
+---
+Added replayable graph validation in src/search/graph.rs with replay_graph_trace and replay_graph_decision, covering missing branch/node/edge/frontier references, duplicate ids, and invalid branch-node or edge transitions. Deterministic replay is covered by the search::graph unit tests and just check.

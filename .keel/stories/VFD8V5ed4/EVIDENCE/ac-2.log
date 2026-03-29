@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T18:15:10.500280174-07:00
+mode: manual
+---
+Replay of validated graph traces is deterministic in src/search/graph.rs::replay_graph_trace. The unit test replay_graph_trace_advances_frontier_state_deterministically reconstructs frontier progression, branch activation, edge creation, and completion from stored state plus trace data; just check passes.
