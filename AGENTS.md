@@ -17,8 +17,13 @@ Keel's operator rhythm is the `Orient -> Inspect -> Pull -> Ship -> Close` loop 
 - **Orient**: Inspect charge and board stability with `just keel heartbeat`, `just keel health --scene`, `just keel flow --scene`, and `just keel doctor`.
 - **Inspect**: Read current demand with `just keel mission next --status`, `just keel pulse`, `just keel roles`, and `just keel next --role <role> --explain` when routing is unclear.
 - **Pull**: Select one role-scoped slice with `just keel next --role <role>`.
-- **Ship**: Execute the slice, record proof, and advance lifecycle state.
-- **Close**: Land the relevant transition and the sealing commit that clears open-loop energy.
+- **Ship**: Execute the slice, record proof while the work is fresh, and land the relevant lifecycle transition (`story submit`, `voyage plan`, `bearing lay`, and similar) before the commit boundary when it rewrites `.keel` artifacts.
+- **Close**:
+  - Record the move in the mission `LOG.md`.
+  - Use `just keel heartbeat` if you need to confirm the current activity source or inspect whether open-loop energy is still present before sealing the turn.
+  - Inspect `git status` and include the resulting code and `.keel` churn in the same atomic commit.
+  - Execute `git commit`. The installed hooks can run repo-local checks and append `doctor --status` metadata to the commit message; resolve any rejection before proceeding.
+  - Re-orient with `just keel doctor --status` and `just keel flow --scene` after the commit lands so the next turn starts from the real board state.
 
 ### Session Start & Human Interaction
 When a human user opens the chat or "pokes" you (e.g., "Wake up", "I'm poking you"), you MUST immediately perform the `Orient` and `Inspect` halves of the turn loop by following the **Human Interaction & Pokes** workflow in [INSTRUCTIONS.md](INSTRUCTIONS.md):
