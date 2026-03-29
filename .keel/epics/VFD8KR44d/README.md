@@ -22,9 +22,9 @@ mission: VFD8IjQ0R
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/2 voyages complete, 0/4 stories done
+**Progress:** 2/2 voyages complete, 4/4 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Define Graph Episode Contracts](voyages/VFD8TQUTj/) | planned | 0/2 |
-| [Validate Replayable Graph Traces](voyages/VFD8TQyTg/) | planned | 0/2 |
+| [Define Graph Episode Contracts](voyages/VFD8TQUTj/) | done | 2/2 |
+| [Validate Replayable Graph Traces](voyages/VFD8TQyTg/) | done | 2/2 |
 <!-- END GENERATED -->

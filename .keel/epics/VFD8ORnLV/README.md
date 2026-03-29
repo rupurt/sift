@@ -22,9 +22,9 @@ mission: VFD8IjQ0R
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/2 voyages complete, 0/0 stories done
+**Progress:** 2/2 voyages complete, 4/4 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Ship Heuristic Graph Planner Baseline](voyages/VFD8TSJVM/) | draft | 0/0 |
-| [Add Model-Driven Graph Planner Strategy](voyages/VFD8TSlWa/) | draft | 0/0 |
+| [Ship Heuristic Graph Planner Baseline](voyages/VFD8TSJVM/) | done | 2/2 |
+| [Add Model-Driven Graph Planner Strategy](voyages/VFD8TSlWa/) | done | 2/2 |
 <!-- END GENERATED -->

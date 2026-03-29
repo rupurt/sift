@@ -22,9 +22,9 @@ mission: VFD8IjQ0R
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/2 voyages complete, 0/0 stories done
+**Progress:** 2/2 voyages complete, 4/4 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Build Frontier Runtime and Branch-Local Evidence](voyages/VFD8TRPTh/) | draft | 0/0 |
-| [Add Merge and Prune Execution Semantics](voyages/VFD8TRwUu/) | draft | 0/0 |
+| [Build Frontier Runtime and Branch-Local Evidence](voyages/VFD8TRPTh/) | done | 2/2 |
+| [Add Merge and Prune Execution Semantics](voyages/VFD8TRwUu/) | done | 2/2 |
 <!-- END GENERATED -->

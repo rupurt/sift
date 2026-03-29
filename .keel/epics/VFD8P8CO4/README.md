@@ -22,9 +22,9 @@ mission: VFD8IjQ0R
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/2 voyages complete, 0/0 stories done
+**Progress:** 2/2 voyages complete, 4/4 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Benchmark Graph Search Against Linear Baselines](voyages/VFD8TTCXY/) | draft | 0/0 |
-| [Promote Graph Search Library and CLI Surface](voyages/VFD8TThXk/) | draft | 0/0 |
+| [Benchmark Graph Search Against Linear Baselines](voyages/VFD8TTCXY/) | done | 2/2 |
+| [Promote Graph Search Library and CLI Surface](voyages/VFD8TThXk/) | done | 2/2 |
 <!-- END GENERATED -->
