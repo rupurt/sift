@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T18:14:56.771403556-07:00
+mode: manual
+---
+Graph node and branch identifiers are explicit and stable in src/search/domain.rs via AutonomousGraphNode { node_id, branch_id }, AutonomousGraphEdge { edge_id, from_node_id, to_node_id, kind }, and AutonomousGraphEpisodeState frontier/branch records. Serde round trips are asserted in tests/autonomous_planner_contract_test.rs; just check passes.

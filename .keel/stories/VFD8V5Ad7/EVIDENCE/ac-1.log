@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-28T18:14:53.788877783-07:00
+mode: manual
+---
+Added graph-mode autonomous DTOs in src/search/domain.rs: AutonomousSearchMode, AutonomousGraphEpisodeState, AutonomousGraphFrontierEntry, AutonomousGraphBranchState, AutonomousGraphNode, plus graph-aware fields on AutonomousSearchRequest/Response and AutonomousPlannerState. Coverage: tests/autonomous_planner_contract_test.rs and just check.
