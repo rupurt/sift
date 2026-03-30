@@ -1,0 +1,9 @@
+---
+recorded_at: 2026-03-30T14:13:16.958405388-07:00
+command: grep -n 'estimated_remaining' /home/alex/workspace/rupurt/sift/src/search/domain.rs
+---
+1110:        estimated_remaining: Option<std::time::Duration>,
+1116:        estimated_remaining: Option<std::time::Duration>,
+1123:        estimated_remaining: Option<std::time::Duration>,
+1129:        estimated_remaining: Option<std::time::Duration>,
+1135:        estimated_remaining: Option<std::time::Duration>,

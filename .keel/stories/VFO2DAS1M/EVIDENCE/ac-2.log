@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-30T14:24:30.786174976-07:00
+command: sh -lc 'cd "/home/alex/workspace/rupurt/sift" && grep -A5 "SearchProgress::PlannerStep" src/facade.rs | grep -c "step_index\|action\|query"'
+---
+3

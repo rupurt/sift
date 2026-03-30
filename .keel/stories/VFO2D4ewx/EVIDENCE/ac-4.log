@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-30T14:23:13.736508414-07:00
+command: sh -lc 'cd "/home/alex/workspace/rupurt/sift" && keel mission show VFO1XfDM9 2>&1 | grep VFO7CZ4Lf'
+---
+    [1m[94mVFO7CZ4Lf[39m[0m - Upstream Sift Progress Callback Requirements From Paddles ([2mlaid[0m)

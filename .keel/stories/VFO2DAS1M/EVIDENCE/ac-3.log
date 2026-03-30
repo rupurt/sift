@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-30T14:24:31.621585182-07:00
+command: sh -lc 'cd "/home/alex/workspace/rupurt/sift" && grep -n "SearchProgress::Retrieving" src/facade.rs'
+---
+440:                cb(&SearchProgress::Retrieving {

@@ -1,0 +1,7 @@
+---
+recorded_at: 2026-03-30T14:13:05.646164705-07:00
+command: grep -n 'Indexing\|Embedding\|PlannerStep\|Retrieving\|Ranking' src/search/domain.rs | head -20
+---
+
+--- stderr ---
+grep: src/search/domain.rs: No such file or directory

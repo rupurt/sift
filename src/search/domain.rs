@@ -1076,6 +1076,66 @@ pub trait AutonomousPlanner: Send + Sync {
     fn plan(&self, request: &AutonomousSearchRequest) -> Result<AutonomousPlannerTrace>;
 }
 
+/// Phase discriminant for downstream display mapping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SearchPhase {
+    Indexing,
+    Embedding,
+    Planning,
+    Retrieving,
+    Ranking,
+}
+
+impl std::fmt::Display for SearchPhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Indexing => write!(f, "Indexing"),
+            Self::Embedding => write!(f, "Embedding"),
+            Self::Planning => write!(f, "Planning"),
+            Self::Retrieving => write!(f, "Retrieving"),
+            Self::Ranking => write!(f, "Ranking"),
+        }
+    }
+}
+
+/// Structured progress event emitted during `search_autonomous` execution.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SearchProgress {
+    Indexing {
+        phase: SearchPhase,
+        files_processed: usize,
+        files_total: usize,
+        estimated_remaining: Option<std::time::Duration>,
+    },
+    Embedding {
+        phase: SearchPhase,
+        chunks_processed: usize,
+        chunks_total: usize,
+        estimated_remaining: Option<std::time::Duration>,
+    },
+    PlannerStep {
+        phase: SearchPhase,
+        step_index: usize,
+        action: String,
+        query: Option<String>,
+        estimated_remaining: Option<std::time::Duration>,
+    },
+    Retrieving {
+        phase: SearchPhase,
+        turn_index: usize,
+        turns_total: usize,
+        estimated_remaining: Option<std::time::Duration>,
+    },
+    Ranking {
+        phase: SearchPhase,
+        results_processed: usize,
+        results_total: usize,
+        estimated_remaining: Option<std::time::Duration>,
+    },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SearchControllerState {
     pub next_turn: usize,

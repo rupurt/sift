@@ -1,0 +1,7 @@
+---
+recorded_at: 2026-03-30T14:20:24.438577070-07:00
+command: sh -lc 'cd "/home/alex/workspace/rupurt/sift" && grep -n "files_total" src/search/corpus.rs'
+---
+83:    let files_total = total_sources;
+108:                files_total,
+132:                files_total,

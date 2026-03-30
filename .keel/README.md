@@ -160,11 +160,11 @@
 | [Benchmark Graph Search Against Linear Baselines](epics/VFD8P8CO4/voyages/VFD8TTCXY/) | done |
 | [Promote Graph Search Library and CLI Surface](epics/VFD8P8CO4/voyages/VFD8TThXk/) | done |
 
-### [Search Progress Callback Interface](epics/VFO1icY5Z/) (active)
+### [Search Progress Callback Interface](epics/VFO1icY5Z/) (done)
 
 | Voyage | Status |
 |--------|--------|
-| [Progress Callback Foundation](epics/VFO1icY5Z/voyages/VFO1uSaNE/) | planned |
+| [Progress Callback Foundation](epics/VFO1icY5Z/voyages/VFO1uSaNE/) | done |
 
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 

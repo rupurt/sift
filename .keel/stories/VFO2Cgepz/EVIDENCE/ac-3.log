@@ -1,0 +1,7 @@
+---
+recorded_at: 2026-03-30T14:16:22.822475148-07:00
+command: sh -lc 'cd "/home/alex/workspace/rupurt/sift" && cargo nextest run 2>&1 | tail -3'
+---
+        PASS [   1.322s] (91/91) sift search::adapters::jina::tests::test_jina_load
+────────────
+     Summary [   1.322s] 91 tests run: 91 passed, 0 skipped

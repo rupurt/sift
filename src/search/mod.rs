@@ -13,7 +13,7 @@ pub use application::{
     LocalFileCorpusRepository, SearchService, SearchServiceBuilder, run_search,
     run_search_with_plan,
 };
-pub use corpus::load_search_corpus;
+pub use corpus::{load_search_corpus, load_search_corpus_with_progress};
 pub use domain::{
     AcquisitionAdapterKind, AgentTurnInput, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
     AutonomousGraphBranchState, AutonomousGraphBranchStatus, AutonomousGraphEdge,
@@ -33,7 +33,7 @@ pub use domain::{
     SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode, SearchHit,
     SearchPlan, SearchRequest, SearchResponse, SearchTelemetry, SearchTrace, SearchTurn,
     SearchTurnRequest, SearchTurnResponse, SearchTurnTrace, StrategyPresetRegistry,
-    ToolOutputInput, tokenize,
+    SearchPhase, SearchProgress, ToolOutputInput, tokenize,
 };
 pub use engine::{SearchEngine, SearchEnvironment};
 pub use graph::{

@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-30T14:13:17.428249966-07:00
+command: grep -n 'SearchProgress\|SearchPhase' /home/alex/workspace/rupurt/sift/src/lib.rs
+---
+58:    SearchEmissionMode, SearchHit, SearchPhase, SearchPlan, SearchProgress, SearchResponse,

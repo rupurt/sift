@@ -1,0 +1,6 @@
+---
+recorded_at: 2026-03-30T14:16:16.276381978-07:00
+command: sh -lc 'cd "/home/alex/workspace/rupurt/sift" && grep -n "search_autonomous_with_progress" src/facade.rs'
+---
+743:        self.search_autonomous_with_progress(request, None::<fn(&SearchProgress)>)
+749:    pub fn search_autonomous_with_progress<F: Fn(&SearchProgress)>(

@@ -1,0 +1,6 @@
+---
+recorded_at: 2026-03-30T14:20:23.242441502-07:00
+command: sh -lc 'cd "/home/alex/workspace/rupurt/sift" && grep -n "SearchProgress::Embedding" src/facade.rs'
+---
+432:                cb(&SearchProgress::Embedding {
+442:                cb(&SearchProgress::Embedding {

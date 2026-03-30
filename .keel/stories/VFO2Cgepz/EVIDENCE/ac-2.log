@@ -1,0 +1,8 @@
+---
+recorded_at: 2026-03-30T14:16:16.828643108-07:00
+command: sh -lc 'cd "/home/alex/workspace/rupurt/sift" && grep -n "search_autonomous_with_planner_progress" src/facade.rs'
+---
+540:        self.search_autonomous_with_planner_progress(
+550:    pub fn search_autonomous_with_planner_progress<P: AutonomousPlanner + ?Sized, F: Fn(&SearchProgress)>(
+757:                self.search_autonomous_with_planner_progress(request, &planner, progress)
+775:                self.search_autonomous_with_planner_progress(request, &planner, progress)

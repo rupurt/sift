@@ -55,9 +55,9 @@ pub use crate::search::{
     ProtocolSearchEmission, QueryExpansionPolicy, RerankingPolicy, RetainedArtifact,
     RetrieverPolicy, ScoreConfidence, SearchControllerAction, SearchControllerDecision,
     SearchControllerRequest, SearchControllerResponse, SearchControllerState, SearchEmission,
-    SearchEmissionMode, SearchHit, SearchPlan, SearchResponse, SearchTrace, SearchTurn,
-    SearchTurnRequest, SearchTurnResponse, SearchTurnTrace, ToolOutputInput, replay_graph_decision,
-    replay_graph_trace,
+    SearchEmissionMode, SearchHit, SearchPhase, SearchPlan, SearchProgress, SearchResponse,
+    SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse, SearchTurnTrace,
+    ToolOutputInput, replay_graph_decision, replay_graph_trace,
 };
 
 #[doc(hidden)]

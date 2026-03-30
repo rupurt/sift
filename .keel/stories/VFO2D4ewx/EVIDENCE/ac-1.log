@@ -1,0 +1,4 @@
+---
+recorded_at: 2026-03-30T14:23:10.909089455-07:00
+command: sh -lc 'cd "/home/alex/workspace/rupurt/sift" && test -f .keel/bearings/VFO7CZ4Lf/BRIEF.md && grep -q "paddles" .keel/bearings/VFO7CZ4Lf/BRIEF.md'
+---

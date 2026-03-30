@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-03-30T14:23:12.262916349-07:00
+command: sh -lc 'cd "/home/alex/workspace/rupurt/sift" && grep -c "SRC-0" .keel/bearings/VFO7CZ4Lf/EVIDENCE.md'
+---
+7

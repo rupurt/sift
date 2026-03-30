@@ -20,10 +20,10 @@ use crate::search::{
     ModelDrivenAutonomousPlanner, ProtocolSearchEmission, QueryEmbeddingCache, RerankingPolicy,
     RetrieverPolicy, SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
     SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode,
-    SearchEnvironment, SearchPlan, SearchRequest, SearchResponse, SearchServiceBuilder,
+    SearchEnvironment, SearchPlan, SearchProgress, SearchRequest, SearchResponse, SearchServiceBuilder,
     SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse, SearchTurnTrace,
-    StrategyPresetRegistry, load_search_corpus, replay_graph_decision, replay_graph_trace,
-    run_search_with_plan,
+    SearchPhase, StrategyPresetRegistry, load_search_corpus_with_progress,
+    replay_graph_decision, replay_graph_trace, run_search_with_plan,
 };
 use crate::system::Telemetry;
 
@@ -323,6 +323,14 @@ impl Sift {
         &self,
         request: SearchControllerRequest,
     ) -> Result<SearchControllerResponse> {
+        self.search_controller_with_progress(request, None::<fn(&SearchProgress)>)
+    }
+
+    fn search_controller_with_progress<F: Fn(&SearchProgress)>(
+        &self,
+        request: SearchControllerRequest,
+        progress: Option<F>,
+    ) -> Result<SearchControllerResponse> {
         if request.turns.is_empty() {
             bail!("controller request requires at least one turn");
         }
@@ -370,7 +378,7 @@ impl Sift {
         let env_request = self.build_turn_search_request(first_turn, &request.plan);
         let dense_model = env_request.dense_model.clone();
         let embedder = self.resolve_embedder_for_plan(&request.plan, &dense_model)?;
-        let corpus = load_search_corpus(
+        let corpus = load_search_corpus_with_progress(
             &first_turn.path,
             self.ignore.as_ref(),
             first_turn.verbose,
@@ -378,6 +386,7 @@ impl Sift {
             &self.telemetry,
             &merged_local_context,
             self.cache_dir.as_deref(),
+            progress.as_ref().map(|f| |p: &SearchProgress| f(p)),
         )?;
         let index = Bm25Index::build(&corpus.artifacts);
         let llm_reranker = SearchServiceBuilder::load_llm_reranker(&request.plan, &env_request)?;
@@ -389,6 +398,8 @@ impl Sift {
             embedder,
             llm_reranker,
         )?;
+
+        let total_chunks: usize = corpus.artifacts.iter().map(|a| a.segments.len()).sum();
 
         let mut state = request.state.clone();
         let mut turn_responses = Vec::new();
@@ -417,14 +428,46 @@ impl Sift {
             );
             turn_request.retained_artifacts = carried_evidence.retained.clone();
 
+            if let Some(ref cb) = progress {
+                cb(&SearchProgress::Embedding {
+                    phase: SearchPhase::Embedding,
+                    chunks_processed: 0,
+                    chunks_total: total_chunks,
+                    estimated_remaining: None,
+                });
+            }
+            if let Some(ref cb) = progress {
+                cb(&SearchProgress::Retrieving {
+                    phase: SearchPhase::Retrieving,
+                    turn_index: idx,
+                    turns_total: turn_limit,
+                    estimated_remaining: None,
+                });
+            }
             let search_request = self.build_turn_search_request(&turn_request, &request.plan);
             let response = env.search(&search_request)?;
+            if let Some(ref cb) = progress {
+                cb(&SearchProgress::Embedding {
+                    phase: SearchPhase::Embedding,
+                    chunks_processed: total_chunks,
+                    chunks_total: total_chunks,
+                    estimated_remaining: None,
+                });
+            }
             let updated_retained = Self::derive_retained_artifacts(
                 &response,
                 &carried_evidence.retained,
                 request.retained_artifact_limit,
             );
             let continue_more = idx + 1 < turn_limit;
+            if let Some(ref cb) = progress {
+                cb(&SearchProgress::Ranking {
+                    phase: SearchPhase::Ranking,
+                    results_processed: response.hits.len(),
+                    results_total: response.hits.len(),
+                    estimated_remaining: None,
+                });
+            }
 
             let mut decisions = vec![
                 SearchControllerDecision::new(SearchControllerAction::Retrieve).with_rationale(
@@ -537,6 +580,22 @@ impl Sift {
         request: AutonomousSearchRequest,
         planner: &P,
     ) -> Result<AutonomousSearchResponse> {
+        self.search_autonomous_with_planner_progress(
+            request,
+            planner,
+            None::<fn(&SearchProgress)>,
+        )
+    }
+
+    /// Like [`search_autonomous_with`](Self::search_autonomous_with) but
+    /// accepts an optional progress callback that receives [`SearchProgress`]
+    /// events during each execution phase.
+    pub fn search_autonomous_with_planner_progress<P: AutonomousPlanner + ?Sized, F: Fn(&SearchProgress)>(
+        &self,
+        request: AutonomousSearchRequest,
+        planner: &P,
+        progress: Option<F>,
+    ) -> Result<AutonomousSearchResponse> {
         let request = self.normalize_autonomous_request(request);
         let plan = self.resolve_autonomous_plan(&request)?;
         let mut planner_trace = planner.plan(&request)?;
@@ -549,6 +608,20 @@ impl Sift {
         }
         if planner_trace.session_id.is_none() {
             planner_trace.session_id = request.session_id.clone();
+        }
+
+        if let Some(ref cb) = progress {
+            for (step_index, step) in planner_trace.steps.iter().enumerate() {
+                for decision in &step.decisions {
+                    cb(&SearchProgress::PlannerStep {
+                        phase: SearchPhase::Planning,
+                        step_index,
+                        action: format!("{:?}", decision.action),
+                        query: decision.query.clone(),
+                        estimated_remaining: None,
+                    });
+                }
+            }
         }
 
         if request.mode == AutonomousSearchMode::Graph {
@@ -571,7 +644,8 @@ impl Sift {
             if let Some(session_id) = request.session_id.clone() {
                 controller_request = controller_request.with_session_id(session_id);
             }
-            let controller_response = self.search_controller(controller_request)?;
+            let controller_response =
+                self.search_controller_with_progress(controller_request, progress)?;
 
             let state = self.derive_autonomous_state(
                 &request,
@@ -724,10 +798,21 @@ impl Sift {
         &self,
         request: AutonomousSearchRequest,
     ) -> Result<AutonomousSearchResponse> {
+        self.search_autonomous_with_progress(request, None::<fn(&SearchProgress)>)
+    }
+
+    /// Like [`search_autonomous`](Self::search_autonomous) but accepts an
+    /// optional progress callback that receives [`SearchProgress`] events
+    /// during each execution phase.
+    pub fn search_autonomous_with_progress<F: Fn(&SearchProgress)>(
+        &self,
+        request: AutonomousSearchRequest,
+        progress: Option<F>,
+    ) -> Result<AutonomousSearchResponse> {
         match request.planner_strategy.kind {
             AutonomousPlannerStrategyKind::Heuristic => {
                 let planner = HeuristicAutonomousPlanner::default();
-                self.search_autonomous_with(request, &planner)
+                self.search_autonomous_with_planner_progress(request, &planner, progress)
             }
             AutonomousPlannerStrategyKind::ModelDriven => {
                 let planner_strategy = request.planner_strategy.clone();
@@ -745,7 +830,7 @@ impl Sift {
                         )
                     })?;
                 let planner = ModelDrivenAutonomousPlanner::new(model);
-                self.search_autonomous_with(request, &planner)
+                self.search_autonomous_with_planner_progress(request, &planner, progress)
             }
         }
     }

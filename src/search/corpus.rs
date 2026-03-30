@@ -39,6 +39,28 @@ pub fn load_search_corpus(
     local_context: &[LocalContextSource],
     cache_base: Option<&Path>,
 ) -> Result<LoadedCorpus> {
+    load_search_corpus_with_progress(
+        root,
+        ignore,
+        _verbose,
+        _dense,
+        telemetry,
+        local_context,
+        cache_base,
+        None::<fn(&super::domain::SearchProgress)>,
+    )
+}
+
+pub fn load_search_corpus_with_progress<F: Fn(&super::domain::SearchProgress)>(
+    root: &Path,
+    ignore: Option<&Ignore>,
+    _verbose: u8,
+    _dense: Option<&dyn Embedder>,
+    telemetry: &crate::system::Telemetry,
+    local_context: &[LocalContextSource],
+    cache_base: Option<&Path>,
+    progress: Option<F>,
+) -> Result<LoadedCorpus> {
     let root = resolve_compatible_cache_path(root);
     if !root.exists() {
         bail!("search path '{}' does not exist", root.display());
@@ -58,6 +80,8 @@ pub fn load_search_corpus(
     };
 
     let mut artifacts = Vec::new();
+    let files_total = total_sources;
+    let mut files_processed = 0usize;
 
     for path in file_paths {
         match load_file_artifact(&root, &path, &mut manifest, cache_paths.as_ref(), telemetry) {
@@ -76,6 +100,15 @@ pub fn load_search_corpus(
                 );
             }
         }
+        files_processed += 1;
+        if let Some(ref cb) = progress {
+            cb(&super::domain::SearchProgress::Indexing {
+                phase: super::domain::SearchPhase::Indexing,
+                files_processed,
+                files_total,
+                estimated_remaining: None,
+            });
+        }
     }
 
     for source in local_context {
@@ -90,6 +123,15 @@ pub fn load_search_corpus(
             Err(error) => {
                 tracing::warn!(error = %error, "skipping invalid local context source");
             }
+        }
+        files_processed += 1;
+        if let Some(ref cb) = progress {
+            cb(&super::domain::SearchProgress::Indexing {
+                phase: super::domain::SearchPhase::Indexing,
+                files_processed,
+                files_total,
+                estimated_remaining: None,
+            });
         }
     }
 
