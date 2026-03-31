@@ -245,6 +245,7 @@ impl Sift {
             dense_model,
             rerank_model,
             gemma_model,
+            retriever_timeout_ms: input.options.retriever_timeout_ms,
             prompts: Some(self.config.prompts.clone()),
             verbose: input.options.verbose,
             retrievers: input
@@ -920,6 +921,7 @@ impl Sift {
             dense_model: self.default_dense_model(),
             rerank_model: self.resolve_rerank_model_for_plan(plan),
             gemma_model: self.resolve_gemma_model_for_plan(plan),
+            retriever_timeout_ms: None,
             query_cache: Some(self.query_cache.clone()),
             cache_dir: self.cache_dir.clone(),
             telemetry: self.telemetry.clone(),
@@ -947,6 +949,7 @@ impl Sift {
             dense_model: self.default_dense_model(),
             rerank_model: self.resolve_rerank_model_for_plan(plan),
             gemma_model: self.resolve_gemma_model_for_plan(plan),
+            retriever_timeout_ms: None,
             query_cache: Some(self.query_cache.clone()),
             cache_dir: self.cache_dir.clone(),
             telemetry: self.telemetry.clone(),
@@ -1581,6 +1584,7 @@ pub struct SearchOptions {
     rerank_model: Option<QwenModelSpec>,
     gemma_model: Option<GemmaModelSpec>,
     verbose: u8,
+    retriever_timeout_ms: Option<u64>,
     retrievers: Option<Vec<Retriever>>,
     fusion: Option<Fusion>,
     reranking: Option<Reranking>,
@@ -1621,6 +1625,11 @@ impl SearchOptions {
 
     pub fn with_gemma_model(mut self, gemma_model: GemmaModelSpec) -> Self {
         self.gemma_model = Some(gemma_model);
+        self
+    }
+
+    pub fn with_retriever_timeout_ms(mut self, timeout_ms: u64) -> Self {
+        self.retriever_timeout_ms = Some(timeout_ms);
         self
     }
 

@@ -7,10 +7,15 @@ use super::domain::{
 };
 use crate::config::Ignore;
 use anyhow::{Result, anyhow};
+use std::collections::HashSet;
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::Arc;
+use std::thread;
+use std::time::{Duration, Instant};
+use crate::cache::resolve_compatible_cache_path;
 
 pub struct SearchService {
-    retrievers: std::collections::HashMap<RetrieverPolicy, Box<dyn Retriever>>,
+    retrievers: std::collections::HashMap<RetrieverPolicy, Arc<dyn Retriever>>,
     fusers: std::collections::HashMap<FusionPolicy, Box<dyn Fuser>>,
     expanders: std::collections::HashMap<QueryExpansionPolicy, Box<dyn Expander>>,
     rerankers: std::collections::HashMap<RerankingPolicy, Arc<dyn Reranker>>,
@@ -33,7 +38,8 @@ impl SearchService {
     }
 
     pub fn register_retriever(&mut self, retriever: Box<dyn Retriever>) {
-        self.retrievers.insert(retriever.policy(), retriever);
+        self.retrievers
+            .insert(retriever.policy(), Arc::from(retriever));
     }
 
     pub fn register_fuser(&mut self, policy: FusionPolicy, fuser: Box<dyn Fuser>) {
@@ -68,18 +74,150 @@ impl SearchService {
 
         // 2. Retrieve candidates
         let mut all_lists = Vec::new();
-        for policy in &plan.retrievers {
-            let retriever = self
-                .retrievers
-                .get(policy)
-                .ok_or_else(|| anyhow!("retriever not registered for {:?}", policy))?;
+        if request.retriever_timeout_ms.is_none() || plan.retrievers.len() <= 1 {
+            for policy in &plan.retrievers {
+                let retriever = self
+                    .retrievers
+                    .get(policy)
+                    .ok_or_else(|| anyhow!("retriever not registered for {:?}", policy))?;
 
-            all_lists.push(retriever.retrieve(
+                let retriever_start = Instant::now();
+                let list = retriever.retrieve(
+                    &query_variants,
+                    corpus,
+                    request.shortlist,
+                    request.verbose,
+                )?;
+                tracing::debug!(
+                    policy = ?policy,
+                    elapsed_ms = retriever_start.elapsed().as_millis(),
+                    results = list.results.len(),
+                    "retriever completed"
+                );
+                all_lists.push(list);
+            }
+        } else {
+            let timeout_ms = request.retriever_timeout_ms.unwrap_or(u64::MAX);
+            let timeout = Duration::from_millis(timeout_ms);
+            let (tx, rx) = mpsc::channel();
+            let shared_artifacts = std::sync::Arc::new(corpus.artifacts.to_vec());
+            let shared_index = corpus.bm25_index.cloned().map(std::sync::Arc::new);
+            let mut pending = HashSet::new();
+
+            tracing::info!(
+                plan_retrievers = ?plan.retrievers,
+                timeout_ms = request.retriever_timeout_ms,
+                shortlist = request.shortlist,
+                "running retrievers in parallel with timeout fallback"
+            );
+
+            for policy in &plan.retrievers {
+                let retriever = self
+                    .retrievers
+                    .get(policy)
+                    .ok_or_else(|| anyhow!("retriever not registered for {:?}", policy))?
+                    .clone();
+                pending.insert(*policy);
+
+                let tx = tx.clone();
+                let policy = *policy;
+                let query_variants = query_variants.clone();
+                let shared_artifacts = std::sync::Arc::clone(&shared_artifacts);
+                let shared_index = shared_index.clone();
+                let shortlist = request.shortlist;
+                let verbose = request.verbose;
+
+                thread::spawn(move || {
+                    let prepared = PreparedCorpus {
+                        artifacts: &shared_artifacts,
+                        bm25_index: shared_index.as_deref(),
+                    };
+                    let retriever_start = Instant::now();
+                    let result = retriever.retrieve(
+                        &query_variants,
+                        &prepared,
+                        shortlist,
+                        verbose,
+                    );
+                    if let Err(error) = tx.send((policy, retriever_start.elapsed(), result)) {
+                        tracing::warn!(
+                            policy = ?policy,
+                            error = %error,
+                            "failed to deliver retriever result"
+                        );
+                    }
+                });
+            }
+
+            drop(tx);
+            let started = Instant::now();
+            while !pending.is_empty() {
+                let remaining = timeout
+                    .checked_sub(started.elapsed())
+                    .unwrap_or_else(Duration::default);
+                if remaining == Duration::ZERO {
+                    tracing::warn!(
+                        requested_ms = timeout_ms,
+                        pending = ?pending,
+                        completed = plan.retrievers.len().saturating_sub(pending.len()),
+                        "retriever strategy timeout reached; returning partial results"
+                    );
+                    break;
+                }
+
+                match rx.recv_timeout(remaining) {
+                    Ok((policy, elapsed, result)) => {
+                        pending.remove(&policy);
+                        tracing::info!(
+                            policy = ?policy,
+                            elapsed_ms = elapsed.as_millis(),
+                            completed = plan.retrievers.len().saturating_sub(pending.len()),
+                            total = plan.retrievers.len(),
+                            "retriever completed within timeout"
+                        );
+                        all_lists.push(result?);
+                    }
+                    Err(RecvTimeoutError::Timeout) => {
+                        tracing::warn!(
+                            requested_ms = timeout_ms,
+                            pending = ?pending,
+                            completed = plan.retrievers.len().saturating_sub(pending.len()),
+                            "retriever strategy timeout reached; returning partial results"
+                        );
+                        break;
+                    }
+                    Err(RecvTimeoutError::Disconnected) => {
+                        tracing::warn!("retriever channel disconnected before all policies completed");
+                        break;
+                    }
+                }
+            }
+
+            while let Ok((_policy, _elapsed, result)) = rx.try_recv() {
+                all_lists.push(result?);
+            }
+        }
+
+        if request.retriever_timeout_ms.is_some()
+            && all_lists.is_empty()
+            && let Some(retriever) = self.retrievers.get(&RetrieverPolicy::Bm25)
+        {
+            tracing::warn!(
+                "all timed-out retrievers returned no results; falling back to BM25 only"
+            );
+            let fallback_start = Instant::now();
+            let list = retriever.retrieve(
                 &query_variants,
                 corpus,
                 request.shortlist,
                 request.verbose,
-            )?);
+            )?;
+            tracing::info!(
+                elapsed_ms = fallback_start.elapsed().as_millis(),
+                results = list.results.len(),
+                "bm25 fallback completed"
+            );
+            all_lists.push(list);
         }
 
         // 3. Fuse candidates
@@ -282,8 +420,64 @@ pub fn run_search_with_plan(
     );
 
     let index_start = std::time::Instant::now();
-    let index = Bm25Index::build(&corpus.artifacts);
-    tracing::info!("built bm25 index in {:.2?}", index_start.elapsed());
+    let index = if let Some(cache_dir) = request.cache_dir.as_deref() {
+        let cache_root = resolve_compatible_cache_path(&request.path);
+        let signature = crate::search::corpus::compute_bm25_index_signature(&corpus.artifacts);
+
+        match crate::search::corpus::load_bm25_index_cache(cache_dir, &cache_root, &signature) {
+            Ok(Some(cached)) => {
+                tracing::info!(
+                    "loaded cached bm25 index in {:.2?} (signature={})",
+                    index_start.elapsed(),
+                    signature
+                );
+                cached
+            }
+            Ok(None) => {
+                tracing::info!(
+                    "bm25 index cache miss for signature {}; building index",
+                    signature
+                );
+                let built = Bm25Index::build(&corpus.artifacts);
+                if let Err(error) = crate::search::corpus::save_bm25_index_cache(
+                    cache_dir,
+                    &cache_root,
+                    &signature,
+                    &built,
+                ) {
+                    tracing::warn!(
+                        error = %error,
+                        signature = %signature,
+                        "failed to save bm25 index cache"
+                    );
+                }
+                built
+            }
+            Err(error) => {
+                tracing::warn!(
+                    error = %error,
+                    "bm25 cache read failed; rebuilding index"
+                );
+                let built = Bm25Index::build(&corpus.artifacts);
+                if let Err(error) = crate::search::corpus::save_bm25_index_cache(
+                    cache_dir,
+                    &cache_root,
+                    &signature,
+                    &built,
+                ) {
+                    tracing::warn!(
+                        error = %error,
+                        signature = %signature,
+                        "failed to save rebuilt bm25 index"
+                    );
+                }
+                built
+            }
+        }
+    } else {
+        Bm25Index::build(&corpus.artifacts)
+    };
+    tracing::info!("bm25 index ready in {:.2?}", index_start.elapsed());
     let prepared = PreparedCorpus {
         artifacts: &corpus.artifacts,
         bm25_index: Some(&index),

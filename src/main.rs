@@ -222,6 +222,10 @@ struct SearchCommand {
     #[arg(long)]
     shortlist: Option<usize>,
 
+    /// Timeout in milliseconds for each retriever strategy before proceeding with partial results.
+    #[arg(long)]
+    retriever_timeout_ms: Option<u64>,
+
     #[arg(long)]
     model_id: Option<String>,
 
@@ -378,6 +382,9 @@ impl SearchCommand {
         if let Some(shortlist) = self.shortlist {
             options = options.with_shortlist(shortlist);
         }
+        if let Some(retriever_timeout_ms) = self.retriever_timeout_ms {
+            options = options.with_retriever_timeout_ms(retriever_timeout_ms);
+        }
         if let Some(dense_model) = self.resolve_dense_model(config) {
             options = options.with_dense_model(dense_model);
         }
@@ -455,6 +462,9 @@ impl SearchCommand {
         }
         if self.retrievers.is_some() {
             unsupported.push("--retrievers");
+        }
+        if self.retriever_timeout_ms.is_some() {
+            unsupported.push("--retriever-timeout-ms");
         }
         if self.fusion.is_some() {
             unsupported.push("--fusion");

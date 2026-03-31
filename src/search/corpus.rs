@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -9,6 +10,7 @@ use walkdir::WalkDir;
 use crate::cache::{
     Manifest, get_file_heuristics, hash_file, load_blob, resolve_compatible_cache_path, save_blob,
 };
+use blake3::Hasher;
 
 use super::domain::{
     AcquisitionAdapterKind, AgentTurnInput, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
@@ -152,6 +154,67 @@ pub fn load_search_corpus_with_progress<F: Fn(&super::domain::SearchProgress)>(
         indexed_artifacts,
         skipped_artifacts,
     })
+}
+
+pub fn compute_bm25_index_signature(artifacts: &[ContextArtifact]) -> String {
+    let mut hasher = Hasher::new();
+    for artifact in artifacts {
+        hasher.update(artifact.id.as_bytes());
+        hasher.update(&artifact.length.to_le_bytes());
+    }
+    hasher.finalize().to_string()
+}
+
+pub fn bm25_index_cache_path(cache_base: &Path, root: &Path, signature: &str) -> PathBuf {
+    let corpus_key = blake3::hash(root.display().to_string().as_bytes()).to_string();
+    cache_base
+        .join("artifacts")
+        .join("indexes")
+        .join(corpus_key)
+        .join(format!("{}.bin", signature))
+}
+
+pub fn load_bm25_index_cache(
+    cache_base: &Path,
+    root: &Path,
+    signature: &str,
+) -> Result<Option<crate::search::domain::Bm25Index>> {
+    let path = bm25_index_cache_path(cache_base, root, signature);
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let file = File::open(&path)
+        .with_context(|| format!("failed to open bm25 index cache {}", path.display()))?;
+    let index = bincode::deserialize_from::<_, crate::search::domain::Bm25Index>(file)
+        .with_context(|| format!("failed to deserialize bm25 index cache {}", path.display()))?;
+    Ok(Some(index))
+}
+
+pub fn save_bm25_index_cache(
+    cache_base: &Path,
+    root: &Path,
+    signature: &str,
+    index: &crate::search::domain::Bm25Index,
+) -> Result<()> {
+    let path = bm25_index_cache_path(cache_base, root, signature);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).context("failed to create bm25 index cache directory")?;
+    }
+
+    let temp_path = path.with_extension("tmp");
+    {
+        let mut file = File::create(&temp_path)
+            .with_context(|| format!("failed to create temporary bm25 index cache {}", temp_path.display()))?;
+        bincode::serialize_into(&mut file, index).with_context(|| {
+            format!("failed to write bm25 index cache to {}", temp_path.display())
+        })?;
+    }
+
+    std::fs::rename(&temp_path, &path)
+        .with_context(|| format!("failed to atomically write bm25 index cache {}", path.display()))?;
+
+    Ok(())
 }
 
 fn collect_file_paths(root: &Path, ignore: Option<&Ignore>) -> Vec<PathBuf> {

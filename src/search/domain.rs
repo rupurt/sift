@@ -233,6 +233,7 @@ pub struct SearchRequest {
     pub dense_model: DenseModelSpec,
     pub rerank_model: Option<crate::search::adapters::qwen::QwenModelSpec>,
     pub gemma_model: Option<crate::search::adapters::gemma::GemmaModelSpec>,
+    pub retriever_timeout_ms: Option<u64>,
     pub query_cache: Option<QueryEmbeddingCache>,
     pub cache_dir: Option<PathBuf>,
     pub telemetry: std::sync::Arc<crate::system::Telemetry>,
@@ -256,6 +257,7 @@ impl SearchRequest {
             dense_model: DenseModelSpec::default(),
             rerank_model: None,
             gemma_model: None,
+            retriever_timeout_ms: None,
             query_cache: None,
             cache_dir: None,
             telemetry: std::sync::Arc::new(crate::system::Telemetry::new()),
@@ -1479,7 +1481,7 @@ impl ContextArtifact {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Bm25Index {
     pub doc_freq: HashMap<String, usize>,
     pub term_freqs: HashMap<String, HashMap<String, usize>>,
