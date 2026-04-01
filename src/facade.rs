@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 
 use anyhow::{Result, anyhow, bail};
 
@@ -186,6 +187,27 @@ struct GraphSearchTurnContext {
 impl Sift {
     pub fn builder() -> SiftBuilder {
         SiftBuilder::new()
+    }
+
+    fn estimate_remaining(
+        start: Instant,
+        processed: usize,
+        total: usize,
+    ) -> Option<Duration> {
+        if processed == 0 || total == 0 {
+            return None;
+        }
+        let elapsed = start.elapsed().as_secs_f64();
+        if elapsed == 0.0 {
+            return None;
+        }
+        let remaining = total.saturating_sub(processed);
+        if remaining == 0 {
+            return Some(Duration::from_secs(0));
+        }
+        Some(Duration::from_secs_f64(
+            elapsed * (remaining as f64 / processed as f64),
+        ))
     }
 
     pub fn search(&self, input: SearchInput) -> Result<SearchResponse> {
@@ -406,6 +428,7 @@ impl Sift {
         let mut turn_responses = Vec::new();
         let mut trace_turns = Vec::new();
         let mut previous_turn_id = None;
+        let retrieving_started_at = Instant::now();
 
         while state.next_turn < turn_limit {
             let idx = state.next_turn;
@@ -430,11 +453,12 @@ impl Sift {
             turn_request.retained_artifacts = carried_evidence.retained.clone();
 
             if let Some(ref cb) = progress {
+                let started_at = Instant::now();
                 cb(&SearchProgress::Embedding {
                     phase: SearchPhase::Embedding,
                     chunks_processed: 0,
                     chunks_total: total_chunks,
-                    estimated_remaining: None,
+                    estimated_remaining: Self::estimate_remaining(started_at, 0, total_chunks),
                 });
             }
             if let Some(ref cb) = progress {
@@ -442,7 +466,11 @@ impl Sift {
                     phase: SearchPhase::Retrieving,
                     turn_index: idx,
                     turns_total: turn_limit,
-                    estimated_remaining: None,
+                    estimated_remaining: Self::estimate_remaining(
+                        retrieving_started_at,
+                        turn_index,
+                        turn_limit,
+                    ),
                 });
             }
             let search_request = self.build_turn_search_request(&turn_request, &request.plan);
@@ -452,7 +480,7 @@ impl Sift {
                     phase: SearchPhase::Embedding,
                     chunks_processed: total_chunks,
                     chunks_total: total_chunks,
-                    estimated_remaining: None,
+                    estimated_remaining: Some(Duration::from_secs(0)),
                 });
             }
             let updated_retained = Self::derive_retained_artifacts(
@@ -466,7 +494,7 @@ impl Sift {
                     phase: SearchPhase::Ranking,
                     results_processed: response.hits.len(),
                     results_total: response.hits.len(),
-                    estimated_remaining: None,
+                    estimated_remaining: Some(Duration::from_secs(0)),
                 });
             }
 
@@ -612,15 +640,32 @@ impl Sift {
         }
 
         if let Some(ref cb) = progress {
+            let planner_started_at = Instant::now();
+            let total_decisions: usize = planner_trace
+                .steps
+                .iter()
+                .map(|step| step.decisions.len())
+                .sum();
+            let mut emitted_decisions = 0usize;
             for (step_index, step) in planner_trace.steps.iter().enumerate() {
                 for decision in &step.decisions {
+                    let estimated_remaining = if total_decisions == 0 {
+                        None
+                    } else {
+                        Self::estimate_remaining(
+                            planner_started_at,
+                            emitted_decisions,
+                            total_decisions,
+                        )
+                    };
                     cb(&SearchProgress::PlannerStep {
                         phase: SearchPhase::Planning,
                         step_index,
                         action: format!("{:?}", decision.action),
                         query: decision.query.clone(),
-                        estimated_remaining: None,
+                        estimated_remaining,
                     });
+                    emitted_decisions += 1;
                 }
             }
         }

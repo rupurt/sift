@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use walkdir::WalkDir;
@@ -84,6 +84,26 @@ pub fn load_search_corpus_with_progress<F: Fn(&super::domain::SearchProgress)>(
     let mut artifacts = Vec::new();
     let files_total = total_sources;
     let mut files_processed = 0usize;
+    let indexing_started_at = Instant::now();
+    let estimate_remaining = |processed: usize, total: usize| -> Option<Duration> {
+        if processed == 0 || total == 0 {
+            return None;
+        }
+
+        let elapsed = indexing_started_at.elapsed().as_secs_f64();
+        if elapsed == 0.0 {
+            return None;
+        }
+
+        let remaining = total.saturating_sub(processed);
+        if remaining == 0 {
+            return Some(Duration::from_secs(0));
+        }
+
+        Some(Duration::from_secs_f64(
+            elapsed * (remaining as f64 / processed as f64),
+        ))
+    };
 
     for path in file_paths {
         match load_file_artifact(&root, &path, &mut manifest, cache_paths.as_ref(), telemetry) {
@@ -108,7 +128,7 @@ pub fn load_search_corpus_with_progress<F: Fn(&super::domain::SearchProgress)>(
                 phase: super::domain::SearchPhase::Indexing,
                 files_processed,
                 files_total,
-                estimated_remaining: None,
+                estimated_remaining: estimate_remaining(files_processed, files_total),
             });
         }
     }
@@ -132,7 +152,7 @@ pub fn load_search_corpus_with_progress<F: Fn(&super::domain::SearchProgress)>(
                 phase: super::domain::SearchPhase::Indexing,
                 files_processed,
                 files_total,
-                estimated_remaining: None,
+                estimated_remaining: estimate_remaining(files_processed, files_total),
             });
         }
     }
