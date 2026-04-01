@@ -468,7 +468,7 @@ impl Sift {
                     turns_total: turn_limit,
                     estimated_remaining: Self::estimate_remaining(
                         retrieving_started_at,
-                        turn_index,
+                        idx,
                         turn_limit,
                     ),
                 });
