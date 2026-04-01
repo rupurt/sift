@@ -53,6 +53,7 @@ pub fn load_search_corpus(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn load_search_corpus_with_progress<F: Fn(&super::domain::SearchProgress)>(
     root: &Path,
     ignore: Option<&Ignore>,
@@ -224,15 +225,26 @@ pub fn save_bm25_index_cache(
 
     let temp_path = path.with_extension("tmp");
     {
-        let mut file = File::create(&temp_path)
-            .with_context(|| format!("failed to create temporary bm25 index cache {}", temp_path.display()))?;
+        let mut file = File::create(&temp_path).with_context(|| {
+            format!(
+                "failed to create temporary bm25 index cache {}",
+                temp_path.display()
+            )
+        })?;
         bincode::serialize_into(&mut file, index).with_context(|| {
-            format!("failed to write bm25 index cache to {}", temp_path.display())
+            format!(
+                "failed to write bm25 index cache to {}",
+                temp_path.display()
+            )
         })?;
     }
 
-    std::fs::rename(&temp_path, &path)
-        .with_context(|| format!("failed to atomically write bm25 index cache {}", path.display()))?;
+    std::fs::rename(&temp_path, &path).with_context(|| {
+        format!(
+            "failed to atomically write bm25 index cache {}",
+            path.display()
+        )
+    })?;
 
     Ok(())
 }

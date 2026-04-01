@@ -21,9 +21,9 @@ use crate::search::{
     ModelDrivenAutonomousPlanner, ProtocolSearchEmission, QueryEmbeddingCache, RerankingPolicy,
     RetrieverPolicy, SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
     SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode,
-    SearchEnvironment, SearchPlan, SearchProgress, SearchRequest, SearchResponse, SearchServiceBuilder,
-    SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse, SearchTurnTrace,
-    SearchPhase, StrategyPresetRegistry, load_search_corpus_with_progress,
+    SearchEnvironment, SearchPhase, SearchPlan, SearchProgress, SearchRequest, SearchResponse,
+    SearchServiceBuilder, SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse,
+    SearchTurnTrace, StrategyPresetRegistry, load_search_corpus_with_progress,
     replay_graph_decision, replay_graph_trace, run_search_with_plan,
 };
 use crate::system::Telemetry;
@@ -189,11 +189,7 @@ impl Sift {
         SiftBuilder::new()
     }
 
-    fn estimate_remaining(
-        start: Instant,
-        processed: usize,
-        total: usize,
-    ) -> Option<Duration> {
+    fn estimate_remaining(start: Instant, processed: usize, total: usize) -> Option<Duration> {
         if processed == 0 || total == 0 {
             return None;
         }
@@ -609,17 +605,16 @@ impl Sift {
         request: AutonomousSearchRequest,
         planner: &P,
     ) -> Result<AutonomousSearchResponse> {
-        self.search_autonomous_with_planner_progress(
-            request,
-            planner,
-            None::<fn(&SearchProgress)>,
-        )
+        self.search_autonomous_with_planner_progress(request, planner, None::<fn(&SearchProgress)>)
     }
 
     /// Like [`search_autonomous_with`](Self::search_autonomous_with) but
     /// accepts an optional progress callback that receives [`SearchProgress`]
     /// events during each execution phase.
-    pub fn search_autonomous_with_planner_progress<P: AutonomousPlanner + ?Sized, F: Fn(&SearchProgress)>(
+    pub fn search_autonomous_with_planner_progress<
+        P: AutonomousPlanner + ?Sized,
+        F: Fn(&SearchProgress),
+    >(
         &self,
         request: AutonomousSearchRequest,
         planner: &P,

@@ -5,14 +5,14 @@ use super::domain::{
     Reranker, RerankingPolicy, Retriever, RetrieverPolicy, SearchHit, SearchPlan, SearchRequest,
     SearchResponse, StrategyPresetRegistry, tokenize,
 };
+use crate::cache::resolve_compatible_cache_path;
 use crate::config::Ignore;
 use anyhow::{Result, anyhow};
 use std::collections::HashSet;
-use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::Arc;
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
 use std::time::{Duration, Instant};
-use crate::cache::resolve_compatible_cache_path;
 
 pub struct SearchService {
     retrievers: std::collections::HashMap<RetrieverPolicy, Arc<dyn Retriever>>,
@@ -133,12 +133,7 @@ impl SearchService {
                         bm25_index: shared_index.as_deref(),
                     };
                     let retriever_start = Instant::now();
-                    let result = retriever.retrieve(
-                        &query_variants,
-                        &prepared,
-                        shortlist,
-                        verbose,
-                    );
+                    let result = retriever.retrieve(&query_variants, &prepared, shortlist, verbose);
                     if let Err(error) = tx.send((policy, retriever_start.elapsed(), result)) {
                         tracing::warn!(
                             policy = ?policy,
@@ -152,9 +147,7 @@ impl SearchService {
             drop(tx);
             let started = Instant::now();
             while !pending.is_empty() {
-                let remaining = timeout
-                    .checked_sub(started.elapsed())
-                    .unwrap_or_else(Duration::default);
+                let remaining = timeout.checked_sub(started.elapsed()).unwrap_or_default();
                 if remaining == Duration::ZERO {
                     tracing::warn!(
                         requested_ms = timeout_ms,
@@ -187,7 +180,9 @@ impl SearchService {
                         break;
                     }
                     Err(RecvTimeoutError::Disconnected) => {
-                        tracing::warn!("retriever channel disconnected before all policies completed");
+                        tracing::warn!(
+                            "retriever channel disconnected before all policies completed"
+                        );
                         break;
                     }
                 }
@@ -206,12 +201,8 @@ impl SearchService {
                 "all timed-out retrievers returned no results; falling back to BM25 only"
             );
             let fallback_start = Instant::now();
-            let list = retriever.retrieve(
-                &query_variants,
-                corpus,
-                request.shortlist,
-                request.verbose,
-            )?;
+            let list =
+                retriever.retrieve(&query_variants, corpus, request.shortlist, request.verbose)?;
             tracing::info!(
                 elapsed_ms = fallback_start.elapsed().as_millis(),
                 results = list.results.len(),
