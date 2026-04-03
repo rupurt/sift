@@ -11,7 +11,7 @@ pub mod presentation;
 pub use adapters::{render_autonomous_search_response, render_search_response};
 pub use application::{
     LocalFileCorpusRepository, SearchService, SearchServiceBuilder, run_search,
-    run_search_with_plan,
+    run_search_with_plan, run_search_with_plan_and_progress,
 };
 pub use corpus::{load_search_corpus, load_search_corpus_with_progress};
 pub use domain::{

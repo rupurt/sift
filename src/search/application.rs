@@ -2,13 +2,14 @@ use super::adapters::*;
 use super::domain::{
     Bm25Index, Candidate, CandidateList, CorpusRepository, Embedder, Expander, Fuser, FusionPolicy,
     GenerativeModel, LoadedCorpus, PreparedCorpus, QueryEmbeddingCache, QueryExpansionPolicy,
-    Reranker, RerankingPolicy, Retriever, RetrieverPolicy, SearchHit, SearchPlan, SearchRequest,
-    SearchResponse, StrategyPresetRegistry, tokenize,
+    Reranker, RerankingPolicy, Retriever, RetrieverPolicy, SearchHit, SearchPhase, SearchPlan,
+    SearchProgress, SearchRequest, SearchResponse, StrategyPresetRegistry, tokenize,
 };
 use crate::cache::resolve_compatible_cache_path;
 use crate::config::Ignore;
 use anyhow::{Result, anyhow};
 use std::collections::HashSet;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
@@ -382,23 +383,46 @@ pub fn run_search_with_plan(
     repository: &dyn CorpusRepository,
     embedder: Option<Arc<dyn Embedder>>,
 ) -> Result<SearchResponse> {
+    run_search_with_plan_and_progress(plan, request, ignore, repository, embedder, None)
+}
+
+pub fn run_search_with_plan_and_progress(
+    plan: &SearchPlan,
+    request: &SearchRequest,
+    ignore: Option<&Ignore>,
+    repository: &dyn CorpusRepository,
+    embedder: Option<Arc<dyn Embedder>>,
+    progress: Option<&dyn Fn(&SearchProgress)>,
+) -> Result<SearchResponse> {
     let verbose = request.verbose;
 
     let corpus_start = std::time::Instant::now();
-    let corpus = repository.load(&crate::search::CorpusLoadRequest {
-        path: &request.path,
-        ignore,
-        verbose,
-        embedder: embedder.as_deref(),
-        telemetry: &request.telemetry,
-        local_context: &request.local_context,
-        cache_dir: request.cache_dir.as_deref(),
-    })?;
+    let corpus = repository.load_with_progress(
+        &crate::search::CorpusLoadRequest {
+            path: &request.path,
+            ignore,
+            verbose,
+            embedder: embedder.as_deref(),
+            telemetry: &request.telemetry,
+            local_context: &request.local_context,
+            cache_dir: request.cache_dir.as_deref(),
+        },
+        progress,
+    )?;
     tracing::info!(
         "corpus loaded ({} artifacts) in {:.2?}",
         corpus.indexed_artifacts,
         corpus_start.elapsed()
     );
+
+    let total_chunks: usize = corpus.artifacts.iter().map(|artifact| artifact.segments.len()).sum();
+    let index = prepare_bm25_index(
+        &request.path,
+        &corpus,
+        request.cache_dir.as_deref(),
+        &request.telemetry,
+        progress,
+    )?;
 
     let llm_reranker = SearchServiceBuilder::load_llm_reranker(plan, request)?;
 
@@ -410,13 +434,84 @@ pub fn run_search_with_plan(
         request.prompts.as_ref(),
     );
 
+    let prepared = PreparedCorpus {
+        artifacts: &corpus.artifacts,
+        bm25_index: Some(&index),
+    };
+
+    if plan_uses_vector_retriever(plan)
+        && let Some(cb) = progress
+    {
+        cb(&SearchProgress::Embedding {
+            phase: SearchPhase::Embedding,
+            chunks_processed: 0,
+            chunks_total: total_chunks,
+            estimated_remaining: None,
+        });
+    }
+
+    let candidates = service.execute(plan, request, &prepared)?;
+
+    if plan_uses_vector_retriever(plan)
+        && let Some(cb) = progress
+    {
+        cb(&SearchProgress::Embedding {
+            phase: SearchPhase::Embedding,
+            chunks_processed: total_chunks,
+            chunks_total: total_chunks,
+            estimated_remaining: Some(Duration::from_secs(0)),
+        });
+    }
+
+    let hits = project_hits(plan, &corpus, candidates.results, &request.query);
+
+    if let Some(cb) = progress {
+        cb(&SearchProgress::Ranking {
+            phase: SearchPhase::Ranking,
+            results_processed: hits.len(),
+            results_total: hits.len(),
+            estimated_remaining: Some(Duration::from_secs(0)),
+        });
+    }
+
+    Ok(SearchResponse {
+        strategy: plan.name.clone(),
+        root: request.path.display().to_string(),
+        indexed_artifacts: corpus.indexed_artifacts,
+        skipped_artifacts: corpus.skipped_artifacts,
+        hits,
+    })
+}
+
+pub(crate) fn prepare_bm25_index(
+    root: &std::path::Path,
+    corpus: &LoadedCorpus,
+    cache_dir: Option<&std::path::Path>,
+    telemetry: &crate::system::Telemetry,
+    progress: Option<&dyn Fn(&SearchProgress)>,
+) -> Result<Bm25Index> {
     let index_start = std::time::Instant::now();
-    let index = if let Some(cache_dir) = request.cache_dir.as_deref() {
-        let cache_root = resolve_compatible_cache_path(&request.path);
+    let total_files = telemetry.total_files.load(Ordering::Relaxed);
+    let emit_indexing_complete = |progress: Option<&dyn Fn(&SearchProgress)>| {
+        if let Some(cb) = progress {
+            cb(&SearchProgress::Indexing {
+                phase: SearchPhase::Indexing,
+                files_processed: total_files,
+                files_total: total_files,
+                estimated_remaining: Some(Duration::from_secs(0)),
+            });
+        }
+    };
+
+    let index = if let Some(cache_dir) = cache_dir {
+        let cache_root = resolve_compatible_cache_path(root);
         let signature = crate::search::corpus::compute_bm25_index_signature(&corpus.artifacts);
 
         match crate::search::corpus::load_bm25_index_cache(cache_dir, &cache_root, &signature) {
             Ok(Some(cached)) => {
+                telemetry
+                    .bm25_index_cache_hits
+                    .fetch_add(1, Ordering::Relaxed);
                 tracing::info!(
                     "loaded cached bm25 index in {:.2?} (signature={})",
                     index_start.elapsed(),
@@ -429,6 +524,7 @@ pub fn run_search_with_plan(
                     "bm25 index cache miss for signature {}; building index",
                     signature
                 );
+                telemetry.bm25_index_builds.fetch_add(1, Ordering::Relaxed);
                 let built = Bm25Index::build(&corpus.artifacts);
                 if let Err(error) = crate::search::corpus::save_bm25_index_cache(
                     cache_dir,
@@ -449,6 +545,7 @@ pub fn run_search_with_plan(
                     error = %error,
                     "bm25 cache read failed; rebuilding index"
                 );
+                telemetry.bm25_index_builds.fetch_add(1, Ordering::Relaxed);
                 let built = Bm25Index::build(&corpus.artifacts);
                 if let Err(error) = crate::search::corpus::save_bm25_index_cache(
                     cache_dir,
@@ -466,24 +563,20 @@ pub fn run_search_with_plan(
             }
         }
     } else {
+        telemetry.bm25_index_builds.fetch_add(1, Ordering::Relaxed);
         Bm25Index::build(&corpus.artifacts)
     };
+
     tracing::info!("bm25 index ready in {:.2?}", index_start.elapsed());
-    let prepared = PreparedCorpus {
-        artifacts: &corpus.artifacts,
-        bm25_index: Some(&index),
-    };
+    emit_indexing_complete(progress);
 
-    let candidates = service.execute(plan, request, &prepared)?;
-    let hits = project_hits(plan, &corpus, candidates.results, &request.query);
+    Ok(index)
+}
 
-    Ok(SearchResponse {
-        strategy: plan.name.clone(),
-        root: request.path.display().to_string(),
-        indexed_artifacts: corpus.indexed_artifacts,
-        skipped_artifacts: corpus.skipped_artifacts,
-        hits,
-    })
+fn plan_uses_vector_retriever(plan: &SearchPlan) -> bool {
+    plan.retrievers
+        .iter()
+        .any(|policy| matches!(policy, RetrieverPolicy::Vector))
 }
 
 pub fn project_hits(
@@ -581,6 +674,23 @@ impl CorpusRepository for LocalFileCorpusRepository {
             request.telemetry,
             request.local_context,
             request.cache_dir,
+        )
+    }
+
+    fn load_with_progress(
+        &self,
+        request: &crate::search::CorpusLoadRequest<'_>,
+        progress: Option<&dyn Fn(&SearchProgress)>,
+    ) -> Result<LoadedCorpus> {
+        crate::internal::search::corpus::load_search_corpus_with_progress(
+            request.path,
+            request.ignore,
+            request.verbose,
+            request.embedder,
+            request.telemetry,
+            request.local_context,
+            request.cache_dir,
+            progress,
         )
     }
 }

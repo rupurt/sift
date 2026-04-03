@@ -1,5 +1,8 @@
+use std::cell::RefCell;
+use std::io::{IsTerminal, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::{Result, bail};
 use clap::{Args, Parser, Subcommand};
@@ -24,7 +27,8 @@ use sift::internal::{
 };
 use sift::{
     AutonomousPlannerStrategy, AutonomousPlannerStrategyKind, AutonomousSearchMode,
-    AutonomousSearchRequest, Fusion, Reranking, Retriever, SearchInput, SearchOptions, Sift,
+    AutonomousSearchRequest, Fusion, Reranking, Retriever, SearchInput, SearchOptions,
+    SearchProgress, SearchTelemetry, Sift,
 };
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
@@ -34,6 +38,42 @@ mod versioning;
 #[cfg(test)]
 mod search_cli_tests {
     use super::*;
+
+    #[test]
+    fn progress_renderer_includes_indexing_cache_metrics() {
+        let mut renderer = ProgressRenderer::new(Vec::new(), true);
+        let telemetry = SearchTelemetry {
+            heuristic_hits: 3,
+            blob_hits: 7,
+            fresh_artifact_builds: 2,
+            skipped_artifacts: 1,
+            embedding_hits: 0,
+            total_files: 10,
+            total_segments: 24,
+            bm25_index_cache_hits: 0,
+            bm25_index_builds: 1,
+        };
+
+        renderer
+            .update(
+                &SearchProgress::Indexing {
+                    phase: sift::SearchPhase::Indexing,
+                    files_processed: 4,
+                    files_total: 10,
+                    estimated_remaining: Some(Duration::from_secs(12)),
+                },
+                &telemetry,
+            )
+            .expect("render indexing progress");
+        renderer.finish().expect("finish renderer");
+
+        let output =
+            String::from_utf8(renderer.into_inner()).expect("progress output should be utf-8");
+        assert!(output.contains("Indexing 4/10 files"));
+        assert!(output.contains("blobs 7"));
+        assert!(output.contains("fresh 2"));
+        assert!(output.contains("bm25 cache 0 build 1"));
+    }
 
     #[test]
     fn direct_search_targets_remain_query_driven_without_agent() {
@@ -674,6 +714,145 @@ fn resolve_eval_paths(
     }
 }
 
+struct ProgressRenderer<W: Write> {
+    writer: W,
+    interactive: bool,
+    last_line: Option<String>,
+}
+
+impl<W: Write> ProgressRenderer<W> {
+    fn new(writer: W, interactive: bool) -> Self {
+        Self {
+            writer,
+            interactive,
+            last_line: None,
+        }
+    }
+
+    fn update(&mut self, progress: &SearchProgress, telemetry: &SearchTelemetry) -> Result<()> {
+        if !self.interactive {
+            return Ok(());
+        }
+
+        let Some(line) = Self::format_line(progress, telemetry) else {
+            return Ok(());
+        };
+
+        if self.last_line.as_ref() == Some(&line) {
+            return Ok(());
+        }
+
+        let width = self
+            .last_line
+            .as_ref()
+            .map(|previous| previous.len())
+            .unwrap_or_default()
+            .max(line.len());
+        write!(self.writer, "\r{line:<width$}")?;
+        self.writer.flush()?;
+        self.last_line = Some(line);
+        Ok(())
+    }
+
+    fn finish(&mut self) -> Result<()> {
+        if self.interactive && self.last_line.is_some() {
+            writeln!(self.writer)?;
+            self.writer.flush()?;
+            self.last_line = None;
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn into_inner(self) -> W {
+        self.writer
+    }
+
+    fn format_line(progress: &SearchProgress, telemetry: &SearchTelemetry) -> Option<String> {
+        match progress {
+            SearchProgress::Indexing {
+                files_processed,
+                files_total,
+                estimated_remaining,
+                ..
+            } => Some(format!(
+                "Indexing {files_processed}/{files_total} files | blobs {} | fresh {} | skipped {} | segments {} | bm25 cache {} build {}{}",
+                telemetry.blob_hits,
+                telemetry.fresh_artifact_builds,
+                telemetry.skipped_artifacts,
+                telemetry.total_segments,
+                telemetry.bm25_index_cache_hits,
+                telemetry.bm25_index_builds,
+                Self::format_eta(*estimated_remaining),
+            )),
+            SearchProgress::Embedding {
+                chunks_processed,
+                chunks_total,
+                estimated_remaining,
+                ..
+            } => Some(format!(
+                "Embedding {chunks_processed}/{chunks_total} chunks{}",
+                Self::format_eta(*estimated_remaining),
+            )),
+            SearchProgress::PlannerStep {
+                step_index,
+                action,
+                query,
+                estimated_remaining,
+                ..
+            } => {
+                let query_suffix = query
+                    .as_ref()
+                    .map(|query| format!(" | query {query}"))
+                    .unwrap_or_default();
+                Some(format!(
+                    "Planning step {} | {}{}{}",
+                    step_index + 1,
+                    action,
+                    query_suffix,
+                    Self::format_eta(*estimated_remaining),
+                ))
+            }
+            SearchProgress::Retrieving {
+                turn_index,
+                turns_total,
+                estimated_remaining,
+                ..
+            } => Some(format!(
+                "Retrieving turn {}/{}{}",
+                turn_index + 1,
+                turns_total,
+                Self::format_eta(*estimated_remaining),
+            )),
+            SearchProgress::Ranking {
+                results_processed,
+                results_total,
+                estimated_remaining,
+                ..
+            } => Some(format!(
+                "Ranking {results_processed}/{results_total} results{}",
+                Self::format_eta(*estimated_remaining),
+            )),
+        }
+    }
+
+    fn format_eta(estimated_remaining: Option<Duration>) -> String {
+        estimated_remaining
+            .map(|remaining| format!(" | eta {}", Self::format_duration(remaining)))
+            .unwrap_or_default()
+    }
+
+    fn format_duration(duration: Duration) -> String {
+        let seconds = duration.as_secs();
+        match seconds {
+            0 => "<1s".to_string(),
+            1..=59 => format!("{seconds}s"),
+            60..=3599 => format!("{}m{}s", seconds / 60, seconds % 60),
+            _ => format!("{}h{}m", seconds / 3600, (seconds % 3600) / 60),
+        }
+    }
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     let verbose = match &cli.command {
@@ -967,18 +1146,37 @@ fn main() -> Result<()> {
             } else {
                 Some(search.to_input(&config)?)
             };
+            let progress_enabled =
+                search.output_format() == OutputFormat::Text && std::io::stderr().is_terminal();
+            let progress = RefCell::new(ProgressRenderer::new(std::io::stderr(), progress_enabled));
             let engine = Sift::builder()
                 .with_config(config)
                 .with_ignore(ignore)
                 .with_telemetry(telemetry)
                 .with_query_cache(query_cache)
+                .with_cache_dir(cache_dir("search")?)
                 .build();
             let output = if search.agent.is_some() {
-                let response = engine.search_autonomous(search.to_autonomous_request()?)?;
+                let response = engine.search_autonomous_with_progress(
+                    search.to_autonomous_request()?,
+                    Some(|event: &SearchProgress| {
+                        let telemetry = engine.telemetry_snapshot();
+                        let _ = progress.borrow_mut().update(event, &telemetry);
+                    }),
+                );
+                let _ = progress.borrow_mut().finish();
+                let response = response?;
                 render_autonomous_search_response(&response, search.output_format())?
             } else {
-                let response =
-                    engine.search(direct_input.expect("direct search input should be built"))?;
+                let response = engine.search_with_progress(
+                    direct_input.expect("direct search input should be built"),
+                    Some(|event: &SearchProgress| {
+                        let telemetry = engine.telemetry_snapshot();
+                        let _ = progress.borrow_mut().update(event, &telemetry);
+                    }),
+                );
+                let _ = progress.borrow_mut().finish();
+                let response = response?;
                 render_search_response(&response, search.output_format())?
             };
             println!("{output}");

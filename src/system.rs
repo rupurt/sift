@@ -5,9 +5,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 pub struct Telemetry {
     pub heuristic_hits: AtomicUsize,
     pub blob_hits: AtomicUsize,
+    pub fresh_artifact_builds: AtomicUsize,
+    pub skipped_artifacts: AtomicUsize,
     pub embedding_hits: AtomicUsize,
     pub total_files: AtomicUsize,
     pub total_segments: AtomicUsize,
+    pub bm25_index_cache_hits: AtomicUsize,
+    pub bm25_index_builds: AtomicUsize,
 }
 
 impl Default for Telemetry {
@@ -21,10 +25,26 @@ impl Telemetry {
         Self {
             heuristic_hits: AtomicUsize::new(0),
             blob_hits: AtomicUsize::new(0),
+            fresh_artifact_builds: AtomicUsize::new(0),
+            skipped_artifacts: AtomicUsize::new(0),
             embedding_hits: AtomicUsize::new(0),
             total_files: AtomicUsize::new(0),
             total_segments: AtomicUsize::new(0),
+            bm25_index_cache_hits: AtomicUsize::new(0),
+            bm25_index_builds: AtomicUsize::new(0),
         }
+    }
+
+    pub fn reset(&self) {
+        self.heuristic_hits.store(0, Ordering::Relaxed);
+        self.blob_hits.store(0, Ordering::Relaxed);
+        self.fresh_artifact_builds.store(0, Ordering::Relaxed);
+        self.skipped_artifacts.store(0, Ordering::Relaxed);
+        self.embedding_hits.store(0, Ordering::Relaxed);
+        self.total_files.store(0, Ordering::Relaxed);
+        self.total_segments.store(0, Ordering::Relaxed);
+        self.bm25_index_cache_hits.store(0, Ordering::Relaxed);
+        self.bm25_index_builds.store(0, Ordering::Relaxed);
     }
 
     pub fn heuristic_hit_rate(&self) -> f64 {
@@ -60,9 +80,17 @@ impl Clone for Telemetry {
         Self {
             heuristic_hits: AtomicUsize::new(self.heuristic_hits.load(Ordering::Relaxed)),
             blob_hits: AtomicUsize::new(self.blob_hits.load(Ordering::Relaxed)),
+            fresh_artifact_builds: AtomicUsize::new(
+                self.fresh_artifact_builds.load(Ordering::Relaxed),
+            ),
+            skipped_artifacts: AtomicUsize::new(self.skipped_artifacts.load(Ordering::Relaxed)),
             embedding_hits: AtomicUsize::new(self.embedding_hits.load(Ordering::Relaxed)),
             total_files: AtomicUsize::new(self.total_files.load(Ordering::Relaxed)),
             total_segments: AtomicUsize::new(self.total_segments.load(Ordering::Relaxed)),
+            bm25_index_cache_hits: AtomicUsize::new(
+                self.bm25_index_cache_hits.load(Ordering::Relaxed),
+            ),
+            bm25_index_builds: AtomicUsize::new(self.bm25_index_builds.load(Ordering::Relaxed)),
         }
     }
 }
@@ -71,11 +99,19 @@ impl PartialEq for Telemetry {
     fn eq(&self, other: &Self) -> bool {
         self.heuristic_hits.load(Ordering::Relaxed) == other.heuristic_hits.load(Ordering::Relaxed)
             && self.blob_hits.load(Ordering::Relaxed) == other.blob_hits.load(Ordering::Relaxed)
+            && self.fresh_artifact_builds.load(Ordering::Relaxed)
+                == other.fresh_artifact_builds.load(Ordering::Relaxed)
+            && self.skipped_artifacts.load(Ordering::Relaxed)
+                == other.skipped_artifacts.load(Ordering::Relaxed)
             && self.embedding_hits.load(Ordering::Relaxed)
                 == other.embedding_hits.load(Ordering::Relaxed)
             && self.total_files.load(Ordering::Relaxed) == other.total_files.load(Ordering::Relaxed)
             && self.total_segments.load(Ordering::Relaxed)
                 == other.total_segments.load(Ordering::Relaxed)
+            && self.bm25_index_cache_hits.load(Ordering::Relaxed)
+                == other.bm25_index_cache_hits.load(Ordering::Relaxed)
+            && self.bm25_index_builds.load(Ordering::Relaxed)
+                == other.bm25_index_builds.load(Ordering::Relaxed)
     }
 }
 

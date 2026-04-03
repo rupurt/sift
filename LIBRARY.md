@@ -9,6 +9,7 @@ The stable crate-root contract includes:
 
 - `Sift`, `SiftBuilder`
 - `SearchInput`, `SearchOptions`
+- `SearchProgress`, `SearchTelemetry`
 - `ContextAssemblyRequest`, `ContextAssemblyResponse`
 - `SearchTurnRequest`, `SearchTurnResponse`
 - `SearchControllerRequest`, `SearchControllerResponse`
@@ -52,7 +53,9 @@ fallback rather than proof of native GGUF or 1-bit runtime support.
 
 ## Mode 1: Direct Search
 
-Use `Sift::search` for standard one-shot retrieval.
+Use `Sift::search` for standard one-shot retrieval, or
+`Sift::search_with_progress` when you want synchronous progress callbacks during
+corpus preparation and ranking.
 
 ```rust
 use sift::{Fusion, Retriever, Reranking, SearchInput, SearchOptions, Sift};
@@ -79,6 +82,38 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 ```
+
+For visible progress:
+
+```rust
+use std::sync::{Arc, Mutex};
+
+use sift::{SearchInput, SearchOptions, SearchProgress, Sift};
+
+fn main() -> anyhow::Result<()> {
+    let engine = Sift::builder().build();
+    let progress = Arc::new(Mutex::new(Vec::new()));
+    let captured = progress.clone();
+
+    let response = engine.search_with_progress(
+        SearchInput::new("./docs", "cache invalidation").with_options(
+            SearchOptions::default().with_strategy("bm25"),
+        ),
+        Some(move |event: &SearchProgress| {
+            captured.lock().expect("progress lock").push(event.clone());
+        }),
+    )?;
+
+    let telemetry = engine.telemetry_snapshot();
+    println!("hits {}", response.hits.len());
+    println!("blob hits {}", telemetry.blob_hits);
+    Ok(())
+}
+```
+
+`telemetry_snapshot()` returns cumulative metrics for the current search run,
+including blob reuse, fresh artifact builds, skipped artifacts, and BM25
+cache/build counts.
 
 ### Direct Search Knobs
 

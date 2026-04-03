@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 pub use crate::internal::config::Ignore;
 use anyhow::{Result, anyhow};
@@ -1898,15 +1899,44 @@ pub struct CorpusLoadRequest<'a> {
 
 pub trait CorpusRepository: Send + Sync {
     fn load(&self, request: &CorpusLoadRequest<'_>) -> Result<LoadedCorpus>;
+
+    fn load_with_progress(
+        &self,
+        request: &CorpusLoadRequest<'_>,
+        progress: Option<&dyn Fn(&SearchProgress)>,
+    ) -> Result<LoadedCorpus> {
+        let _ = progress;
+        self.load(request)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SearchTelemetry {
     pub heuristic_hits: usize,
     pub blob_hits: usize,
+    pub fresh_artifact_builds: usize,
+    pub skipped_artifacts: usize,
     pub embedding_hits: usize,
     pub total_files: usize,
     pub total_segments: usize,
+    pub bm25_index_cache_hits: usize,
+    pub bm25_index_builds: usize,
+}
+
+impl SearchTelemetry {
+    pub fn capture(telemetry: &crate::system::Telemetry) -> Self {
+        Self {
+            heuristic_hits: telemetry.heuristic_hits.load(Ordering::Relaxed),
+            blob_hits: telemetry.blob_hits.load(Ordering::Relaxed),
+            fresh_artifact_builds: telemetry.fresh_artifact_builds.load(Ordering::Relaxed),
+            skipped_artifacts: telemetry.skipped_artifacts.load(Ordering::Relaxed),
+            embedding_hits: telemetry.embedding_hits.load(Ordering::Relaxed),
+            total_files: telemetry.total_files.load(Ordering::Relaxed),
+            total_segments: telemetry.total_segments.load(Ordering::Relaxed),
+            bm25_index_cache_hits: telemetry.bm25_index_cache_hits.load(Ordering::Relaxed),
+            bm25_index_builds: telemetry.bm25_index_builds.load(Ordering::Relaxed),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

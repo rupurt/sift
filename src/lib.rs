@@ -11,6 +11,7 @@
 //! - graph episode DTOs and replay helpers for bounded graph search state inspection
 //! - [`Retriever`], [`Fusion`], and [`Reranking`] for supported strategy overrides
 //! - [`SearchResponse`], [`SearchHit`], [`ContextArtifact`], and [`ScoreConfidence`] for results and artifact metadata
+//! - [`SearchProgress`] and [`SearchTelemetry`] for synchronous search progress and indexing telemetry snapshots
 //! - [`ModelSource`], [`ModelRuntimeContract`], [`PreparedModel`], and [`prepare_model`] for stable local model-preparation workflows
 //!
 //! Everything under [`internal`] exists to support the bundled executable,
@@ -62,7 +63,8 @@ pub use crate::search::{
     RetrieverPolicy, ScoreConfidence, SearchControllerAction, SearchControllerDecision,
     SearchControllerRequest, SearchControllerResponse, SearchControllerState, SearchEmission,
     SearchEmissionMode, SearchHit, SearchPhase, SearchPlan, SearchProgress, SearchResponse,
-    SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse, SearchTurnTrace,
+    SearchTelemetry, SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse,
+    SearchTurnTrace,
     ToolOutputInput, replay_graph_decision, replay_graph_trace,
 };
 

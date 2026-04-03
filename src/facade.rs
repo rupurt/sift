@@ -15,16 +15,17 @@ use crate::search::{
     AutonomousGraphBranchState, AutonomousGraphBranchStatus, AutonomousGraphEpisodeState,
     AutonomousGraphNode, AutonomousPlanner, AutonomousPlannerAction, AutonomousPlannerStopReason,
     AutonomousPlannerStrategyKind, AutonomousPlannerTrace, AutonomousSearchMode,
-    AutonomousSearchRequest, AutonomousSearchResponse, Bm25Index, ContextAssemblyBudget,
+    AutonomousSearchRequest, AutonomousSearchResponse, ContextAssemblyBudget,
     ContextAssemblyRequest, ContextAssemblyResponse, Embedder, FusionPolicy,
     HeuristicAutonomousPlanner, LatentSearchEmission, LatentSearchHit, LocalFileCorpusRepository,
     ModelDrivenAutonomousPlanner, ProtocolSearchEmission, QueryEmbeddingCache, RerankingPolicy,
     RetrieverPolicy, SearchControllerAction, SearchControllerDecision, SearchControllerRequest,
     SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode,
     SearchEnvironment, SearchPhase, SearchPlan, SearchProgress, SearchRequest, SearchResponse,
-    SearchServiceBuilder, SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse,
-    SearchTurnTrace, StrategyPresetRegistry, load_search_corpus_with_progress,
-    replay_graph_decision, replay_graph_trace, run_search_with_plan,
+    SearchServiceBuilder, SearchTelemetry, SearchTrace, SearchTurn, SearchTurnRequest,
+    SearchTurnResponse, SearchTurnTrace, StrategyPresetRegistry,
+    load_search_corpus_with_progress, replay_graph_decision, replay_graph_trace,
+    run_search_with_plan, run_search_with_plan_and_progress,
 };
 use crate::system::Telemetry;
 
@@ -207,18 +208,32 @@ impl Sift {
     }
 
     pub fn search(&self, input: SearchInput) -> Result<SearchResponse> {
+        self.search_with_progress(input, None::<fn(&SearchProgress)>)
+    }
+
+    pub fn search_with_progress<F: Fn(&SearchProgress)>(
+        &self,
+        input: SearchInput,
+        progress: Option<F>,
+    ) -> Result<SearchResponse> {
+        self.telemetry.reset();
         let search_request = self.build_search_request(input)?;
         let dense_model = search_request.dense_model.clone();
         let plan = self.resolve_search_plan(&search_request)?;
         let embedder = self.resolve_embedder_for_plan(&plan, &dense_model)?;
 
-        run_search_with_plan(
+        run_search_with_plan_and_progress(
             &plan,
             &search_request,
             self.ignore.as_ref(),
             &LocalFileCorpusRepository,
             embedder,
+            progress.as_ref().map(|callback| callback as &dyn Fn(&SearchProgress)),
         )
+    }
+
+    pub fn telemetry_snapshot(&self) -> SearchTelemetry {
+        SearchTelemetry::capture(self.telemetry.as_ref())
     }
 
     pub fn assemble_context(
@@ -350,6 +365,7 @@ impl Sift {
         request: SearchControllerRequest,
         progress: Option<F>,
     ) -> Result<SearchControllerResponse> {
+        self.telemetry.reset();
         if request.turns.is_empty() {
             bail!("controller request requires at least one turn");
         }
@@ -407,7 +423,13 @@ impl Sift {
             self.cache_dir.as_deref(),
             progress.as_ref().map(|f| |p: &SearchProgress| f(p)),
         )?;
-        let index = Bm25Index::build(&corpus.artifacts);
+        let index = crate::search::application::prepare_bm25_index(
+            &first_turn.path,
+            &corpus,
+            self.cache_dir.as_deref(),
+            &self.telemetry,
+            progress.as_ref().map(|callback| callback as &dyn Fn(&SearchProgress)),
+        )?;
         let llm_reranker = SearchServiceBuilder::load_llm_reranker(&request.plan, &env_request)?;
         let env = SearchEnvironment::new_with_plan(
             &env_request,
@@ -1722,4 +1744,128 @@ fn resolve_plan(strategy: &str, options: &SearchOptions) -> Result<crate::search
     }
 
     Ok(plan)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    use tempfile::tempdir;
+
+    fn write_test_corpus(root: &Path) {
+        std::fs::write(
+            root.join("alpha.txt"),
+            "alpha retrieval architecture and cache invalidation",
+        )
+        .expect("write alpha doc");
+        std::fs::write(
+            root.join("beta.txt"),
+            "beta service catalog and latency measurements",
+        )
+        .expect("write beta doc");
+    }
+
+    fn bm25_input(root: &Path) -> SearchInput {
+        SearchInput::new(root, "alpha retrieval").with_options(
+            SearchOptions::default()
+                .with_strategy("bm25")
+                .with_limit(5),
+        )
+    }
+
+    #[test]
+    fn direct_search_with_progress_emits_indexing_and_ranking() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_test_corpus(corpus.path());
+
+        let engine = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+
+        let response = engine
+            .search_with_progress(
+                bm25_input(corpus.path()),
+                Some(move |event: &SearchProgress| {
+                    captured.lock().expect("progress lock").push(event.clone());
+                }),
+            )
+            .expect("direct search with progress");
+
+        assert!(!response.hits.is_empty());
+
+        let events = events.lock().expect("events lock");
+        assert!(events.iter().any(|event| matches!(event, SearchProgress::Indexing { .. })));
+        assert!(events.iter().any(|event| matches!(event, SearchProgress::Ranking { .. })));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            SearchProgress::Indexing {
+                files_processed,
+                files_total,
+                ..
+            } if files_processed == files_total
+        )));
+    }
+
+    #[test]
+    fn direct_search_reuses_bm25_cache() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_test_corpus(corpus.path());
+
+        let first = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        first
+            .search(bm25_input(corpus.path()))
+            .expect("first direct search");
+        assert!(first.telemetry_snapshot().bm25_index_builds > 0);
+
+        let second = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        second
+            .search(bm25_input(corpus.path()))
+            .expect("second direct search");
+        assert!(second.telemetry_snapshot().bm25_index_cache_hits > 0);
+    }
+
+    #[test]
+    fn search_controller_reuses_bm25_cache() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_test_corpus(corpus.path());
+
+        let plan = StrategyPresetRegistry::default_registry()
+            .resolve("bm25")
+            .expect("bm25 plan");
+        let request = SearchControllerRequest::new(
+            plan,
+            vec![SearchTurnRequest::new(corpus.path(), "alpha retrieval")],
+        );
+
+        let first = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        first
+            .search_controller(request.clone())
+            .expect("first controller search");
+        assert!(first.telemetry_snapshot().bm25_index_builds > 0);
+
+        let second = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        second
+            .search_controller(request)
+            .expect("second controller search");
+        assert!(second.telemetry_snapshot().bm25_index_cache_hits > 0);
+    }
 }

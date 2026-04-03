@@ -1827,28 +1827,7 @@ fn evaluate_quality(
             mrr_at_10: mrr_total / counted_queries as f64,
             recall_at_10: recall_total / counted_queries as f64,
         },
-        crate::search::SearchTelemetry {
-            heuristic_hits: env
-                .telemetry
-                .heuristic_hits
-                .load(std::sync::atomic::Ordering::Relaxed),
-            blob_hits: env
-                .telemetry
-                .blob_hits
-                .load(std::sync::atomic::Ordering::Relaxed),
-            embedding_hits: env
-                .telemetry
-                .embedding_hits
-                .load(std::sync::atomic::Ordering::Relaxed),
-            total_files: env
-                .telemetry
-                .total_files
-                .load(std::sync::atomic::Ordering::Relaxed),
-            total_segments: env
-                .telemetry
-                .total_segments
-                .load(std::sync::atomic::Ordering::Relaxed),
-        },
+        crate::search::SearchTelemetry::capture(env.telemetry.as_ref()),
     ))
 }
 

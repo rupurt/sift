@@ -22,11 +22,12 @@ For project background and design rationale, read the introductory post:
 
 - **Single Rust binary:** No external database, daemon, or long-running service.
 - **Local-first retrieval:** Search runs over local corpora with transparent caching in standard user cache directories.
+- **Visible indexing:** Interactive `sift search` runs show live stderr progress for indexing and cache reuse while preparation is in flight.
 - **Default interactive strategy:** The default config strategy is `hybrid`.
 - **Current champion preset:** `page-index-hybrid` is the richer benchmark preset for comparative evaluation.
 - **Layered pipeline:** Query Expansion -> Retrieval -> Fusion -> Reranking.
 - **Executable surface:** `search`, `eval`, `dataset`, `optimize`, and `config` are the supported CLI commands.
-- **Library surface:** `search`, `assemble_context`, `search_turn`, `search_controller`, and `search_autonomous` are supported at the crate root.
+- **Library surface:** `search`, `search_with_progress`, `assemble_context`, `search_turn`, `search_controller`, and `search_autonomous` are supported at the crate root.
 - **Autonomous planning:** Bounded linear and graph autonomous planning ship through `sift search --agent` and `Sift::search_autonomous`, with heuristic and model-driven planner strategies.
 - **Emission modes:** Turn-aware library calls can emit `view`, `protocol`, or `latent` responses.
 - **Supported inputs:** Text, HTML, PDF, and OOXML files (`.docx`, `.xlsx`, `.pptx`).
@@ -132,6 +133,10 @@ Emit JSON instead of text:
 sift search --json "query"
 ```
 
+Interactive text-mode `sift search` writes transient progress to stderr while
+the corpus is being prepared. That progress includes file counts plus cache and
+BM25 reuse/build metrics so the first run does not look hung.
+
 ### Verbose Mode
 
 Trace the pipeline and timings at different levels:
@@ -159,6 +164,7 @@ surface lives at the crate root and includes:
 - `SearchPlan`, `QueryExpansionPolicy`, `RetrieverPolicy`, `FusionPolicy`, `RerankingPolicy`
 - `Retriever`, `Fusion`, `Reranking`
 - `SearchResponse`, `SearchHit`, `ContextArtifact`, `ContextArtifactKind`, `ScoreConfidence`
+- `SearchProgress`, `SearchTelemetry`
 - `ModelSource`, `ModelRuntimeContract`, `PreparedModel`, `ModelArtifactFormat`, `ModelPreparationMode`, `prepare_model`
 
 Everything under `sift::internal` exists to support the bundled executable,

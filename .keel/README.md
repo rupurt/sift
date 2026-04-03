@@ -172,6 +172,12 @@
 |--------|--------|
 | [Expose Stable Model Preparation API](epics/VFkJD2NwK/voyages/VFkJcKSVA/) | done |
 
+### [Incremental Indexing Visibility](epics/VFlF7aHQw/) (done)
+
+| Voyage | Status |
+|--------|--------|
+| [Indexing Progress And Incremental Reuse](epics/VFlF7aHQw/voyages/VFlFAS7rn/) | done |
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |

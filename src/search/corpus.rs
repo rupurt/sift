@@ -114,8 +114,11 @@ pub fn load_search_corpus_with_progress<F: Fn(&super::domain::SearchProgress)>(
                     .fetch_add(artifact.segments.len(), Ordering::Relaxed);
                 artifacts.push(artifact);
             }
-            Ok(None) => {}
+            Ok(None) => {
+                telemetry.skipped_artifacts.fetch_add(1, Ordering::Relaxed);
+            }
             Err(error) => {
+                telemetry.skipped_artifacts.fetch_add(1, Ordering::Relaxed);
                 tracing::warn!(
                     path = %path.display(),
                     error = %error,
@@ -142,8 +145,11 @@ pub fn load_search_corpus_with_progress<F: Fn(&super::domain::SearchProgress)>(
                     .fetch_add(artifact.segments.len(), Ordering::Relaxed);
                 artifacts.push(artifact);
             }
-            Ok(None) => {}
+            Ok(None) => {
+                telemetry.skipped_artifacts.fetch_add(1, Ordering::Relaxed);
+            }
             Err(error) => {
+                telemetry.skipped_artifacts.fetch_add(1, Ordering::Relaxed);
                 tracing::warn!(error = %error, "skipping invalid local context source");
             }
         }
@@ -318,6 +324,9 @@ fn load_file_artifact(
         },
         &content_hash,
     );
+    telemetry
+        .fresh_artifact_builds
+        .fetch_add(1, Ordering::Relaxed);
 
     if let Some(paths) = cache_paths {
         save_blob(&paths.blobs_dir, &content_hash, &artifact)?;
@@ -348,6 +357,10 @@ fn load_local_context_artifact(
     if let Some(paths) = cache_paths {
         save_blob(&paths.blobs_dir, &cache_key, &synthetic)?;
     }
+
+    telemetry
+        .fresh_artifact_builds
+        .fetch_add(1, Ordering::Relaxed);
 
     Ok(Some(synthetic))
 }
