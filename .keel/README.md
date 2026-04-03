@@ -166,6 +166,12 @@
 |--------|--------|
 | [Progress Callback Foundation](epics/VFO1icY5Z/voyages/VFO1uSaNE/) | done |
 
+### [Stable Local Model Preparation Seam](epics/VFkJD2NwK/) (done)
+
+| Voyage | Status |
+|--------|--------|
+| [Expose Stable Model Preparation API](epics/VFkJD2NwK/voyages/VFkJcKSVA/) | done |
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |

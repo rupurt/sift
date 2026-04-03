@@ -1,18 +1,14 @@
-use std::fs;
-use std::path::Path;
-
 use anyhow::{Result, anyhow};
 use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::qwen2::{Config as QwenConfig, Model as QwenModel};
+use std::fs;
 use tokenizers::Tokenizer;
 
-use crate::cache::cache_dir;
-use crate::search::adapters::llm_utils::{
-    QwenConfigPartial, ensure_hf_asset, load_mmaped_safetensors_with_repair, qwen_generate,
-};
+use crate::search::adapters::llm_utils::{QwenConfigPartial, qwen_generate};
 use crate::search::domain::GenerativeModel;
 use crate::search::domain::{CandidateList, Reranker};
+use crate::{ModelRuntimeContract, ModelSource, prepare_model};
 
 pub const DEFAULT_JINA_MODEL_ID: &str = "jinaai/jina-reranker-v3";
 pub const DEFAULT_JINA_REVISION: &str = "main";
@@ -72,44 +68,22 @@ pub struct JinaReranker {
 
 impl JinaReranker {
     pub fn load(spec: JinaModelSpec) -> Result<Self> {
-        let cache_root = cache_dir("models")?;
-        let root = cache_root
-            .join(Path::new(&spec.model_id))
-            .join(Path::new(&spec.revision));
-
-        let weights_path = root.join("model.safetensors");
-        let tokenizer_path = root.join("tokenizer.json");
-        let config_path = root.join("config.json");
-
-        ensure_hf_asset(&spec.model_id, &spec.revision, &config_path, "config.json")?;
-        ensure_hf_asset(
-            &spec.model_id,
-            &spec.revision,
-            &tokenizer_path,
-            "tokenizer.json",
-        )?;
-        ensure_hf_asset(
-            &spec.model_id,
-            &spec.revision,
-            &weights_path,
-            "model.safetensors",
+        let prepared = prepare_model(
+            ModelSource::hugging_face_revision(&spec.model_id, &spec.revision),
+            ModelRuntimeContract::CandleSafetensorsBundle,
         )?;
 
-        let config_content = fs::read_to_string(&config_path)?;
+        let config_content = fs::read_to_string(&prepared.config)?;
         let config_partial: QwenConfigPartial = serde_json::from_str(&config_content)?;
         let config = config_partial.into_config()?;
 
-        let tokenizer = Tokenizer::from_file(&tokenizer_path)
+        let tokenizer = Tokenizer::from_file(&prepared.tokenizer)
             .map_err(|m| anyhow!("failed to load tokenizer: {}", m))?;
 
         let device = super::llm_utils::get_device_for("JINA")?;
-        let vb = load_mmaped_safetensors_with_repair(
-            &spec.model_id,
-            &spec.revision,
-            &weights_path,
-            DType::F32,
-            &device,
-        )?;
+        let vb = unsafe {
+            VarBuilder::from_mmaped_safetensors(&[prepared.weights], DType::F32, &device)?
+        };
 
         let projector = Projector::new(vb.pp("projector"))?;
 

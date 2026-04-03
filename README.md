@@ -159,6 +159,7 @@ surface lives at the crate root and includes:
 - `SearchPlan`, `QueryExpansionPolicy`, `RetrieverPolicy`, `FusionPolicy`, `RerankingPolicy`
 - `Retriever`, `Fusion`, `Reranking`
 - `SearchResponse`, `SearchHit`, `ContextArtifact`, `ContextArtifactKind`, `ScoreConfidence`
+- `ModelSource`, `ModelRuntimeContract`, `PreparedModel`, `ModelArtifactFormat`, `ModelPreparationMode`, `prepare_model`
 
 Everything under `sift::internal` exists to support the bundled executable,
 benchmarks, and repository-internal tests. It is not part of the stable
@@ -192,6 +193,27 @@ cargo run --manifest-path examples/sift-embed/Cargo.toml -- search tests/fixture
 If `PATH` is omitted, `sift-embed search "<term>"` searches the current
 directory. See [`examples/sift-embed/README.md`](examples/sift-embed/README.md)
 for the runnable example notes.
+
+### Local Model Preparation
+
+Embedders that need local model artifacts for the current Candle-backed runtime
+can use the stable crate-root preparation seam:
+
+```rust
+use sift::{ModelRuntimeContract, ModelSource, prepare_model};
+
+let prepared = prepare_model(
+    ModelSource::hugging_face_revision("prism-ml/Bonsai-8B-gguf", "main"),
+    ModelRuntimeContract::CandleSafetensorsBundle,
+)?;
+println!("{}", prepared.root.display());
+```
+
+This surface is a compatibility/preparation seam. If a source is already
+compatible, sift reuses it. If the source is GGUF-backed, sift can invoke
+metamorph to translate it into a Candle-loadable safetensors bundle. That
+translation is lossy and does not preserve the original 1-bit runtime
+efficiency; native 1-bit execution support remains a separate future project.
 
 ### Add The Dependency
 

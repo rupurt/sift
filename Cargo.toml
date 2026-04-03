@@ -30,6 +30,7 @@ fs2 = "0.4.3"
 html2text = "0.15.3"
 ignore = "0.4.25"
 memmap2 = "0.9.10"
+metamorph = { git = "https://github.com/rupurt/metamorph", rev = "00ac826973d378ce7670b1057bfd467f6cf8de29" }
 pdf-extract = "0.10.0"
 rayon = "1.11.0"
 rust_tokenizers = { version = "8.1.1", default-features = false }

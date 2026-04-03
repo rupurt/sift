@@ -1,8 +1,5 @@
-use std::fs;
-use std::path::{Path, PathBuf};
-
 use anyhow::{Result, anyhow, bail};
-use candle_core::{DType, Device, Tensor};
+use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::qwen2::{Config as QwenConfig, Model as QwenModel};
 use serde::Deserialize;
@@ -97,77 +94,6 @@ impl QwenConfigPartial {
             max_window_layers: self.num_hidden_layers,
             tie_word_embeddings: true,
         })
-    }
-}
-
-pub fn ensure_hf_asset(model_id: &str, revision: &str, path: &Path, filename: &str) -> Result<()> {
-    if path.exists() {
-        return Ok(());
-    }
-
-    download_hf_asset(model_id, revision, path, filename)
-}
-
-fn download_hf_asset(model_id: &str, revision: &str, path: &Path, filename: &str) -> Result<()> {
-    let tmp_path = temp_download_path(path)?;
-
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-
-    let url = format!(
-        "https://huggingface.co/{}/resolve/{}/{}",
-        model_id, revision, filename
-    );
-
-    tracing::info!("downloading {}...", url);
-    let mut request = ureq::get(&url);
-    if let Ok(token) = std::env::var("HF_TOKEN") {
-        request = request.header("Authorization", &format!("Bearer {}", token));
-    }
-
-    let mut response = request.call()?;
-    let mut file = fs::File::create(&tmp_path)?;
-    let mut reader = response.body_mut().as_reader();
-    std::io::copy(&mut reader, &mut file)?;
-    file.sync_all()?;
-    fs::rename(&tmp_path, path)?;
-
-    Ok(())
-}
-
-fn temp_download_path(path: &Path) -> Result<PathBuf> {
-    let file_name = path
-        .file_name()
-        .ok_or_else(|| anyhow!("missing filename for download target {}", path.display()))?;
-
-    Ok(path.with_file_name(format!(".{}.part", file_name.to_string_lossy())))
-}
-
-pub fn load_mmaped_safetensors_with_repair(
-    model_id: &str,
-    revision: &str,
-    weights_path: &Path,
-    dtype: DType,
-    device: &Device,
-) -> Result<VarBuilder<'static>> {
-    let weights = [weights_path.to_path_buf()];
-
-    match unsafe { VarBuilder::from_mmaped_safetensors(&weights, dtype, device) } {
-        Ok(vb) => Ok(vb),
-        Err(err) => {
-            tracing::warn!(
-                "failed to load {}, redownloading weights: {:?}",
-                weights_path.display(),
-                err
-            );
-            if weights_path.exists() {
-                fs::remove_file(weights_path)?;
-            }
-            ensure_hf_asset(model_id, revision, weights_path, "model.safetensors")?;
-            unsafe { VarBuilder::from_mmaped_safetensors(&weights, dtype, device) }
-                .map_err(Into::into)
-        }
     }
 }
 

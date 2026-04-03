@@ -23,9 +23,32 @@ The stable crate-root contract includes:
 - `SearchResponse`, `SearchHit`, `ContextArtifact`, `ContextArtifactKind`, `ScoreConfidence`
 - `LocalContextSource`, `EnvironmentFactInput`, `ToolOutputInput`, `AgentTurnInput`
 - `GenerativeModel`, `Conversation`
+- `ModelSource`, `ModelRuntimeContract`, `PreparedModel`, `ModelArtifactFormat`, `ModelPreparationMode`, `prepare_model`
 
 Everything under `sift::internal` is executable support code or repository
 plumbing and should be treated as unstable.
+
+## Model Preparation
+
+Use `prepare_model` when your application needs a stable sift-owned boundary for
+local model preparation before runtime loading:
+
+```rust
+use sift::{ModelRuntimeContract, ModelSource, prepare_model};
+
+let prepared = prepare_model(
+    ModelSource::hugging_face_revision("prism-ml/Bonsai-8B-gguf", "main"),
+    ModelRuntimeContract::CandleSafetensorsBundle,
+)?;
+
+assert!(prepared.weights.is_file());
+```
+
+This seam is for compatibility preparation, not native 1-bit execution. Sift
+reuses already-compatible bundles when it can and may invoke metamorph to
+translate GGUF sources into the current Candle-loadable safetensors contract.
+That conversion is lossy and should be treated as a runtime-compatibility
+fallback rather than proof of native GGUF or 1-bit runtime support.
 
 ## Mode 1: Direct Search
 

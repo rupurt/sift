@@ -1,17 +1,13 @@
-use std::fs;
-use std::path::Path;
-
 use anyhow::{Result, anyhow};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 use candle_transformers::models::qwen2::{Config as QwenConfig, Model as QwenModel};
+use std::fs;
 use tokenizers::Tokenizer;
 
-use super::llm_utils::{
-    QwenConfigPartial, ensure_hf_asset, load_mmaped_safetensors_with_repair, qwen_generate,
-};
-use crate::cache::cache_dir;
+use super::llm_utils::{QwenConfigPartial, qwen_generate};
 use crate::search::domain::{CandidateList, GenerativeModel, Reranker};
+use crate::{ModelRuntimeContract, ModelSource, prepare_model};
 
 pub const DEFAULT_QWEN_MODEL_ID: &str = "Qwen/Qwen2.5-0.5B-Instruct";
 pub const DEFAULT_QWEN_REVISION: &str = "main";
@@ -46,44 +42,22 @@ pub struct QwenReranker {
 
 impl QwenReranker {
     pub fn load(spec: QwenModelSpec) -> Result<Self> {
-        let cache_root = cache_dir("models")?;
-        let root = cache_root
-            .join(Path::new(&spec.model_id))
-            .join(Path::new(&spec.revision));
-
-        let config_path = root.join("config.json");
-        let tokenizer_path = root.join("tokenizer.json");
-        let weights_path = root.join("model.safetensors");
-
-        ensure_hf_asset(&spec.model_id, &spec.revision, &config_path, "config.json")?;
-        ensure_hf_asset(
-            &spec.model_id,
-            &spec.revision,
-            &tokenizer_path,
-            "tokenizer.json",
-        )?;
-        ensure_hf_asset(
-            &spec.model_id,
-            &spec.revision,
-            &weights_path,
-            "model.safetensors",
+        let prepared = prepare_model(
+            ModelSource::hugging_face_revision(&spec.model_id, &spec.revision),
+            ModelRuntimeContract::CandleSafetensorsBundle,
         )?;
 
         let config_partial: QwenConfigPartial =
-            serde_json::from_str(&fs::read_to_string(&config_path)?)?;
+            serde_json::from_str(&fs::read_to_string(&prepared.config)?)?;
         let config = config_partial.into_config()?;
 
-        let tokenizer = Tokenizer::from_file(&tokenizer_path)
+        let tokenizer = Tokenizer::from_file(&prepared.tokenizer)
             .map_err(|m| anyhow!("failed to load tokenizer: {}", m))?;
 
         let device = super::llm_utils::get_device_for("QWEN")?;
-        let vb = load_mmaped_safetensors_with_repair(
-            &spec.model_id,
-            &spec.revision,
-            &weights_path,
-            DType::F32,
-            &device,
-        )?;
+        let vb = unsafe {
+            VarBuilder::from_mmaped_safetensors(&[prepared.weights], DType::F32, &device)?
+        };
 
         Ok(Self {
             model_id: spec.model_id,

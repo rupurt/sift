@@ -11,6 +11,7 @@
 //! - graph episode DTOs and replay helpers for bounded graph search state inspection
 //! - [`Retriever`], [`Fusion`], and [`Reranking`] for supported strategy overrides
 //! - [`SearchResponse`], [`SearchHit`], [`ContextArtifact`], and [`ScoreConfidence`] for results and artifact metadata
+//! - [`ModelSource`], [`ModelRuntimeContract`], [`PreparedModel`], and [`prepare_model`] for stable local model-preparation workflows
 //!
 //! Everything under [`internal`] exists to support the bundled executable,
 //! benchmarks, and repository-internal tests. It is not part of the supported
@@ -30,6 +31,7 @@ mod eval;
 mod extract;
 mod facade;
 mod hybrid;
+mod model;
 mod optimize;
 mod search;
 mod segment;
@@ -39,6 +41,10 @@ mod vector;
 pub use crate::facade::{
     Conversation, Fusion, GenerativeModel, Reranking, Retriever, SearchInput, SearchOptions, Sift,
     SiftBuilder,
+};
+pub use crate::model::{
+    ModelArtifactFormat, ModelPreparationMode, ModelRuntimeContract, ModelSource, PreparedModel,
+    prepare_model,
 };
 pub use crate::search::{
     AcquisitionAdapterKind, AgentTurnInput, ArtifactBudget, ArtifactFreshness, ArtifactProvenance,
