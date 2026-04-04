@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-04-03T22:21:07.085161960-07:00
+mode: manual
+---
+Breadcrumb persistence is a local bincode journal stored under the existing cache root at artifacts/breadcrumbs/<corpus_key>.bin through src/cache/breadcrumb.rs and src/cache/store.rs. The rebuild loop writes and clears this file directly in-process; no daemon, coordinator, or external service is introduced.

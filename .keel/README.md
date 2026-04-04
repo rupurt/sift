@@ -188,7 +188,7 @@
 
 | Voyage | Status |
 |--------|--------|
-| [Implement Resumable Sector Rebuild Journals](epics/VFnGRPtQQ/voyages/VFnGWuLCk/) | planned |
+| [Implement Resumable Sector Rebuild Journals](epics/VFnGRPtQQ/voyages/VFnGWuLCk/) | in-progress |
 | [Implement Sectorized Direct Search Reuse](epics/VFnGRPtQQ/voyages/VFnGWuRCh/) | done |
 | [Adopt Sector Reuse Across Runtime Surfaces](epics/VFnGRPtQQ/voyages/VFnGWulCe/) | planned |
 | [Implement Frontier Coverage Search Semantics](epics/VFnGRPtQQ/voyages/VFnGWurCd/) | planned |

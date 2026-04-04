@@ -22,3 +22,9 @@
 - Reworked `src/search/corpus.rs` to load clean sectors from persisted blobs, rebuild only dirty/untracked sectors, and persist a refreshed `SectorMap` plus sector-local BM25 shards from actual loaded artifacts.
 - Updated `src/search/application.rs` to combine persisted sector BM25 shards on whole-corpus cache misses, and extended telemetry/progress surfaces with sector cache and sector shard counters.
 - Added direct regression coverage for warm clean-sector restart reuse and one-sector dirty rebuild isolation, then verified the full workspace with `cargo test`.
+
+## 2026-04-03T22:21:07-07:00
+
+- Completed breadcrumb persistence story `VFnGb6Nq5`.
+- Added `src/cache/breadcrumb.rs` for persisted rebuild journals keyed under the existing cache root and wired dirty-sector rebuild checkpoints through `src/search/corpus.rs`.
+- Added focused breadcrumb persistence tests and re-ran the full workspace test suite with `cargo test`.

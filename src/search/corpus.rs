@@ -8,10 +8,11 @@ use anyhow::{Context, Result, bail};
 use walkdir::WalkDir;
 
 use crate::cache::{
-    CacheEntry, Manifest, SectorLexicalShardFormat, SectorLexicalShardRef, SectorMap,
-    SectorMemberInput, SectorPartitionStrategy, corpus_cache_key, get_file_heuristics, hash_file,
-    load_blob, load_locked_bincode, resolve_compatible_cache_path, resolve_sector_member_path,
-    save_blob, save_locked_bincode, sector_bm25_shard_cache_path, sector_relative_path,
+    ActiveBreadcrumbSector, BreadcrumbJournal, CacheEntry, Manifest, SectorLexicalShardFormat,
+    SectorLexicalShardRef, SectorMap, SectorMemberInput, SectorPartitionStrategy, corpus_cache_key,
+    get_file_heuristics, hash_file, load_blob, load_locked_bincode, resolve_compatible_cache_path,
+    resolve_sector_member_path, save_blob, save_locked_bincode, sector_bm25_shard_cache_path,
+    sector_relative_path,
 };
 use blake3::Hasher;
 
@@ -304,6 +305,18 @@ struct FileSectorCandidate {
     cached_hash: Option<String>,
 }
 
+struct RebuildHooks<'a> {
+    after_breadcrumb_checkpoint: Option<&'a mut dyn FnMut(&BreadcrumbJournal) -> Result<()>>,
+}
+
+impl<'a> Default for RebuildHooks<'a> {
+    fn default() -> Self {
+        Self {
+            after_breadcrumb_checkpoint: None,
+        }
+    }
+}
+
 fn load_file_artifacts_with_sector_cache<F: FnMut()>(
     root: &Path,
     file_paths: &[PathBuf],
@@ -312,6 +325,29 @@ fn load_file_artifacts_with_sector_cache<F: FnMut()>(
     cache_paths: &CachePaths,
     telemetry: &crate::system::Telemetry,
     on_processed: &mut F,
+) -> Result<Vec<ContextArtifact>> {
+    let mut hooks = RebuildHooks::default();
+    load_file_artifacts_with_sector_cache_impl(
+        root,
+        file_paths,
+        manifest,
+        cache_base,
+        cache_paths,
+        telemetry,
+        on_processed,
+        &mut hooks,
+    )
+}
+
+fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
+    root: &Path,
+    file_paths: &[PathBuf],
+    manifest: &mut Manifest,
+    cache_base: &Path,
+    cache_paths: &CachePaths,
+    telemetry: &crate::system::Telemetry,
+    on_processed: &mut F,
+    hooks: &mut RebuildHooks<'_>,
 ) -> Result<Vec<ContextArtifact>> {
     let cached_sector_map = match SectorMap::load_for_root(cache_base, root) {
         Ok(map) => map,
@@ -403,12 +439,36 @@ fn load_file_artifacts_with_sector_cache<F: FnMut()>(
         }
     }
 
+    let dirty_sector_ids = load_dirty_sector_ids(&provisional_map, &clean_sector_ids);
+    let mut breadcrumb = if dirty_sector_ids.is_empty() {
+        None
+    } else {
+        Some(BreadcrumbJournal::new(
+            provisional_map.corpus_key.clone(),
+            generate_breadcrumb_run_id(),
+            dirty_sector_ids,
+        ))
+    };
+
     for sector in provisional_map
         .sectors
         .iter()
         .filter(|sector| !clean_sector_ids.contains(&sector.sector_id))
     {
-        for proof in &sector.proofs {
+        if let Some(journal) = breadcrumb.as_mut() {
+            journal.active_sector = Some(ActiveBreadcrumbSector {
+                sector_id: sector.sector_id.clone(),
+                next_member_offset: 0,
+                next_member_relative_path: sector
+                    .proofs
+                    .first()
+                    .map(|proof| proof.relative_path.clone()),
+                sector_member_count: sector.proofs.len(),
+            });
+            checkpoint_breadcrumb(journal, cache_base, root, hooks)?;
+        }
+
+        for (member_index, proof) in sector.proofs.iter().enumerate() {
             let path = tracked_candidates
                 .get(&proof.relative_path)
                 .map(|candidate| candidate.path.clone())
@@ -421,8 +481,28 @@ fn load_file_artifacts_with_sector_cache<F: FnMut()>(
                 telemetry,
                 &mut file_artifacts,
             );
+            if let Some(journal) = breadcrumb.as_mut() {
+                if let Some(active) = journal.active_sector.as_mut() {
+                    active.next_member_offset = member_index + 1;
+                    active.next_member_relative_path = sector
+                        .proofs
+                        .get(member_index + 1)
+                        .map(|next| next.relative_path.clone());
+                }
+                checkpoint_breadcrumb(journal, cache_base, root, hooks)?;
+            }
             on_processed();
         }
+
+        if let Some(journal) = breadcrumb.as_mut() {
+            journal.completed_sectors.push(sector.sector_id.clone());
+            journal.active_sector = None;
+            checkpoint_breadcrumb(journal, cache_base, root, hooks)?;
+        }
+    }
+
+    if breadcrumb.is_some() {
+        BreadcrumbJournal::clear_for_root(cache_base, root)?;
     }
 
     for path in untracked_paths {
@@ -453,6 +533,40 @@ fn load_file_artifacts_with_sector_cache<F: FnMut()>(
     )?;
 
     Ok(file_artifacts)
+}
+
+fn checkpoint_breadcrumb(
+    journal: &mut BreadcrumbJournal,
+    cache_base: &Path,
+    root: &Path,
+    hooks: &mut RebuildHooks<'_>,
+) -> Result<()> {
+    journal.updated_at_unix_secs = current_unix_secs();
+    journal.save_for_root(cache_base, root)?;
+    if let Some(callback) = hooks.after_breadcrumb_checkpoint.as_mut() {
+        callback(journal)?;
+    }
+    Ok(())
+}
+
+fn generate_breadcrumb_run_id() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    format!("{}-{}-{nanos}", current_unix_secs(), std::process::id())
+}
+
+fn load_dirty_sector_ids(
+    provisional_map: &SectorMap,
+    clean_sector_ids: &HashSet<String>,
+) -> Vec<String> {
+    provisional_map
+        .sectors
+        .iter()
+        .filter(|sector| !clean_sector_ids.contains(&sector.sector_id))
+        .map(|sector| sector.sector_id.clone())
+        .collect()
 }
 
 fn load_file_artifact_with_tracking(
@@ -630,6 +744,94 @@ pub fn save_sector_bm25_shard(
         &sector_bm25_shard_cache_path(cache_base, root, sector_id, shard_key),
         index,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use tempfile::tempdir;
+
+    use super::*;
+
+    fn write_breadcrumb_corpus(root: &Path) {
+        std::fs::write(root.join("alpha.txt"), "alpha retrieval cache sector").expect("alpha");
+        std::fs::write(root.join("beta.txt"), "beta retrieval cache sector").expect("beta");
+        std::fs::write(root.join("gamma.txt"), "gamma retrieval cache sector").expect("gamma");
+    }
+
+    #[test]
+    fn persists_breadcrumb_journal_during_dirty_sector_rebuild() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_breadcrumb_corpus(corpus.path());
+
+        let telemetry = crate::system::Telemetry::new();
+        load_search_corpus(
+            corpus.path(),
+            None,
+            0,
+            None,
+            &telemetry,
+            &[],
+            Some(cache.path()),
+        )
+        .expect("initial load");
+
+        std::fs::write(
+            corpus.path().join("alpha.txt"),
+            "alpha retrieval cache sector changed",
+        )
+        .expect("rewrite dirty file");
+
+        let file_paths = collect_file_paths(corpus.path(), None);
+        let cache_paths = CachePaths::for_root(cache.path(), corpus.path());
+        let mut manifest = Manifest::load(&cache_paths.manifest_path).expect("manifest");
+        let mut processed = 0usize;
+        let mut checkpoint_calls = 0usize;
+        let mut hooks = RebuildHooks {
+            after_breadcrumb_checkpoint: Some(&mut |journal| {
+                checkpoint_calls += 1;
+                if journal
+                    .active_sector
+                    .as_ref()
+                    .is_some_and(|active| active.next_member_offset >= 1)
+                {
+                    return Err(anyhow::anyhow!("interrupt for breadcrumb test"));
+                }
+                Ok(())
+            }),
+        };
+
+        let error = load_file_artifacts_with_sector_cache_impl(
+            corpus.path(),
+            &file_paths,
+            &mut manifest,
+            cache.path(),
+            &cache_paths,
+            &telemetry,
+            &mut || {
+                processed += 1;
+            },
+            &mut hooks,
+        )
+        .expect_err("should interrupt after breadcrumb checkpoint");
+        assert!(error.to_string().contains("interrupt for breadcrumb test"));
+        assert!(checkpoint_calls >= 2);
+        assert!(processed >= 1);
+        assert!(processed < file_paths.len());
+
+        let journal = BreadcrumbJournal::load_for_root(cache.path(), corpus.path())
+            .expect("load breadcrumb journal")
+            .expect("breadcrumb journal should exist");
+        assert!(!journal.run_id.is_empty());
+        assert!(!journal.dirty_sectors.is_empty());
+        assert!(journal.updated_at_unix_secs > 0);
+        assert!(journal.completed_sectors.is_empty());
+        let active = journal
+            .active_sector
+            .expect("active sector should be recorded");
+        assert_eq!(active.next_member_offset, 1);
+        assert!(active.sector_member_count >= active.next_member_offset);
+    }
 }
 
 fn load_file_artifact(
