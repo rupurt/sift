@@ -53,6 +53,14 @@
 
         cargoToml = (builtins.fromTOML (builtins.readFile ./Cargo.toml));
         version = cargoToml.package.version;
+        cargoOutputHashes = {
+          "candle-core-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
+          "candle-nn-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
+          "candle-transformers-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
+          "candle-kernels-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
+          "candle-ug-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
+          "metamorph-0.1.0" = "sha256-sGl4+khLHI2k4gX/jikg9ZcVDknQNKXYWHuV2uZtnCc=";
+        };
 
         siftPkg = pkgs.rustPlatform.buildRustPackage {
           pname = "sift";
@@ -60,13 +68,7 @@
           src = ./.;
           cargoLock = {
             lockFile = ./Cargo.lock;
-            outputHashes = {
-              "candle-core-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
-              "candle-nn-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
-              "candle-transformers-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
-              "candle-kernels-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
-              "candle-ug-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
-            };
+            outputHashes = cargoOutputHashes;
           };
           nativeBuildInputs = [ pkgs.pkg-config ] ++ pkgs.lib.optionals isLinux [ cudaToolkit ];
           buildInputs = [ pkgs.bzip2 pkgs.xz pkgs.zlib ] ++ pkgs.lib.optionals isLinux [ cudaToolkit ];
@@ -86,13 +88,7 @@
           src = ./.;
           cargoLock = {
             lockFile = ./Cargo.lock;
-            outputHashes = {
-              "candle-core-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
-              "candle-nn-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
-              "candle-transformers-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
-              "candle-kernels-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
-              "candle-ug-0.9.2" = "sha256-Oa62yRA95P/MsGUG2u10a/jgcRtUdVFOQIoykqmv4Bs=";
-            };
+            outputHashes = cargoOutputHashes;
           };
           nativeBuildInputs = [ pkgs.pkg-config ] ++ pkgs.lib.optionals isLinux [ cudaToolkit ];
           buildInputs = [ pkgs.bzip2 pkgs.xz pkgs.zlib ] ++ pkgs.lib.optionals isLinux [ cudaToolkit ];
