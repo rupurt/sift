@@ -1,13 +1,15 @@
 ---
 # system-managed
 id: VFnC94a5Y
-status: active
+status: verified
 created_at: 2026-04-03T21:17:10
-updated_at: 2026-04-03T21:21:16
+updated_at: 2026-04-03T21:30:26
 # authored
 title: Build Sector-Aware Frontier Search Cache Reuse
 watch: ~
 activated_at: 2026-04-03T21:21:16
+achieved_at: 2026-04-03T21:30:26
+verified_at: 2026-04-03T21:30:26
 ---
 
 # Build Sector-Aware Frontier Search Cache Reuse

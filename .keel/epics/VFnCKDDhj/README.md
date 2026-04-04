@@ -22,8 +22,8 @@ mission: VFnC94a5Y
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/1 voyages complete, 0/4 stories done
+**Progress:** 1/1 voyages complete, 4/4 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Plan Sector Maps Frontier Ledgers And Breadcrumb Journals](voyages/VFnCTN04l/) | planned | 0/4 |
+| [Plan Sector Maps Frontier Ledgers And Breadcrumb Journals](voyages/VFnCTN04l/) | done | 4/4 |
 <!-- END GENERATED -->
