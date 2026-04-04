@@ -16,6 +16,8 @@ pub struct Telemetry {
     pub sector_rebuilds: AtomicUsize,
     pub sector_shard_cache_hits: AtomicUsize,
     pub sector_shard_builds: AtomicUsize,
+    pub breadcrumb_resume_hits: AtomicUsize,
+    pub breadcrumb_recovery_discards: AtomicUsize,
 }
 
 impl Default for Telemetry {
@@ -40,6 +42,8 @@ impl Telemetry {
             sector_rebuilds: AtomicUsize::new(0),
             sector_shard_cache_hits: AtomicUsize::new(0),
             sector_shard_builds: AtomicUsize::new(0),
+            breadcrumb_resume_hits: AtomicUsize::new(0),
+            breadcrumb_recovery_discards: AtomicUsize::new(0),
         }
     }
 
@@ -57,6 +61,9 @@ impl Telemetry {
         self.sector_rebuilds.store(0, Ordering::Relaxed);
         self.sector_shard_cache_hits.store(0, Ordering::Relaxed);
         self.sector_shard_builds.store(0, Ordering::Relaxed);
+        self.breadcrumb_resume_hits.store(0, Ordering::Relaxed);
+        self.breadcrumb_recovery_discards
+            .store(0, Ordering::Relaxed);
     }
 
     pub fn heuristic_hit_rate(&self) -> f64 {
@@ -109,6 +116,12 @@ impl Clone for Telemetry {
                 self.sector_shard_cache_hits.load(Ordering::Relaxed),
             ),
             sector_shard_builds: AtomicUsize::new(self.sector_shard_builds.load(Ordering::Relaxed)),
+            breadcrumb_resume_hits: AtomicUsize::new(
+                self.breadcrumb_resume_hits.load(Ordering::Relaxed),
+            ),
+            breadcrumb_recovery_discards: AtomicUsize::new(
+                self.breadcrumb_recovery_discards.load(Ordering::Relaxed),
+            ),
         }
     }
 }
@@ -138,6 +151,10 @@ impl PartialEq for Telemetry {
                 == other.sector_shard_cache_hits.load(Ordering::Relaxed)
             && self.sector_shard_builds.load(Ordering::Relaxed)
                 == other.sector_shard_builds.load(Ordering::Relaxed)
+            && self.breadcrumb_resume_hits.load(Ordering::Relaxed)
+                == other.breadcrumb_resume_hits.load(Ordering::Relaxed)
+            && self.breadcrumb_recovery_discards.load(Ordering::Relaxed)
+                == other.breadcrumb_recovery_discards.load(Ordering::Relaxed)
     }
 }
 

@@ -8,11 +8,11 @@ use anyhow::{Context, Result, bail};
 use walkdir::WalkDir;
 
 use crate::cache::{
-    ActiveBreadcrumbSector, BreadcrumbJournal, CacheEntry, Manifest, SectorLexicalShardFormat,
-    SectorLexicalShardRef, SectorMap, SectorMemberInput, SectorPartitionStrategy, corpus_cache_key,
-    get_file_heuristics, hash_file, load_blob, load_locked_bincode, resolve_compatible_cache_path,
-    resolve_sector_member_path, save_blob, save_locked_bincode, sector_bm25_shard_cache_path,
-    sector_relative_path,
+    ActiveBreadcrumbSector, BREADCRUMB_SCHEMA_VERSION, BreadcrumbJournal, CacheEntry, Manifest,
+    SectorLexicalShardFormat, SectorLexicalShardRef, SectorMap, SectorMemberInput,
+    SectorPartitionStrategy, corpus_cache_key, get_file_heuristics, hash_file, load_blob,
+    load_locked_bincode, resolve_compatible_cache_path, resolve_sector_member_path, save_blob,
+    save_locked_bincode, sector_bm25_shard_cache_path, sector_relative_path,
 };
 use blake3::Hasher;
 
@@ -440,35 +440,85 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
     }
 
     let dirty_sector_ids = load_dirty_sector_ids(&provisional_map, &clean_sector_ids);
-    let mut breadcrumb = if dirty_sector_ids.is_empty() {
-        None
-    } else {
-        Some(BreadcrumbJournal::new(
+    let mut breadcrumb = load_resumable_breadcrumb_journal(
+        root,
+        cache_base,
+        cache_paths,
+        &provisional_map,
+        &dirty_sector_ids,
+        telemetry,
+    )?;
+    if breadcrumb.is_none() && !dirty_sector_ids.is_empty() {
+        breadcrumb = Some(BreadcrumbJournal::new(
             provisional_map.corpus_key.clone(),
             generate_breadcrumb_run_id(),
-            dirty_sector_ids,
-        ))
-    };
+            dirty_sector_ids.clone(),
+        ));
+    }
+    let resumed_completed_sector_ids = breadcrumb
+        .as_ref()
+        .map(|journal| {
+            journal
+                .completed_sectors
+                .iter()
+                .cloned()
+                .collect::<HashSet<_>>()
+        })
+        .unwrap_or_default();
+    let resumed_active_sector = breadcrumb
+        .as_ref()
+        .and_then(|journal| journal.active_sector.clone());
 
     for sector in provisional_map
         .sectors
         .iter()
         .filter(|sector| !clean_sector_ids.contains(&sector.sector_id))
     {
-        if let Some(journal) = breadcrumb.as_mut() {
+        if resumed_completed_sector_ids.contains(&sector.sector_id) {
+            for artifact in load_sector_artifacts_from_cache(&cache_paths.blobs_dir, sector)? {
+                record_loaded_artifact(&mut file_artifacts, artifact, telemetry);
+                on_processed();
+            }
+            continue;
+        }
+
+        let resume_offset = if resumed_active_sector
+            .as_ref()
+            .is_some_and(|active| active.sector_id == sector.sector_id)
+        {
+            let offset = resumed_active_sector
+                .as_ref()
+                .map(|active| active.next_member_offset)
+                .unwrap_or_default();
+            for artifact in
+                load_sector_artifacts_from_cache_prefix(&cache_paths.blobs_dir, sector, offset)?
+            {
+                record_loaded_artifact(&mut file_artifacts, artifact, telemetry);
+                on_processed();
+            }
+            offset
+        } else {
+            0
+        };
+
+        if let Some(journal) = breadcrumb.as_mut()
+            && !resumed_active_sector
+                .as_ref()
+                .is_some_and(|active| active.sector_id == sector.sector_id)
+        {
             journal.active_sector = Some(ActiveBreadcrumbSector {
                 sector_id: sector.sector_id.clone(),
-                next_member_offset: 0,
+                next_member_offset: resume_offset,
                 next_member_relative_path: sector
                     .proofs
-                    .first()
+                    .get(resume_offset)
                     .map(|proof| proof.relative_path.clone()),
                 sector_member_count: sector.proofs.len(),
             });
             checkpoint_breadcrumb(journal, cache_base, root, hooks)?;
         }
 
-        for (member_index, proof) in sector.proofs.iter().enumerate() {
+        for (member_index, proof) in sector.proofs.iter().enumerate().skip(resume_offset) {
             let path = tracked_candidates
                 .get(&proof.relative_path)
                 .map(|candidate| candidate.path.clone())
@@ -481,6 +531,7 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
                 telemetry,
                 &mut file_artifacts,
             );
+            persist_manifest_checkpoint(manifest, cache_paths)?;
             if let Some(journal) = breadcrumb.as_mut() {
                 if let Some(active) = journal.active_sector.as_mut() {
                     active.next_member_offset = member_index + 1;
@@ -567,6 +618,146 @@ fn load_dirty_sector_ids(
         .filter(|sector| !clean_sector_ids.contains(&sector.sector_id))
         .map(|sector| sector.sector_id.clone())
         .collect()
+}
+
+fn load_resumable_breadcrumb_journal(
+    root: &Path,
+    cache_base: &Path,
+    cache_paths: &CachePaths,
+    provisional_map: &SectorMap,
+    dirty_sector_ids: &[String],
+    telemetry: &crate::system::Telemetry,
+) -> Result<Option<BreadcrumbJournal>> {
+    let journal = match BreadcrumbJournal::load_for_root(cache_base, root) {
+        Ok(journal) => journal,
+        Err(error) => {
+            tracing::warn!(
+                error = %error,
+                "discarding unreadable breadcrumb journal before sector rebuild"
+            );
+            discard_breadcrumb_journal(cache_base, root, telemetry)?;
+            return Ok(None);
+        }
+    };
+    let Some(journal) = journal else {
+        return Ok(None);
+    };
+
+    if let Err(reason) = validate_breadcrumb_journal(
+        &journal,
+        provisional_map,
+        dirty_sector_ids,
+        &cache_paths.blobs_dir,
+    ) {
+        tracing::warn!(
+            reason,
+            "discarding incompatible breadcrumb journal before sector rebuild"
+        );
+        discard_breadcrumb_journal(cache_base, root, telemetry)?;
+        return Ok(None);
+    }
+
+    telemetry
+        .breadcrumb_resume_hits
+        .fetch_add(1, Ordering::Relaxed);
+    Ok(Some(journal))
+}
+
+fn discard_breadcrumb_journal(
+    cache_base: &Path,
+    root: &Path,
+    telemetry: &crate::system::Telemetry,
+) -> Result<()> {
+    telemetry
+        .breadcrumb_recovery_discards
+        .fetch_add(1, Ordering::Relaxed);
+    BreadcrumbJournal::clear_for_root(cache_base, root)
+}
+
+fn validate_breadcrumb_journal(
+    journal: &BreadcrumbJournal,
+    provisional_map: &SectorMap,
+    dirty_sector_ids: &[String],
+    blobs_dir: &Path,
+) -> std::result::Result<(), String> {
+    if journal.schema_version != BREADCRUMB_SCHEMA_VERSION {
+        return Err(format!(
+            "schema version mismatch: {} != {}",
+            journal.schema_version, BREADCRUMB_SCHEMA_VERSION
+        ));
+    }
+    if journal.corpus_key != provisional_map.corpus_key {
+        return Err("corpus key mismatch".to_string());
+    }
+    if journal.is_stale(current_unix_secs()) {
+        return Err("breadcrumb journal is stale".to_string());
+    }
+    if journal.dirty_sectors != dirty_sector_ids {
+        return Err("dirty sector set mismatch".to_string());
+    }
+    if journal.completed_sectors.len() > dirty_sector_ids.len() {
+        return Err("completed sectors exceed dirty sector count".to_string());
+    }
+    if journal.completed_sectors.as_slice() != &dirty_sector_ids[..journal.completed_sectors.len()]
+    {
+        return Err("completed sectors do not match the dirty sector prefix".to_string());
+    }
+
+    let sectors_by_id = provisional_map
+        .sectors
+        .iter()
+        .map(|sector| (sector.sector_id.as_str(), sector))
+        .collect::<HashMap<_, _>>();
+
+    for sector_id in &journal.completed_sectors {
+        let Some(sector) = sectors_by_id.get(sector_id.as_str()) else {
+            return Err(format!("completed sector {sector_id} is not present"));
+        };
+        ensure_cached_sector_artifacts_available(blobs_dir, sector, sector.proofs.len())?;
+    }
+
+    let Some(active) = journal.active_sector.as_ref() else {
+        return Ok(());
+    };
+    if dirty_sector_ids.get(journal.completed_sectors.len()) != Some(&active.sector_id) {
+        return Err("active sector does not follow the completed prefix".to_string());
+    }
+
+    let Some(sector) = sectors_by_id.get(active.sector_id.as_str()) else {
+        return Err(format!("active sector {} is not present", active.sector_id));
+    };
+    if active.sector_member_count != sector.proofs.len() {
+        return Err("active sector member count changed".to_string());
+    }
+    if active.next_member_offset > sector.proofs.len() {
+        return Err("active sector offset is out of range".to_string());
+    }
+    let expected_next_path = sector
+        .proofs
+        .get(active.next_member_offset)
+        .map(|proof| proof.relative_path.clone());
+    if active.next_member_relative_path != expected_next_path {
+        return Err("active sector next member path mismatch".to_string());
+    }
+    ensure_cached_sector_artifacts_available(blobs_dir, sector, active.next_member_offset)
+}
+
+fn ensure_cached_sector_artifacts_available(
+    blobs_dir: &Path,
+    sector: &crate::cache::SectorRecord,
+    count: usize,
+) -> std::result::Result<(), String> {
+    if count == 0 {
+        return Ok(());
+    }
+
+    load_sector_artifacts_from_cache_prefix(blobs_dir, sector, count)
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
+fn persist_manifest_checkpoint(manifest: &Manifest, cache_paths: &CachePaths) -> Result<()> {
+    manifest.save(&cache_paths.manifest_path)
 }
 
 fn load_file_artifact_with_tracking(
@@ -704,9 +895,18 @@ fn load_sector_artifacts_from_cache(
     blobs_dir: &Path,
     sector: &crate::cache::SectorRecord,
 ) -> Result<Vec<ContextArtifact>> {
+    load_sector_artifacts_from_cache_prefix(blobs_dir, sector, sector.proofs.len())
+}
+
+fn load_sector_artifacts_from_cache_prefix(
+    blobs_dir: &Path,
+    sector: &crate::cache::SectorRecord,
+    count: usize,
+) -> Result<Vec<ContextArtifact>> {
     sector
         .proofs
         .iter()
+        .take(count)
         .map(|proof| load_blob(blobs_dir, &proof.artifact_blob_key))
         .collect()
 }
@@ -748,14 +948,25 @@ pub fn save_sector_bm25_shard(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::atomic::Ordering;
+
     use tempfile::tempdir;
 
     use super::*;
+    use crate::cache::{BREADCRUMB_STALE_AFTER_SECS, breadcrumb_cache_path};
 
     fn write_breadcrumb_corpus(root: &Path) {
         std::fs::write(root.join("alpha.txt"), "alpha retrieval cache sector").expect("alpha");
         std::fs::write(root.join("beta.txt"), "beta retrieval cache sector").expect("beta");
         std::fs::write(root.join("gamma.txt"), "gamma retrieval cache sector").expect("gamma");
+    }
+
+    fn write_resume_corpus(root: &Path) {
+        for index in 0..64 {
+            let name = format!("doc-{index:02}.txt");
+            let contents = format!("retrieval breadcrumb sector document {index}");
+            std::fs::write(root.join(name), contents).expect("write resume corpus file");
+        }
     }
 
     #[test]
@@ -831,6 +1042,250 @@ mod tests {
             .expect("active sector should be recorded");
         assert_eq!(active.next_member_offset, 1);
         assert!(active.sector_member_count >= active.next_member_offset);
+    }
+
+    #[test]
+    fn resumes_interrupted_dirty_sector_rebuilds_from_breadcrumb_state() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_resume_corpus(corpus.path());
+
+        let initial_telemetry = crate::system::Telemetry::new();
+        load_search_corpus(
+            corpus.path(),
+            None,
+            0,
+            None,
+            &initial_telemetry,
+            &[],
+            Some(cache.path()),
+        )
+        .expect("initial load");
+
+        let before = SectorMap::load_for_root(cache.path(), corpus.path()).expect("sector map");
+        assert!(before.sectors.len() > 1);
+        let dirty_sector = before
+            .sectors
+            .iter()
+            .find(|sector| sector.proofs.len() > 1)
+            .expect("sector with multiple members");
+        let changed_path = resolve_sector_member_path(
+            corpus.path(),
+            &dirty_sector
+                .proofs
+                .first()
+                .expect("dirty proof")
+                .relative_path,
+        );
+        std::fs::write(
+            &changed_path,
+            "retrieval breadcrumb sector document changed to force rebuild",
+        )
+        .expect("rewrite dirty file");
+
+        let file_paths = collect_file_paths(corpus.path(), None);
+        let cache_paths = CachePaths::for_root(cache.path(), corpus.path());
+        let mut manifest = Manifest::load(&cache_paths.manifest_path).expect("manifest");
+        let interrupted_telemetry = crate::system::Telemetry::new();
+        let mut hooks = RebuildHooks {
+            after_breadcrumb_checkpoint: Some(&mut |journal| {
+                if journal
+                    .active_sector
+                    .as_ref()
+                    .is_some_and(|active| active.next_member_offset >= 1)
+                {
+                    return Err(anyhow::anyhow!("interrupt for breadcrumb resume test"));
+                }
+                Ok(())
+            }),
+        };
+
+        let error = load_file_artifacts_with_sector_cache_impl(
+            corpus.path(),
+            &file_paths,
+            &mut manifest,
+            cache.path(),
+            &cache_paths,
+            &interrupted_telemetry,
+            &mut || {},
+            &mut hooks,
+        )
+        .expect_err("should interrupt dirty rebuild");
+        assert!(
+            error
+                .to_string()
+                .contains("interrupt for breadcrumb resume test")
+        );
+
+        let resumed_telemetry = crate::system::Telemetry::new();
+        let loaded = load_search_corpus(
+            corpus.path(),
+            None,
+            0,
+            None,
+            &resumed_telemetry,
+            &[],
+            Some(cache.path()),
+        )
+        .expect("resume from breadcrumb");
+
+        assert_eq!(loaded.indexed_artifacts, file_paths.len());
+        assert_eq!(
+            resumed_telemetry
+                .breadcrumb_resume_hits
+                .load(Ordering::Relaxed),
+            1
+        );
+        assert_eq!(
+            resumed_telemetry
+                .breadcrumb_recovery_discards
+                .load(Ordering::Relaxed),
+            0
+        );
+        assert!(resumed_telemetry.sector_cache_hits.load(Ordering::Relaxed) > 0);
+        assert!(
+            BreadcrumbJournal::load_for_root(cache.path(), corpus.path())
+                .expect("load breadcrumb after resume")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn discards_stale_breadcrumb_journal_before_restart() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_resume_corpus(corpus.path());
+
+        let initial_telemetry = crate::system::Telemetry::new();
+        load_search_corpus(
+            corpus.path(),
+            None,
+            0,
+            None,
+            &initial_telemetry,
+            &[],
+            Some(cache.path()),
+        )
+        .expect("initial load");
+
+        let sector_map = SectorMap::load_for_root(cache.path(), corpus.path()).expect("sector map");
+        let dirty_sector = sector_map
+            .sectors
+            .iter()
+            .find(|sector| !sector.proofs.is_empty())
+            .expect("dirty sector");
+        let changed_path = resolve_sector_member_path(
+            corpus.path(),
+            &dirty_sector
+                .proofs
+                .first()
+                .expect("dirty proof")
+                .relative_path,
+        );
+        std::fs::write(&changed_path, "retrieval breadcrumb stale journal change")
+            .expect("rewrite dirty file");
+
+        let mut journal = BreadcrumbJournal::new(
+            corpus_cache_key(corpus.path()),
+            "stale-run".to_string(),
+            vec![dirty_sector.sector_id.clone()],
+        );
+        journal.updated_at_unix_secs = current_unix_secs() - BREADCRUMB_STALE_AFTER_SECS - 1;
+        journal
+            .save_for_root(cache.path(), corpus.path())
+            .expect("save stale breadcrumb");
+
+        let telemetry = crate::system::Telemetry::new();
+        load_search_corpus(
+            corpus.path(),
+            None,
+            0,
+            None,
+            &telemetry,
+            &[],
+            Some(cache.path()),
+        )
+        .expect("load after stale breadcrumb");
+
+        assert_eq!(telemetry.breadcrumb_resume_hits.load(Ordering::Relaxed), 0);
+        assert_eq!(
+            telemetry
+                .breadcrumb_recovery_discards
+                .load(Ordering::Relaxed),
+            1
+        );
+        assert!(
+            BreadcrumbJournal::load_for_root(cache.path(), corpus.path())
+                .expect("load breadcrumb after stale discard")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn discards_corrupt_breadcrumb_journal_before_restart() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_resume_corpus(corpus.path());
+
+        let initial_telemetry = crate::system::Telemetry::new();
+        load_search_corpus(
+            corpus.path(),
+            None,
+            0,
+            None,
+            &initial_telemetry,
+            &[],
+            Some(cache.path()),
+        )
+        .expect("initial load");
+
+        let sector_map = SectorMap::load_for_root(cache.path(), corpus.path()).expect("sector map");
+        let dirty_sector = sector_map
+            .sectors
+            .iter()
+            .find(|sector| !sector.proofs.is_empty())
+            .expect("dirty sector");
+        let changed_path = resolve_sector_member_path(
+            corpus.path(),
+            &dirty_sector
+                .proofs
+                .first()
+                .expect("dirty proof")
+                .relative_path,
+        );
+        std::fs::write(&changed_path, "retrieval breadcrumb corrupt journal change")
+            .expect("rewrite dirty file");
+
+        let path = breadcrumb_cache_path(cache.path(), corpus.path());
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).expect("create breadcrumb parent");
+        }
+        std::fs::write(&path, b"not-bincode").expect("write corrupt breadcrumb");
+
+        let telemetry = crate::system::Telemetry::new();
+        load_search_corpus(
+            corpus.path(),
+            None,
+            0,
+            None,
+            &telemetry,
+            &[],
+            Some(cache.path()),
+        )
+        .expect("load after corrupt breadcrumb");
+
+        assert_eq!(telemetry.breadcrumb_resume_hits.load(Ordering::Relaxed), 0);
+        assert_eq!(
+            telemetry
+                .breadcrumb_recovery_discards
+                .load(Ordering::Relaxed),
+            1
+        );
+        assert!(
+            BreadcrumbJournal::load_for_root(cache.path(), corpus.path())
+                .expect("load breadcrumb after corrupt discard")
+                .is_none()
+        );
     }
 }
 

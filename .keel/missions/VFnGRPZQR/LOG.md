@@ -28,3 +28,10 @@
 - Completed breadcrumb persistence story `VFnGb6Nq5`.
 - Added `src/cache/breadcrumb.rs` for persisted rebuild journals keyed under the existing cache root and wired dirty-sector rebuild checkpoints through `src/search/corpus.rs`.
 - Added focused breadcrumb persistence tests and re-ran the full workspace test suite with `cargo test`.
+
+## 2026-04-03T22:29:26-07:00
+
+- Completed story `VFnGb6Xq1` for startup breadcrumb resume and recovery.
+- Updated `src/search/corpus.rs` to persist manifest checkpoints during dirty-sector rebuilds, validate saved breadcrumb journals on startup, resume completed and partially processed sectors from cached blobs, and discard stale or corrupt journals safely.
+- Extended `src/system.rs`, `src/search/domain.rs`, and `src/main.rs` with breadcrumb resume and recovery telemetry so both library embedders and the interactive CLI can observe indexing restart behavior.
+- Added restart regression tests for resume, stale-journal discard, and corrupt-journal discard, then re-ran the full workspace with `cargo test`.

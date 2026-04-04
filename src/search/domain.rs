@@ -1925,6 +1925,8 @@ pub struct SearchTelemetry {
     pub sector_rebuilds: usize,
     pub sector_shard_cache_hits: usize,
     pub sector_shard_builds: usize,
+    pub breadcrumb_resume_hits: usize,
+    pub breadcrumb_recovery_discards: usize,
 }
 
 impl SearchTelemetry {
@@ -1943,6 +1945,10 @@ impl SearchTelemetry {
             sector_rebuilds: telemetry.sector_rebuilds.load(Ordering::Relaxed),
             sector_shard_cache_hits: telemetry.sector_shard_cache_hits.load(Ordering::Relaxed),
             sector_shard_builds: telemetry.sector_shard_builds.load(Ordering::Relaxed),
+            breadcrumb_resume_hits: telemetry.breadcrumb_resume_hits.load(Ordering::Relaxed),
+            breadcrumb_recovery_discards: telemetry
+                .breadcrumb_recovery_discards
+                .load(Ordering::Relaxed),
         }
     }
 }

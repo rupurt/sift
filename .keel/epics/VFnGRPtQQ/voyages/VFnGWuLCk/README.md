@@ -27,10 +27,10 @@ started_at: 2026-04-03T22:17:37
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 1/2 stories complete
+**Progress:** 2/2 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
 | [Persist Breadcrumb Journals During Sector Rebuilds](../../../../stories/VFnGb6Nq5/README.md) | feat | done |
-| [Resume Interrupted Sector Rebuilds On Startup](../../../../stories/VFnGb6Xq1/README.md) | feat | backlog |
+| [Resume Interrupted Sector Rebuilds On Startup](../../../../stories/VFnGb6Xq1/README.md) | feat | done |
 <!-- END GENERATED -->
