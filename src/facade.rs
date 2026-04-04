@@ -23,9 +23,8 @@ use crate::search::{
     SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode,
     SearchEnvironment, SearchPhase, SearchPlan, SearchProgress, SearchRequest, SearchResponse,
     SearchServiceBuilder, SearchTelemetry, SearchTrace, SearchTurn, SearchTurnRequest,
-    SearchTurnResponse, SearchTurnTrace, StrategyPresetRegistry, load_search_corpus_with_progress,
-    replay_graph_decision, replay_graph_trace, run_search_with_plan,
-    run_search_with_plan_and_progress,
+    SearchTurnResponse, SearchTurnTrace, StrategyPresetRegistry, replay_graph_decision,
+    replay_graph_trace, run_search_with_plan, run_search_with_plan_and_progress,
 };
 use crate::system::Telemetry;
 
@@ -412,24 +411,15 @@ impl Sift {
                 .flat_map(|turn| turn.local_context.clone())
                 .collect(),
         );
-        let env_request = self.build_turn_search_request(first_turn, &request.plan);
+        let mut env_request = self.build_turn_search_request(first_turn, &request.plan);
+        env_request.local_context = merged_local_context;
         let dense_model = env_request.dense_model.clone();
         let embedder = self.resolve_embedder_for_plan(&request.plan, &dense_model)?;
-        let corpus = load_search_corpus_with_progress(
-            &first_turn.path,
+        let prepared = crate::search::application::prepare_search_runtime_with_progress(
+            &env_request,
             self.ignore.as_ref(),
-            first_turn.verbose,
-            embedder.as_deref(),
-            &self.telemetry,
-            &merged_local_context,
-            self.cache_dir.as_deref(),
-            progress.as_ref().map(|f| |p: &SearchProgress| f(p)),
-        )?;
-        let index = crate::search::application::prepare_bm25_index(
-            &first_turn.path,
-            &corpus,
-            self.cache_dir.as_deref(),
-            &self.telemetry,
+            &LocalFileCorpusRepository,
+            embedder.clone(),
             progress
                 .as_ref()
                 .map(|callback| callback as &dyn Fn(&SearchProgress)),
@@ -438,13 +428,12 @@ impl Sift {
         let env = SearchEnvironment::new_with_plan(
             &env_request,
             request.plan.clone(),
-            &corpus,
-            &index,
+            &prepared.corpus,
+            &prepared.index,
             embedder,
             llm_reranker,
         )?;
-
-        let total_chunks: usize = corpus.artifacts.iter().map(|a| a.segments.len()).sum();
+        let total_chunks = prepared.total_chunks;
 
         let mut state = request.state.clone();
         let mut turn_responses = Vec::new();
@@ -1789,6 +1778,17 @@ mod tests {
             .with_options(SearchOptions::default().with_strategy("bm25").with_limit(5))
     }
 
+    fn bm25_controller_request(root: &Path) -> SearchControllerRequest {
+        let plan = StrategyPresetRegistry::default_registry()
+            .resolve("bm25")
+            .expect("bm25 plan");
+        SearchControllerRequest::new(plan, vec![SearchTurnRequest::new(root, "alpha retrieval")])
+    }
+
+    fn bm25_autonomous_request(root: &Path) -> AutonomousSearchRequest {
+        AutonomousSearchRequest::new(root, "alpha retrieval").with_strategy("bm25")
+    }
+
     #[test]
     fn direct_search_with_progress_emits_indexing_and_ranking() {
         let corpus = tempdir().expect("temp corpus");
@@ -1985,13 +1985,7 @@ mod tests {
         let cache = tempdir().expect("temp cache");
         write_test_corpus(corpus.path());
 
-        let plan = StrategyPresetRegistry::default_registry()
-            .resolve("bm25")
-            .expect("bm25 plan");
-        let request = SearchControllerRequest::new(
-            plan,
-            vec![SearchTurnRequest::new(corpus.path(), "alpha retrieval")],
-        );
+        let request = bm25_controller_request(corpus.path());
 
         let first = Sift::builder()
             .without_ignore()
@@ -2011,5 +2005,62 @@ mod tests {
             .search_controller(request)
             .expect("second controller search");
         assert!(second.telemetry_snapshot().bm25_index_cache_hits > 0);
+    }
+
+    #[test]
+    fn search_controller_reuses_clean_sectors_on_warm_restart() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_sector_test_corpus(corpus.path());
+        let request = bm25_controller_request(corpus.path());
+
+        let first = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        first
+            .search_controller(request.clone())
+            .expect("first controller search");
+
+        let second = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        second
+            .search_controller(request)
+            .expect("second controller search");
+
+        let telemetry = second.telemetry_snapshot();
+        assert!(telemetry.sector_cache_hits > 0);
+        assert_eq!(telemetry.fresh_artifact_builds, 0);
+        assert!(telemetry.bm25_index_cache_hits > 0);
+    }
+
+    #[test]
+    fn autonomous_search_reuses_clean_sectors_on_warm_restart() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_sector_test_corpus(corpus.path());
+        let request = bm25_autonomous_request(corpus.path());
+
+        let first = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        first
+            .search_autonomous(request.clone())
+            .expect("first autonomous search");
+
+        let second = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        second
+            .search_autonomous(request)
+            .expect("second autonomous search");
+
+        let telemetry = second.telemetry_snapshot();
+        assert!(telemetry.sector_cache_hits > 0);
+        assert!(telemetry.bm25_index_cache_hits > 0);
     }
 }

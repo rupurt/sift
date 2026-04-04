@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-04-03T22:34:16.550130957-07:00
+mode: manual
+---
+Consolidated controller startup onto src/search/application.rs::prepare_search_runtime_with_progress so direct search, controller, autonomous linear mode, and the shared cache substrate all derive corpus loading and BM25 preparation from one authority.

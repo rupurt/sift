@@ -35,3 +35,10 @@
 - Updated `src/search/corpus.rs` to persist manifest checkpoints during dirty-sector rebuilds, validate saved breadcrumb journals on startup, resume completed and partially processed sectors from cached blobs, and discard stale or corrupt journals safely.
 - Extended `src/system.rs`, `src/search/domain.rs`, and `src/main.rs` with breadcrumb resume and recovery telemetry so both library embedders and the interactive CLI can observe indexing restart behavior.
 - Added restart regression tests for resume, stale-journal discard, and corrupt-journal discard, then re-ran the full workspace with `cargo test`.
+
+## 2026-04-03T22:34:24-07:00
+
+- Completed story `VFnGb6hpt` to route controller and autonomous runtime startup through the shared sector-aware preparation seam.
+- Added `src/search/application.rs::prepare_search_runtime_with_progress` as the single authority for corpus loading and BM25 preparation, then switched `src/facade.rs` controller startup onto that helper so autonomous linear mode inherits the same cache reuse path.
+- Added warm-restart regression coverage for controller and autonomous library surfaces while preserving the shared CLI telemetry renderer contract.
+- Re-ran the full workspace test suite with `cargo test`.

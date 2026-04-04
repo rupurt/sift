@@ -386,14 +386,19 @@ pub fn run_search_with_plan(
     run_search_with_plan_and_progress(plan, request, ignore, repository, embedder, None)
 }
 
-pub fn run_search_with_plan_and_progress(
-    plan: &SearchPlan,
+pub(crate) struct PreparedSearchRuntime {
+    pub corpus: LoadedCorpus,
+    pub index: Bm25Index,
+    pub total_chunks: usize,
+}
+
+pub(crate) fn prepare_search_runtime_with_progress(
     request: &SearchRequest,
     ignore: Option<&Ignore>,
     repository: &dyn CorpusRepository,
     embedder: Option<Arc<dyn Embedder>>,
     progress: Option<&dyn Fn(&SearchProgress)>,
-) -> Result<SearchResponse> {
+) -> Result<PreparedSearchRuntime> {
     let verbose = request.verbose;
 
     let corpus_start = std::time::Instant::now();
@@ -427,6 +432,34 @@ pub fn run_search_with_plan_and_progress(
         &request.telemetry,
         progress,
     )?;
+
+    Ok(PreparedSearchRuntime {
+        corpus,
+        index,
+        total_chunks,
+    })
+}
+
+pub fn run_search_with_plan_and_progress(
+    plan: &SearchPlan,
+    request: &SearchRequest,
+    ignore: Option<&Ignore>,
+    repository: &dyn CorpusRepository,
+    embedder: Option<Arc<dyn Embedder>>,
+    progress: Option<&dyn Fn(&SearchProgress)>,
+) -> Result<SearchResponse> {
+    let prepared = prepare_search_runtime_with_progress(
+        request,
+        ignore,
+        repository,
+        embedder.clone(),
+        progress,
+    )?;
+    let PreparedSearchRuntime {
+        corpus,
+        index,
+        total_chunks,
+    } = prepared;
 
     let llm_reranker = SearchServiceBuilder::load_llm_reranker(plan, request)?;
 
