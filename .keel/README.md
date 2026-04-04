@@ -184,6 +184,15 @@
 |--------|--------|
 | [Plan Sector Maps Frontier Ledgers And Breadcrumb Journals](epics/VFnCKDDhj/voyages/VFnCTN04l/) | done |
 
+### [Implement Sector-Aware Frontier Search Cache Reuse](epics/VFnGRPtQQ/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Implement Resumable Sector Rebuild Journals](epics/VFnGRPtQQ/voyages/VFnGWuLCk/) | planned |
+| [Implement Sectorized Direct Search Reuse](epics/VFnGRPtQQ/voyages/VFnGWuRCh/) | planned |
+| [Adopt Sector Reuse Across Runtime Surfaces](epics/VFnGRPtQQ/voyages/VFnGWulCe/) | planned |
+| [Implement Frontier Coverage Search Semantics](epics/VFnGRPtQQ/voyages/VFnGWurCd/) | planned |
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |
