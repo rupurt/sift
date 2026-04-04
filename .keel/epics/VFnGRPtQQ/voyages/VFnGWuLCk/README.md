@@ -1,7 +1,7 @@
 ---
 # system-managed
 id: VFnGWuLCk
-status: in-progress
+status: done
 epic: VFnGRPtQQ
 created_at: 2026-04-03T21:34:35
 # authored
@@ -9,6 +9,7 @@ title: Implement Resumable Sector Rebuild Journals
 index: 1
 updated_at: 2026-04-03T21:41:37
 started_at: 2026-04-03T22:17:37
+completed_at: 2026-04-03T22:30:33
 ---
 
 # Implement Resumable Sector Rebuild Journals
@@ -22,6 +23,8 @@ started_at: 2026-04-03T22:17:37
 |----------|-------------|
 | [SRS.md](SRS.md) | Requirements and verification criteria |
 | [SDD.md](SDD.md) | Architecture and implementation details |
+| [VOYAGE_REPORT.md](VOYAGE_REPORT.md) | Narrative summary of implementation and evidence |
+| [COMPLIANCE_REPORT.md](COMPLIANCE_REPORT.md) | Traceability matrix and verification proof |
 <!-- END DOCUMENTS -->
 
 ## Stories

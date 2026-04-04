@@ -22,10 +22,10 @@ mission: VFnGRPZQR
 ## Voyages
 
 <!-- BEGIN GENERATED -->
-**Progress:** 1/4 voyages complete, 4/8 stories done
+**Progress:** 2/4 voyages complete, 4/8 stories done
 | Voyage | Status | Stories |
 |--------|--------|---------|
-| [Implement Resumable Sector Rebuild Journals](voyages/VFnGWuLCk/) | in-progress | 2/2 |
+| [Implement Resumable Sector Rebuild Journals](voyages/VFnGWuLCk/) | done | 2/2 |
 | [Implement Sectorized Direct Search Reuse](voyages/VFnGWuRCh/) | done | 2/2 |
 | [Adopt Sector Reuse Across Runtime Surfaces](voyages/VFnGWulCe/) | planned | 0/2 |
 | [Implement Frontier Coverage Search Semantics](voyages/VFnGWurCd/) | planned | 0/2 |
