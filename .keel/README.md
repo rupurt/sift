@@ -178,6 +178,12 @@
 |--------|--------|
 | [Indexing Progress And Incremental Reuse](epics/VFlF7aHQw/voyages/VFlFAS7rn/) | done |
 
+### [Design Sector Maps Breadcrumb Journals And Frontier Search Modes](epics/VFnCKDDhj/) (active)
+
+| Voyage | Status |
+|--------|--------|
+| [Plan Sector Maps Frontier Ledgers And Breadcrumb Journals](epics/VFnCKDDhj/voyages/VFnCTN04l/) | planned |
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |
