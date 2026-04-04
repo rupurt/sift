@@ -1,13 +1,14 @@
 ---
 # system-managed
 id: VFnGWurCd
-status: planned
+status: in-progress
 epic: VFnGRPtQQ
 created_at: 2026-04-03T21:34:35
 # authored
 title: Implement Frontier Coverage Search Semantics
 index: 4
 updated_at: 2026-04-03T21:41:39
+started_at: 2026-04-03T22:40:12
 ---
 
 # Implement Frontier Coverage Search Semantics
@@ -26,10 +27,10 @@ updated_at: 2026-04-03T21:41:39
 ## Stories
 
 <!-- BEGIN GENERATED -->
-**Progress:** 0/2 stories complete
+**Progress:** 1/2 stories complete
 
 | Title | Type | Status |
 |-------|------|--------|
 | [Surface Frontier Coverage Through Progress And Responses](../../../../stories/VFnGb6ypo/README.md) | feat | backlog |
-| [Add Frontier Ledger Rolling Sector Statistics](../../../../stories/VFnGb7HrI/README.md) | feat | backlog |
+| [Add Frontier Ledger Rolling Sector Statistics](../../../../stories/VFnGb7HrI/README.md) | feat | done |
 <!-- END GENERATED -->

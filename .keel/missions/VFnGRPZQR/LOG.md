@@ -49,3 +49,10 @@
 - Added end-to-end facade tests showing direct, controller, and autonomous surfaces can prepare sectors for one another through the same cache root, plus a bounded dirty-sector rebuild proof after cross-surface reuse.
 - Updated `README.md` and `LIBRARY.md` to describe the shared sector-aware cache semantics while keeping the positioning local-first and library-friendly.
 - Fixed the CLI agent integration tests to use per-test cache roots so the cross-process proofs stay stable under parallel execution, then re-ran the full workspace with `cargo test`.
+
+## 2026-04-03T22:45:38-07:00
+
+- Completed story `VFnGb7HrI` to add the frontier ledger substrate for rolling sector statistics.
+- Added `src/cache/frontier.rs` and a telemetry-held frontier snapshot so sector counts, reuse counts, dirty-sector counts, and active rebuild metadata are derived from the sector map and breadcrumb journal instead of a new file-state tracker.
+- Wired frontier updates through `src/search/corpus.rs` so warm sector mounts, dirty rebuild progress, and breadcrumb resume state transitions all refresh the ledger during direct-search preparation.
+- Added focused frontier tests plus corpus integration coverage, then re-ran the full workspace with `cargo test`.

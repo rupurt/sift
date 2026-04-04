@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::sync::RwLock;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -18,6 +19,8 @@ pub struct Telemetry {
     pub sector_shard_builds: AtomicUsize,
     pub breadcrumb_resume_hits: AtomicUsize,
     pub breadcrumb_recovery_discards: AtomicUsize,
+    #[serde(skip)]
+    pub frontier_ledger: RwLock<crate::cache::FrontierLedger>,
 }
 
 impl Default for Telemetry {
@@ -44,6 +47,7 @@ impl Telemetry {
             sector_shard_builds: AtomicUsize::new(0),
             breadcrumb_resume_hits: AtomicUsize::new(0),
             breadcrumb_recovery_discards: AtomicUsize::new(0),
+            frontier_ledger: RwLock::new(crate::cache::FrontierLedger::default()),
         }
     }
 
@@ -64,6 +68,24 @@ impl Telemetry {
         self.breadcrumb_resume_hits.store(0, Ordering::Relaxed);
         self.breadcrumb_recovery_discards
             .store(0, Ordering::Relaxed);
+        *self
+            .frontier_ledger
+            .write()
+            .expect("frontier ledger write lock") = crate::cache::FrontierLedger::default();
+    }
+
+    pub fn frontier_snapshot(&self) -> crate::cache::FrontierLedger {
+        self.frontier_ledger
+            .read()
+            .expect("frontier ledger read lock")
+            .clone()
+    }
+
+    pub fn replace_frontier_ledger(&self, frontier: crate::cache::FrontierLedger) {
+        *self
+            .frontier_ledger
+            .write()
+            .expect("frontier ledger write lock") = frontier;
     }
 
     pub fn heuristic_hit_rate(&self) -> f64 {
@@ -122,6 +144,7 @@ impl Clone for Telemetry {
             breadcrumb_recovery_discards: AtomicUsize::new(
                 self.breadcrumb_recovery_discards.load(Ordering::Relaxed),
             ),
+            frontier_ledger: RwLock::new(self.frontier_snapshot()),
         }
     }
 }
@@ -155,6 +178,7 @@ impl PartialEq for Telemetry {
                 == other.breadcrumb_resume_hits.load(Ordering::Relaxed)
             && self.breadcrumb_recovery_discards.load(Ordering::Relaxed)
                 == other.breadcrumb_recovery_discards.load(Ordering::Relaxed)
+            && self.frontier_snapshot() == other.frontier_snapshot()
     }
 }
 

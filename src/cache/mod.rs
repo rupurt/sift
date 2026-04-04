@@ -1,9 +1,11 @@
 pub mod breadcrumb;
+pub mod frontier;
 pub mod model;
 pub mod sector;
 pub mod store;
 
 pub use breadcrumb::*;
+pub use frontier::*;
 pub use model::*;
 pub use sector::*;
 pub use store::*;

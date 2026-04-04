@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-04-03T22:45:34.086470825-07:00
+mode: manual
+---
+Implemented FrontierLedger in src/cache/frontier.rs and updated it exclusively from sector-map and breadcrumb-derived state inside src/search/corpus.rs, without introducing a second file-state tracker or independent cache authority.

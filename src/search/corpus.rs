@@ -8,11 +8,11 @@ use anyhow::{Context, Result, bail};
 use walkdir::WalkDir;
 
 use crate::cache::{
-    ActiveBreadcrumbSector, BREADCRUMB_SCHEMA_VERSION, BreadcrumbJournal, CacheEntry, Manifest,
-    SectorLexicalShardFormat, SectorLexicalShardRef, SectorMap, SectorMemberInput,
-    SectorPartitionStrategy, corpus_cache_key, get_file_heuristics, hash_file, load_blob,
-    load_locked_bincode, resolve_compatible_cache_path, resolve_sector_member_path, save_blob,
-    save_locked_bincode, sector_bm25_shard_cache_path, sector_relative_path,
+    ActiveBreadcrumbSector, BREADCRUMB_SCHEMA_VERSION, BreadcrumbJournal, CacheEntry,
+    FrontierLedger, Manifest, SectorLexicalShardFormat, SectorLexicalShardRef, SectorMap,
+    SectorMemberInput, SectorPartitionStrategy, corpus_cache_key, get_file_heuristics, hash_file,
+    load_blob, load_locked_bincode, resolve_compatible_cache_path, resolve_sector_member_path,
+    save_blob, save_locked_bincode, sector_bm25_shard_cache_path, sector_relative_path,
 };
 use blake3::Hasher;
 
@@ -468,6 +468,14 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
     let resumed_active_sector = breadcrumb
         .as_ref()
         .and_then(|journal| journal.active_sector.clone());
+    let mut frontier = FrontierLedger::new(provisional_map.sectors.len(), dirty_sector_ids.len());
+    for sector_id in &clean_sector_ids {
+        frontier.record_clean_mount(sector_id.clone());
+    }
+    if let Some(journal) = breadcrumb.as_ref() {
+        frontier.apply_breadcrumb_resume(journal);
+    }
+    telemetry.replace_frontier_ledger(frontier.clone());
 
     for sector in provisional_map
         .sectors
@@ -506,6 +514,8 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
                 .as_ref()
                 .is_some_and(|active| active.sector_id == sector.sector_id)
         {
+            frontier.start_dirty_rebuild(sector.sector_id.clone(), sector.proofs.len(), false, 0);
+            telemetry.replace_frontier_ledger(frontier.clone());
             journal.active_sector = Some(ActiveBreadcrumbSector {
                 sector_id: sector.sector_id.clone(),
                 next_member_offset: resume_offset,
@@ -532,6 +542,8 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
                 &mut file_artifacts,
             );
             persist_manifest_checkpoint(manifest, cache_paths)?;
+            frontier.advance_dirty_rebuild(&sector.sector_id, member_index + 1);
+            telemetry.replace_frontier_ledger(frontier.clone());
             if let Some(journal) = breadcrumb.as_mut() {
                 if let Some(active) = journal.active_sector.as_mut() {
                     active.next_member_offset = member_index + 1;
@@ -545,6 +557,11 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
             on_processed();
         }
 
+        let sector_reused = resumed_active_sector.as_ref().is_some_and(|active| {
+            active.sector_id == sector.sector_id && active.next_member_offset >= sector.proofs.len()
+        });
+        frontier.complete_dirty_rebuild(sector.sector_id.clone(), sector_reused);
+        telemetry.replace_frontier_ledger(frontier.clone());
         if let Some(journal) = breadcrumb.as_mut() {
             journal.completed_sectors.push(sector.sector_id.clone());
             journal.active_sector = None;
@@ -1045,6 +1062,39 @@ mod tests {
     }
 
     #[test]
+    fn frontier_snapshot_reflects_warm_sector_reuse() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_resume_corpus(corpus.path());
+
+        let initial = crate::system::Telemetry::new();
+        load_search_corpus(
+            corpus.path(),
+            None,
+            0,
+            None,
+            &initial,
+            &[],
+            Some(cache.path()),
+        )
+        .expect("initial load");
+
+        let warm = crate::system::Telemetry::new();
+        load_search_corpus(corpus.path(), None, 0, None, &warm, &[], Some(cache.path()))
+            .expect("warm load");
+
+        let sector_map = SectorMap::load_for_root(cache.path(), corpus.path()).expect("sector map");
+        let frontier = warm.frontier_snapshot();
+        assert_eq!(frontier.total_sector_count, sector_map.sectors.len());
+        assert_eq!(frontier.mounted_sector_count, sector_map.sectors.len());
+        assert_eq!(frontier.reused_sector_count, sector_map.sectors.len());
+        assert_eq!(frontier.dirty_sector_count, 0);
+        assert_eq!(frontier.completed_dirty_sector_count, 0);
+        assert_eq!(frontier.rebuilding_sector_count, 0);
+        assert!(frontier.active_rebuild.is_none());
+    }
+
+    #[test]
     fn resumes_interrupted_dirty_sector_rebuilds_from_breadcrumb_state() {
         let corpus = tempdir().expect("temp corpus");
         let cache = tempdir().expect("temp cache");
@@ -1116,6 +1166,10 @@ mod tests {
                 .to_string()
                 .contains("interrupt for breadcrumb resume test")
         );
+        let interrupted_frontier = interrupted_telemetry.frontier_snapshot();
+        assert_eq!(interrupted_frontier.rebuilding_sector_count, 1);
+        assert!(interrupted_frontier.active_rebuild.is_some());
+        assert!(interrupted_frontier.dirty_sector_count > 0);
 
         let resumed_telemetry = crate::system::Telemetry::new();
         let loaded = load_search_corpus(
@@ -1143,6 +1197,12 @@ mod tests {
             0
         );
         assert!(resumed_telemetry.sector_cache_hits.load(Ordering::Relaxed) > 0);
+        let resumed_frontier = resumed_telemetry.frontier_snapshot();
+        assert_eq!(resumed_frontier.dirty_sector_count, 0);
+        assert!(resumed_frontier.completed_dirty_sector_count > 0);
+        assert!(resumed_frontier.resumed_sector_count > 0);
+        assert_eq!(resumed_frontier.rebuilding_sector_count, 0);
+        assert!(resumed_frontier.active_rebuild.is_none());
         assert!(
             BreadcrumbJournal::load_for_root(cache.path(), corpus.path())
                 .expect("load breadcrumb after resume")
