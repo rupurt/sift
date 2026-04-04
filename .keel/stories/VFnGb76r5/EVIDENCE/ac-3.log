@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-04-03T22:39:06.810350283-07:00
+mode: manual
+---
+Updated README.md and LIBRARY.md to document that direct search, agent mode, controller execution, and crate-root autonomous calls reuse the same cache root across fresh processes while remaining local-first and library-friendly.

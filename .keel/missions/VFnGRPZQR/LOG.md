@@ -42,3 +42,10 @@
 - Added `src/search/application.rs::prepare_search_runtime_with_progress` as the single authority for corpus loading and BM25 preparation, then switched `src/facade.rs` controller startup onto that helper so autonomous linear mode inherits the same cache reuse path.
 - Added warm-restart regression coverage for controller and autonomous library surfaces while preserving the shared CLI telemetry renderer contract.
 - Re-ran the full workspace test suite with `cargo test`.
+
+## 2026-04-03T22:39:14-07:00
+
+- Completed story `VFnGb76r5` with cross-surface fresh-process proof coverage and shared-cache documentation.
+- Added end-to-end facade tests showing direct, controller, and autonomous surfaces can prepare sectors for one another through the same cache root, plus a bounded dirty-sector rebuild proof after cross-surface reuse.
+- Updated `README.md` and `LIBRARY.md` to describe the shared sector-aware cache semantics while keeping the positioning local-first and library-friendly.
+- Fixed the CLI agent integration tests to use per-test cache roots so the cross-process proofs stay stable under parallel execution, then re-ran the full workspace with `cargo test`.

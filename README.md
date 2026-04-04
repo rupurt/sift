@@ -22,6 +22,7 @@ For project background and design rationale, read the introductory post:
 
 - **Single Rust binary:** No external database, daemon, or long-running service.
 - **Local-first retrieval:** Search runs over local corpora with transparent caching in standard user cache directories.
+- **Shared runtime cache:** Direct search, `search --agent`, and the crate-root controller/autonomous APIs reuse the same cache root across fresh processes.
 - **Visible indexing:** Interactive `sift search` runs show live stderr progress for indexing and cache reuse while preparation is in flight.
 - **Default interactive strategy:** The default config strategy is `hybrid`.
 - **Current champion preset:** `page-index-hybrid` is the richer benchmark preset for comparative evaluation.
@@ -135,7 +136,9 @@ sift search --json "query"
 
 Interactive text-mode `sift search` writes transient progress to stderr while
 the corpus is being prepared. That progress includes file counts plus cache and
-BM25 reuse/build metrics so the first run does not look hung.
+BM25 reuse/build metrics so the first run does not look hung. The same cache
+root is reused by direct and agent-mode runs, and bounded dirty-sector rebuilds
+preserve reuse for unchanged sectors after fresh restarts.
 
 ### Verbose Mode
 
@@ -170,6 +173,11 @@ surface lives at the crate root and includes:
 Everything under `sift::internal` exists to support the bundled executable,
 benchmarks, and repository-internal tests. It is not part of the stable
 embedding contract.
+
+When you point `Sift::builder()` or `SearchOptions` at a cache directory, direct
+search, controller execution, and autonomous runtime calls all reuse that same
+sector-aware cache substrate. Fresh processes can mount clean sectors prepared
+by another surface and only rebuild sectors touched by corpus changes.
 
 See [LIBRARY.md](LIBRARY.md) for the full embedding guide, including direct
 search, context assembly, deterministic controller execution, supported

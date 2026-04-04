@@ -190,7 +190,7 @@
 |--------|--------|
 | [Implement Resumable Sector Rebuild Journals](epics/VFnGRPtQQ/voyages/VFnGWuLCk/) | done |
 | [Implement Sectorized Direct Search Reuse](epics/VFnGRPtQQ/voyages/VFnGWuRCh/) | done |
-| [Adopt Sector Reuse Across Runtime Surfaces](epics/VFnGRPtQQ/voyages/VFnGWulCe/) | in-progress |
+| [Adopt Sector Reuse Across Runtime Surfaces](epics/VFnGRPtQQ/voyages/VFnGWulCe/) | done |
 | [Implement Frontier Coverage Search Semantics](epics/VFnGRPtQQ/voyages/VFnGWurCd/) | planned |
 
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)

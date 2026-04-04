@@ -1789,6 +1789,12 @@ mod tests {
         AutonomousSearchRequest::new(root, "alpha retrieval").with_strategy("bm25")
     }
 
+    fn assert_sector_warm_reuse(telemetry: &SearchTelemetry) {
+        assert!(telemetry.sector_cache_hits > 0);
+        assert_eq!(telemetry.fresh_artifact_builds, 0);
+        assert!(telemetry.bm25_index_cache_hits > 0);
+    }
+
     #[test]
     fn direct_search_with_progress_emits_indexing_and_ranking() {
         let corpus = tempdir().expect("temp corpus");
@@ -2059,8 +2065,123 @@ mod tests {
             .search_autonomous(request)
             .expect("second autonomous search");
 
-        let telemetry = second.telemetry_snapshot();
-        assert!(telemetry.sector_cache_hits > 0);
-        assert!(telemetry.bm25_index_cache_hits > 0);
+        assert_sector_warm_reuse(&second.telemetry_snapshot());
+    }
+
+    #[test]
+    fn controller_reuses_sectors_prepared_by_direct_search() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_sector_test_corpus(corpus.path());
+
+        let direct = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        direct
+            .search(bm25_input(corpus.path()))
+            .expect("direct search primes cache");
+
+        let controller = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        controller
+            .search_controller(bm25_controller_request(corpus.path()))
+            .expect("controller search reuses cache");
+
+        assert_sector_warm_reuse(&controller.telemetry_snapshot());
+    }
+
+    #[test]
+    fn direct_search_reuses_sectors_prepared_by_controller() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_sector_test_corpus(corpus.path());
+
+        let controller = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        controller
+            .search_controller(bm25_controller_request(corpus.path()))
+            .expect("controller search primes cache");
+
+        let direct = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        direct
+            .search(bm25_input(corpus.path()))
+            .expect("direct search reuses cache");
+
+        assert_sector_warm_reuse(&direct.telemetry_snapshot());
+    }
+
+    #[test]
+    fn direct_search_reuses_sectors_prepared_by_autonomous_search() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_sector_test_corpus(corpus.path());
+
+        let autonomous = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        autonomous
+            .search_autonomous(bm25_autonomous_request(corpus.path()))
+            .expect("autonomous search primes cache");
+
+        let direct = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        direct
+            .search(bm25_input(corpus.path()))
+            .expect("direct search reuses autonomous cache");
+
+        assert_sector_warm_reuse(&direct.telemetry_snapshot());
+    }
+
+    #[test]
+    fn cross_surface_dirty_rebuilds_stay_bounded() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_sector_test_corpus(corpus.path());
+
+        let controller = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        controller
+            .search_controller(bm25_controller_request(corpus.path()))
+            .expect("controller search primes cache");
+
+        let before =
+            SectorMap::load_for_root(cache.path(), corpus.path()).expect("before sector map");
+        assert!(before.sectors.len() >= 2);
+        let changed_sector = before.sectors.first().expect("sector");
+        let changed_path = resolve_sector_member_path(
+            corpus.path(),
+            &changed_sector.proofs.first().expect("proof").relative_path,
+        );
+        std::fs::write(
+            &changed_path,
+            "cross-surface dirty rebuild with shared cache reuse",
+        )
+        .expect("rewrite changed path");
+
+        let direct = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        direct
+            .search(bm25_input(corpus.path()))
+            .expect("direct search reuses controller cache");
+
+        let telemetry = direct.telemetry_snapshot();
+        assert_eq!(telemetry.sector_rebuilds, 1);
+        assert!(telemetry.sector_cache_hits >= before.sectors.len().saturating_sub(1));
+        assert!(telemetry.sector_shard_cache_hits > 0);
     }
 }

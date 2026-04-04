@@ -113,7 +113,9 @@ fn main() -> anyhow::Result<()> {
 
 `telemetry_snapshot()` returns cumulative metrics for the current search run,
 including blob reuse, fresh artifact builds, skipped artifacts, and BM25
-cache/build counts.
+cache/build counts. When you configure `with_cache_dir`, those metrics come from
+the same shared cache root that `search`, `search_controller`, and
+`search_autonomous` reuse across fresh processes.
 
 ### Direct Search Knobs
 
@@ -252,6 +254,11 @@ This mode gives you:
 
 It is deterministic and plan-driven. It does not currently invent turns or do
 autonomous decomposition by itself.
+
+Controller execution uses the same sector-aware corpus preparation seam as
+direct search. Reusing the same cache directory lets a fresh controller process
+mount clean sectors prepared by direct or autonomous runs and only rebuild dirty
+sectors.
 
 ## Mode 5: Supported Autonomous Search
 

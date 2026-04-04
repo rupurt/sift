@@ -13,7 +13,9 @@ fn sample_corpus() -> tempfile::TempDir {
 #[test]
 fn search_agent_json_exposes_planner_metadata_and_trace() {
     let corpus = sample_corpus();
+    let cache = tempfile::tempdir().expect("temp cache");
     let output = Command::new(env!("CARGO_BIN_EXE_sift"))
+        .env("SIFT_CACHE", cache.path())
         .args([
             "search",
             "--strategy",
@@ -52,7 +54,9 @@ fn search_agent_json_exposes_planner_metadata_and_trace() {
 #[test]
 fn search_agent_text_exposes_planner_summary() {
     let corpus = sample_corpus();
+    let cache = tempfile::tempdir().expect("temp cache");
     let output = Command::new(env!("CARGO_BIN_EXE_sift"))
+        .env("SIFT_CACHE", cache.path())
         .args([
             "search",
             "--strategy",
@@ -85,7 +89,9 @@ fn search_agent_text_exposes_planner_summary() {
 #[test]
 fn search_without_agent_preserves_existing_json_shape() {
     let corpus = sample_corpus();
+    let cache = tempfile::tempdir().expect("temp cache");
     let output = Command::new(env!("CARGO_BIN_EXE_sift"))
+        .env("SIFT_CACHE", cache.path())
         .args([
             "search",
             "--strategy",
