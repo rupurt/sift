@@ -56,3 +56,14 @@
 - Added `src/cache/frontier.rs` and a telemetry-held frontier snapshot so sector counts, reuse counts, dirty-sector counts, and active rebuild metadata are derived from the sector map and breadcrumb journal instead of a new file-state tracker.
 - Wired frontier updates through `src/search/corpus.rs` so warm sector mounts, dirty rebuild progress, and breadcrumb resume state transitions all refresh the ledger during direct-search preparation.
 - Added focused frontier tests plus corpus integration coverage, then re-ran the full workspace with `cargo test`.
+
+## 2026-04-03T22:56:18-07:00
+
+- Completed story `VFnGb6ypo` to surface truthful frontier coverage through direct-search progress, telemetry, CLI output, and responses.
+- Added public `SearchCoverageMode`, `SearchCoverageSnapshot`, and active rebuild metadata to `src/search/domain.rs`, then threaded that contract through indexing progress, search responses, telemetry snapshots, and crate-root exports.
+- Reworked `src/search/corpus.rs` so all discovered files participate in provisional sector coverage, clean-sector mounts update coverage before progress emission, and breadcrumb resume/rebuild paths keep `sealed` claims conservative until dirty work converges.
+- Updated the text CLI renderer, interactive progress renderer, and direct-search regression coverage to prove `frontier -> converging -> sealed` transitions without adding a second validation pass, then re-ran the full workspace with `cargo test`.
+
+## 2026-04-03T22:57:08
+
+Mission achieved by local system user 'alex'

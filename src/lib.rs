@@ -11,7 +11,7 @@
 //! - graph episode DTOs and replay helpers for bounded graph search state inspection
 //! - [`Retriever`], [`Fusion`], and [`Reranking`] for supported strategy overrides
 //! - [`SearchResponse`], [`SearchHit`], [`ContextArtifact`], and [`ScoreConfidence`] for results and artifact metadata
-//! - [`SearchProgress`] and [`SearchTelemetry`] for synchronous search progress and indexing telemetry snapshots
+//! - [`SearchCoverageMode`], [`SearchCoverageSnapshot`], [`SearchProgress`], and [`SearchTelemetry`] for synchronous search progress and truthful indexing coverage snapshots
 //! - [`ModelSource`], [`ModelRuntimeContract`], [`PreparedModel`], and [`prepare_model`] for stable local model-preparation workflows
 //!
 //! Everything under [`internal`] exists to support the bundled executable,
@@ -61,7 +61,8 @@ pub use crate::search::{
     LatentSearchEmission, LatentSearchHit, LocalContextSource, ModelDrivenAutonomousPlanner,
     ProtocolSearchEmission, QueryExpansionPolicy, RerankingPolicy, RetainedArtifact,
     RetrieverPolicy, ScoreConfidence, SearchControllerAction, SearchControllerDecision,
-    SearchControllerRequest, SearchControllerResponse, SearchControllerState, SearchEmission,
+    SearchControllerRequest, SearchControllerResponse, SearchControllerState,
+    SearchCoverageActiveRebuild, SearchCoverageMode, SearchCoverageSnapshot, SearchEmission,
     SearchEmissionMode, SearchHit, SearchPhase, SearchPlan, SearchProgress, SearchResponse,
     SearchTelemetry, SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse,
     SearchTurnTrace, ToolOutputInput, replay_graph_decision, replay_graph_trace,

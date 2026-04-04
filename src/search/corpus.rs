@@ -118,6 +118,9 @@ pub fn load_search_corpus_with_progress<F: Fn(&super::domain::SearchProgress)>(
                 files_processed,
                 files_total,
                 estimated_remaining: estimate_remaining(files_processed, files_total),
+                coverage: super::domain::SearchCoverageSnapshot::from_frontier(
+                    &telemetry.frontier_snapshot(),
+                ),
             });
         }
     };
@@ -180,6 +183,9 @@ pub fn load_search_corpus_with_progress<F: Fn(&super::domain::SearchProgress)>(
                 files_processed,
                 files_total,
                 estimated_remaining: estimate_remaining(files_processed, files_total),
+                coverage: super::domain::SearchCoverageSnapshot::from_frontier(
+                    &telemetry.frontier_snapshot(),
+                ),
             });
         }
     }
@@ -359,20 +365,8 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
             SectorMap::default()
         }
     };
-    let tracked_relative_paths = cached_sector_map
-        .sectors
-        .iter()
-        .flat_map(|sector| {
-            sector
-                .proofs
-                .iter()
-                .map(|proof| proof.relative_path.clone())
-        })
-        .collect::<HashSet<_>>();
-
     let mut tracked_inputs = Vec::new();
     let mut tracked_candidates = HashMap::new();
-    let mut untracked_paths = Vec::new();
 
     for path in file_paths {
         let relative_path = sector_relative_path(root, path);
@@ -386,18 +380,14 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
             cached_hash,
         };
 
-        if candidate.cached_hash.is_some() || tracked_relative_paths.contains(&relative_path) {
-            tracked_inputs.push(SectorMemberInput::filesystem(
-                candidate.path.clone(),
-                candidate
-                    .cached_hash
-                    .clone()
-                    .unwrap_or_else(|| dirty_sector_placeholder(candidate.current.as_ref())),
-            ));
-            tracked_candidates.insert(relative_path, candidate);
-        } else {
-            untracked_paths.push(path.clone());
-        }
+        tracked_inputs.push(SectorMemberInput::filesystem(
+            candidate.path.clone(),
+            candidate
+                .cached_hash
+                .clone()
+                .unwrap_or_else(|| dirty_sector_placeholder(candidate.current.as_ref())),
+        ));
+        tracked_candidates.insert(relative_path, candidate);
     }
 
     let provisional_map =
@@ -409,6 +399,9 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
         .collect::<HashMap<_, _>>();
     let mut file_artifacts = Vec::new();
     let mut clean_sector_ids = HashSet::new();
+    let mut frontier =
+        FrontierLedger::new(provisional_map.sectors.len(), provisional_map.sectors.len());
+    telemetry.replace_frontier_ledger(frontier.clone());
 
     for sector in &provisional_map.sectors {
         let Some(cached_sector) = cached_sectors_by_id.get(&sector.sector_id) else {
@@ -424,6 +417,8 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
         match load_sector_artifacts_from_cache(&cache_paths.blobs_dir, cached_sector) {
             Ok(artifacts) => {
                 clean_sector_ids.insert(sector.sector_id.clone());
+                frontier.record_clean_mount(sector.sector_id.clone());
+                telemetry.replace_frontier_ledger(frontier.clone());
                 for artifact in artifacts {
                     record_loaded_artifact(&mut file_artifacts, artifact, telemetry);
                     on_processed();
@@ -468,14 +463,10 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
     let resumed_active_sector = breadcrumb
         .as_ref()
         .and_then(|journal| journal.active_sector.clone());
-    let mut frontier = FrontierLedger::new(provisional_map.sectors.len(), dirty_sector_ids.len());
-    for sector_id in &clean_sector_ids {
-        frontier.record_clean_mount(sector_id.clone());
-    }
     if let Some(journal) = breadcrumb.as_ref() {
         frontier.apply_breadcrumb_resume(journal);
+        telemetry.replace_frontier_ledger(frontier.clone());
     }
-    telemetry.replace_frontier_ledger(frontier.clone());
 
     for sector in provisional_map
         .sectors
@@ -571,18 +562,6 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
 
     if breadcrumb.is_some() {
         BreadcrumbJournal::clear_for_root(cache_base, root)?;
-    }
-
-    for path in untracked_paths {
-        load_file_artifact_with_tracking(
-            root,
-            &path,
-            manifest,
-            Some(cache_paths),
-            telemetry,
-            &mut file_artifacts,
-        );
-        on_processed();
     }
 
     let order = file_paths
@@ -971,6 +950,7 @@ mod tests {
 
     use super::*;
     use crate::cache::{BREADCRUMB_STALE_AFTER_SECS, breadcrumb_cache_path};
+    use crate::search::{SearchCoverageMode, SearchCoverageSnapshot};
 
     fn write_breadcrumb_corpus(root: &Path) {
         std::fs::write(root.join("alpha.txt"), "alpha retrieval cache sector").expect("alpha");
@@ -1167,9 +1147,11 @@ mod tests {
                 .contains("interrupt for breadcrumb resume test")
         );
         let interrupted_frontier = interrupted_telemetry.frontier_snapshot();
+        let interrupted_coverage = SearchCoverageSnapshot::from_frontier(&interrupted_frontier);
         assert_eq!(interrupted_frontier.rebuilding_sector_count, 1);
         assert!(interrupted_frontier.active_rebuild.is_some());
         assert!(interrupted_frontier.dirty_sector_count > 0);
+        assert_eq!(interrupted_coverage.mode, SearchCoverageMode::Converging);
 
         let resumed_telemetry = crate::system::Telemetry::new();
         let loaded = load_search_corpus(
@@ -1198,11 +1180,13 @@ mod tests {
         );
         assert!(resumed_telemetry.sector_cache_hits.load(Ordering::Relaxed) > 0);
         let resumed_frontier = resumed_telemetry.frontier_snapshot();
+        let resumed_coverage = SearchCoverageSnapshot::from_frontier(&resumed_frontier);
         assert_eq!(resumed_frontier.dirty_sector_count, 0);
         assert!(resumed_frontier.completed_dirty_sector_count > 0);
         assert!(resumed_frontier.resumed_sector_count > 0);
         assert_eq!(resumed_frontier.rebuilding_sector_count, 0);
         assert!(resumed_frontier.active_rebuild.is_none());
+        assert_eq!(resumed_coverage.mode, SearchCoverageMode::Sealed);
         assert!(
             BreadcrumbJournal::load_for_root(cache.path(), corpus.path())
                 .expect("load breadcrumb after resume")

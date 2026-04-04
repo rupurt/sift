@@ -1838,6 +1838,88 @@ mod tests {
                 ..
             } if files_processed == files_total
         )));
+        assert_eq!(
+            response.coverage.mode,
+            crate::search::SearchCoverageMode::Sealed
+        );
+    }
+
+    #[test]
+    fn direct_search_progress_surfaces_frontier_then_converging_then_sealed() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_sector_test_corpus(corpus.path());
+
+        let first = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        first
+            .search(bm25_input(corpus.path()))
+            .expect("first direct search");
+
+        let before =
+            SectorMap::load_for_root(cache.path(), corpus.path()).expect("before sector map");
+        assert!(before.sectors.len() >= 2);
+        let changed_sector = before.sectors.first().expect("sector");
+        let changed_path = resolve_sector_member_path(
+            corpus.path(),
+            &changed_sector.proofs.first().expect("proof").relative_path,
+        );
+        std::fs::write(
+            &changed_path,
+            "coverage transition test forces one dirty sector rebuild",
+        )
+        .expect("rewrite changed path");
+
+        let second = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let captured = Arc::clone(&events);
+
+        let response = second
+            .search_with_progress(
+                bm25_input(corpus.path()),
+                Some(move |event: &SearchProgress| {
+                    captured.lock().expect("progress lock").push(event.clone());
+                }),
+            )
+            .expect("search with coverage progress");
+
+        assert_eq!(
+            response.coverage.mode,
+            crate::search::SearchCoverageMode::Sealed
+        );
+        assert_eq!(response.coverage.dirty_sector_count, 0);
+        assert!(response.coverage.completed_dirty_sector_count > 0);
+
+        let indexing_modes = events
+            .lock()
+            .expect("events lock")
+            .iter()
+            .filter_map(|event| match event {
+                SearchProgress::Indexing { coverage, .. } => Some(coverage.mode),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        let frontier_index = indexing_modes
+            .iter()
+            .position(|mode| *mode == crate::search::SearchCoverageMode::Frontier)
+            .expect("frontier mode should be reported");
+        let converging_index = indexing_modes
+            .iter()
+            .position(|mode| *mode == crate::search::SearchCoverageMode::Converging)
+            .expect("converging mode should be reported");
+        let sealed_index = indexing_modes
+            .iter()
+            .rposition(|mode| *mode == crate::search::SearchCoverageMode::Sealed)
+            .expect("sealed mode should be reported");
+
+        assert!(frontier_index < converging_index);
+        assert!(converging_index < sealed_index);
     }
 
     #[test]

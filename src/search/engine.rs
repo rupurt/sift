@@ -2,8 +2,8 @@ use super::adapters::*;
 use super::application::{SearchService, project_hits};
 use super::domain::{
     Bm25Index, Embedder, FusionPolicy, GenerativeModel, LoadedCorpus, PreparedCorpus,
-    QueryEmbeddingCache, QueryExpansionPolicy, Reranker, RerankingPolicy, SearchPlan,
-    SearchRequest, SearchResponse, StrategyPresetRegistry,
+    QueryEmbeddingCache, QueryExpansionPolicy, Reranker, RerankingPolicy, SearchCoverageSnapshot,
+    SearchPlan, SearchRequest, SearchResponse, StrategyPresetRegistry,
 };
 use anyhow::Result;
 use std::sync::Arc;
@@ -300,6 +300,7 @@ impl SearchExecution for PipelineExecution {
             root: request.path.display().to_string(),
             indexed_artifacts: corpus.indexed_artifacts,
             skipped_artifacts: corpus.skipped_artifacts,
+            coverage: SearchCoverageSnapshot::from_frontier(&request.telemetry.frontier_snapshot()),
             hits,
         })
     }

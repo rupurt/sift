@@ -41,6 +41,7 @@ impl FrontierLedger {
         let sector_id = sector_id.into();
         if self.mounted_sector_ids.insert(sector_id.clone()) {
             self.mounted_sector_count += 1;
+            self.dirty_sector_count = self.dirty_sector_count.saturating_sub(1);
         }
         if self.reused_sector_ids.insert(sector_id) {
             self.reused_sector_count += 1;
@@ -121,7 +122,7 @@ mod tests {
 
     #[test]
     fn frontier_ledger_tracks_clean_mounts_and_dirty_rebuild_progress() {
-        let mut frontier = FrontierLedger::new(4, 2);
+        let mut frontier = FrontierLedger::new(4, 4);
 
         frontier.record_clean_mount("sector-clean");
         frontier.start_dirty_rebuild("sector-dirty-a", 3, false, 0);
@@ -131,7 +132,7 @@ mod tests {
         assert_eq!(frontier.total_sector_count, 4);
         assert_eq!(frontier.mounted_sector_count, 2);
         assert_eq!(frontier.reused_sector_count, 1);
-        assert_eq!(frontier.dirty_sector_count, 1);
+        assert_eq!(frontier.dirty_sector_count, 2);
         assert_eq!(frontier.completed_dirty_sector_count, 1);
         assert_eq!(frontier.rebuilding_sector_count, 0);
         assert!(frontier.active_rebuild.is_none());

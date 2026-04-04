@@ -58,6 +58,22 @@ mod search_cli_tests {
             sector_shard_builds: 1,
             breadcrumb_resume_hits: 1,
             breadcrumb_recovery_discards: 0,
+            coverage: sift::SearchCoverageSnapshot {
+                mode: sift::SearchCoverageMode::Converging,
+                total_sector_count: 6,
+                mounted_sector_count: 4,
+                reused_sector_count: 4,
+                dirty_sector_count: 2,
+                completed_dirty_sector_count: 1,
+                rebuilding_sector_count: 1,
+                resumed_sector_count: 1,
+                active_rebuild: Some(sift::SearchCoverageActiveRebuild {
+                    sector_id: "sector-a".to_string(),
+                    next_member_offset: 2,
+                    sector_member_count: 3,
+                    resumed: true,
+                }),
+            },
         };
 
         renderer
@@ -67,6 +83,7 @@ mod search_cli_tests {
                     files_processed: 4,
                     files_total: 10,
                     estimated_remaining: Some(Duration::from_secs(12)),
+                    coverage: telemetry.coverage.clone(),
                 },
                 &telemetry,
             )
@@ -76,6 +93,7 @@ mod search_cli_tests {
         let output =
             String::from_utf8(renderer.into_inner()).expect("progress output should be utf-8");
         assert!(output.contains("Indexing 4/10 files"));
+        assert!(output.contains("coverage converging 4/6 mounted"));
         assert!(output.contains("blobs 7"));
         assert!(output.contains("fresh 2"));
         assert!(output.contains("sector cache 4 rebuild 1"));
@@ -783,9 +801,16 @@ impl<W: Write> ProgressRenderer<W> {
                 files_processed,
                 files_total,
                 estimated_remaining,
+                coverage,
                 ..
             } => Some(format!(
-                "Indexing {files_processed}/{files_total} files | blobs {} | fresh {} | skipped {} | segments {} | sector cache {} rebuild {} | sector bm25 cache {} build {} | breadcrumb resume {} recover {} | bm25 cache {} build {}{}",
+                "Indexing {files_processed}/{files_total} files | coverage {} {}/{} mounted dirty {} converged {} rebuilding {} | blobs {} | fresh {} | skipped {} | segments {} | sector cache {} rebuild {} | sector bm25 cache {} build {} | breadcrumb resume {} recover {} | bm25 cache {} build {}{}",
+                coverage.mode,
+                coverage.mounted_sector_count,
+                coverage.total_sector_count,
+                coverage.dirty_sector_count,
+                coverage.completed_dirty_sector_count,
+                coverage.rebuilding_sector_count,
                 telemetry.blob_hits,
                 telemetry.fresh_artifact_builds,
                 telemetry.skipped_artifacts,

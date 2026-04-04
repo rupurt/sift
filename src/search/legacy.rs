@@ -84,6 +84,26 @@ mod tests {
             assert!(first.get("rank").is_some());
             assert!(first.get("score").is_some());
             assert!(first.get("snippet").is_some());
+            assert_eq!(parsed["coverage"]["mode"], "sealed");
+            assert!(parsed["coverage"]["total_sector_count"].is_number());
+        }
+
+        #[test]
+        fn text_output_includes_coverage_summary() {
+            let env = TestEnv::new(sample_search_tree());
+            let response = run_search(
+                &env.request("bm25", "retrieval architecture"),
+                None,
+                &LocalFileCorpusRepository,
+                None,
+            )
+            .expect("search response");
+
+            let output =
+                render_search_response(&response, OutputFormat::Text).expect("text rendering");
+
+            assert!(output.contains("coverage: sealed"));
+            assert!(output.contains("mounted"));
         }
     }
 

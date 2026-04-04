@@ -2,8 +2,9 @@ use super::adapters::*;
 use super::domain::{
     Bm25Index, Candidate, CandidateList, CorpusRepository, Embedder, Expander, Fuser, FusionPolicy,
     GenerativeModel, LoadedCorpus, PreparedCorpus, QueryEmbeddingCache, QueryExpansionPolicy,
-    Reranker, RerankingPolicy, Retriever, RetrieverPolicy, SearchHit, SearchPhase, SearchPlan,
-    SearchProgress, SearchRequest, SearchResponse, StrategyPresetRegistry, tokenize,
+    Reranker, RerankingPolicy, Retriever, RetrieverPolicy, SearchCoverageSnapshot, SearchHit,
+    SearchPhase, SearchPlan, SearchProgress, SearchRequest, SearchResponse, StrategyPresetRegistry,
+    tokenize,
 };
 use crate::cache::resolve_compatible_cache_path;
 use crate::config::Ignore;
@@ -516,6 +517,7 @@ pub fn run_search_with_plan_and_progress(
         root: request.path.display().to_string(),
         indexed_artifacts: corpus.indexed_artifacts,
         skipped_artifacts: corpus.skipped_artifacts,
+        coverage: SearchCoverageSnapshot::from_frontier(&request.telemetry.frontier_snapshot()),
         hits,
     })
 }
@@ -536,6 +538,7 @@ pub(crate) fn prepare_bm25_index(
                 files_processed: total_files,
                 files_total: total_files,
                 estimated_remaining: Some(Duration::from_secs(0)),
+                coverage: SearchCoverageSnapshot::from_frontier(&telemetry.frontier_snapshot()),
             });
         }
     };

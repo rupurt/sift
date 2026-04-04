@@ -268,12 +268,86 @@ impl SearchRequest {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SearchCoverageMode {
+    Frontier,
+    Converging,
+    Sealed,
+}
+
+impl std::fmt::Display for SearchCoverageMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Frontier => write!(f, "frontier"),
+            Self::Converging => write!(f, "converging"),
+            Self::Sealed => write!(f, "sealed"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SearchCoverageActiveRebuild {
+    pub sector_id: String,
+    pub next_member_offset: usize,
+    pub sector_member_count: usize,
+    pub resumed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SearchCoverageSnapshot {
+    pub mode: SearchCoverageMode,
+    pub total_sector_count: usize,
+    pub mounted_sector_count: usize,
+    pub reused_sector_count: usize,
+    pub dirty_sector_count: usize,
+    pub completed_dirty_sector_count: usize,
+    pub rebuilding_sector_count: usize,
+    pub resumed_sector_count: usize,
+    pub active_rebuild: Option<SearchCoverageActiveRebuild>,
+}
+
+impl SearchCoverageSnapshot {
+    pub fn from_frontier(frontier: &crate::cache::FrontierLedger) -> Self {
+        let mode = if frontier.dirty_sector_count == 0 && frontier.rebuilding_sector_count == 0 {
+            SearchCoverageMode::Sealed
+        } else if frontier.completed_dirty_sector_count > 0
+            || frontier.rebuilding_sector_count > 0
+            || frontier.resumed_sector_count > 0
+        {
+            SearchCoverageMode::Converging
+        } else {
+            SearchCoverageMode::Frontier
+        };
+
+        Self {
+            mode,
+            total_sector_count: frontier.total_sector_count,
+            mounted_sector_count: frontier.mounted_sector_count,
+            reused_sector_count: frontier.reused_sector_count,
+            dirty_sector_count: frontier.dirty_sector_count,
+            completed_dirty_sector_count: frontier.completed_dirty_sector_count,
+            rebuilding_sector_count: frontier.rebuilding_sector_count,
+            resumed_sector_count: frontier.resumed_sector_count,
+            active_rebuild: frontier.active_rebuild.as_ref().map(|active| {
+                SearchCoverageActiveRebuild {
+                    sector_id: active.sector_id.clone(),
+                    next_member_offset: active.next_member_offset,
+                    sector_member_count: active.sector_member_count,
+                    resumed: active.resumed,
+                }
+            }),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SearchResponse {
     pub strategy: String,
     pub root: String,
     pub indexed_artifacts: usize,
     pub skipped_artifacts: usize,
+    pub coverage: SearchCoverageSnapshot,
     pub hits: Vec<SearchHit>,
 }
 
@@ -1111,6 +1185,7 @@ pub enum SearchProgress {
         files_processed: usize,
         files_total: usize,
         estimated_remaining: Option<std::time::Duration>,
+        coverage: SearchCoverageSnapshot,
     },
     Embedding {
         phase: SearchPhase,
@@ -1927,6 +2002,7 @@ pub struct SearchTelemetry {
     pub sector_shard_builds: usize,
     pub breadcrumb_resume_hits: usize,
     pub breadcrumb_recovery_discards: usize,
+    pub coverage: SearchCoverageSnapshot,
 }
 
 impl SearchTelemetry {
@@ -1949,6 +2025,7 @@ impl SearchTelemetry {
             breadcrumb_recovery_discards: telemetry
                 .breadcrumb_recovery_discards
                 .load(Ordering::Relaxed),
+            coverage: SearchCoverageSnapshot::from_frontier(&telemetry.frontier_snapshot()),
         }
     }
 }
@@ -1981,7 +2058,11 @@ pub enum OutputFormat {
 
 #[cfg(test)]
 mod tests {
-    use super::{QueryExpansionPolicy, RerankingPolicy, RetrieverPolicy, StrategyPresetRegistry};
+    use super::{
+        QueryExpansionPolicy, RerankingPolicy, RetrieverPolicy, SearchCoverageMode,
+        SearchCoverageSnapshot, StrategyPresetRegistry,
+    };
+    use crate::cache::FrontierLedger;
 
     #[test]
     fn default_registry_includes_vector_strategy() {
@@ -1993,5 +2074,56 @@ mod tests {
         assert_eq!(plan.query_expansion, QueryExpansionPolicy::None);
         assert_eq!(plan.retrievers, vec![RetrieverPolicy::Vector]);
         assert_eq!(plan.reranking, RerankingPolicy::None);
+    }
+
+    #[test]
+    fn coverage_snapshot_reports_frontier_before_dirty_rebuild_starts() {
+        let mut frontier = FrontierLedger::new(4, 4);
+        frontier.record_clean_mount("sector-clean-a");
+        frontier.record_clean_mount("sector-clean-b");
+
+        let coverage = SearchCoverageSnapshot::from_frontier(&frontier);
+
+        assert_eq!(coverage.mode, SearchCoverageMode::Frontier);
+        assert_eq!(coverage.mounted_sector_count, 2);
+        assert_eq!(coverage.dirty_sector_count, 2);
+    }
+
+    #[test]
+    fn coverage_snapshot_reports_converging_during_active_or_resumed_rebuilds() {
+        let mut frontier = FrontierLedger::new(4, 4);
+        frontier.record_clean_mount("sector-clean-a");
+        frontier.start_dirty_rebuild("sector-dirty-a", 3, false, 1);
+
+        let active = SearchCoverageSnapshot::from_frontier(&frontier);
+        assert_eq!(active.mode, SearchCoverageMode::Converging);
+        assert_eq!(
+            active
+                .active_rebuild
+                .as_ref()
+                .map(|active| active.next_member_offset),
+            Some(1)
+        );
+
+        frontier.complete_dirty_rebuild("sector-dirty-a", false);
+        frontier.start_dirty_rebuild("sector-dirty-b", 2, true, 1);
+        let resumed = SearchCoverageSnapshot::from_frontier(&frontier);
+        assert_eq!(resumed.mode, SearchCoverageMode::Converging);
+        assert_eq!(resumed.resumed_sector_count, 1);
+    }
+
+    #[test]
+    fn coverage_snapshot_reports_sealed_once_dirty_work_converges() {
+        let mut frontier = FrontierLedger::new(3, 3);
+        frontier.record_clean_mount("sector-clean-a");
+        frontier.complete_dirty_rebuild("sector-dirty-a", false);
+        frontier.complete_dirty_rebuild("sector-dirty-b", false);
+
+        let coverage = SearchCoverageSnapshot::from_frontier(&frontier);
+
+        assert_eq!(coverage.mode, SearchCoverageMode::Sealed);
+        assert_eq!(coverage.mounted_sector_count, 3);
+        assert_eq!(coverage.dirty_sector_count, 0);
+        assert_eq!(coverage.rebuilding_sector_count, 0);
     }
 }

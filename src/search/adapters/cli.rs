@@ -23,9 +23,24 @@ pub fn render_autonomous_search_response(
 fn render_text_response(response: &SearchResponse) -> Result<String> {
     let mut output = String::new();
 
+    writeln!(
+        &mut output,
+        "coverage: {} | sectors {}/{} mounted | dirty {} | converged {} | rebuilding {} | resumed {}",
+        coverage_mode_label(response.coverage.mode),
+        response.coverage.mounted_sector_count,
+        response.coverage.total_sector_count,
+        response.coverage.dirty_sector_count,
+        response.coverage.completed_dirty_sector_count,
+        response.coverage.rebuilding_sector_count,
+        response.coverage.resumed_sector_count,
+    )?;
+
     if response.hits.is_empty() {
-        return Ok("no matching hits".to_string());
+        writeln!(&mut output, "no matching hits")?;
+        return Ok(output.trim_end().to_string());
     }
+
+    writeln!(&mut output)?;
 
     for hit in &response.hits {
         writeln!(&mut output, "{}. \x1b[1;32m{}\x1b[0m", hit.rank, hit.path)?;
@@ -113,6 +128,14 @@ fn autonomous_search_mode_label(mode: AutonomousSearchMode) -> &'static str {
     match mode {
         AutonomousSearchMode::Linear => "linear",
         AutonomousSearchMode::Graph => "graph",
+    }
+}
+
+fn coverage_mode_label(mode: SearchCoverageMode) -> &'static str {
+    match mode {
+        SearchCoverageMode::Frontier => "frontier",
+        SearchCoverageMode::Converging => "converging",
+        SearchCoverageMode::Sealed => "sealed",
     }
 }
 
