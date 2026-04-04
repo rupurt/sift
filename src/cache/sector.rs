@@ -308,6 +308,18 @@ fn stable_path_key(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
 
+pub fn sector_relative_path(root: &Path, path: &Path) -> PathBuf {
+    relative_member_path(root, path)
+}
+
+pub fn resolve_sector_member_path(root: &Path, relative_path: &Path) -> PathBuf {
+    if root.is_file() {
+        root.to_path_buf()
+    } else {
+        root.join(relative_path)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};

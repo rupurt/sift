@@ -1921,6 +1921,10 @@ pub struct SearchTelemetry {
     pub total_segments: usize,
     pub bm25_index_cache_hits: usize,
     pub bm25_index_builds: usize,
+    pub sector_cache_hits: usize,
+    pub sector_rebuilds: usize,
+    pub sector_shard_cache_hits: usize,
+    pub sector_shard_builds: usize,
 }
 
 impl SearchTelemetry {
@@ -1935,6 +1939,10 @@ impl SearchTelemetry {
             total_segments: telemetry.total_segments.load(Ordering::Relaxed),
             bm25_index_cache_hits: telemetry.bm25_index_cache_hits.load(Ordering::Relaxed),
             bm25_index_builds: telemetry.bm25_index_builds.load(Ordering::Relaxed),
+            sector_cache_hits: telemetry.sector_cache_hits.load(Ordering::Relaxed),
+            sector_rebuilds: telemetry.sector_rebuilds.load(Ordering::Relaxed),
+            sector_shard_cache_hits: telemetry.sector_shard_cache_hits.load(Ordering::Relaxed),
+            sector_shard_builds: telemetry.sector_shard_builds.load(Ordering::Relaxed),
         }
     }
 }

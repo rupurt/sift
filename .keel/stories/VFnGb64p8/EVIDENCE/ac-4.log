@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-04-03T22:12:08.097198737-07:00
+mode: manual
+---
+The implementation is confined to direct-search startup and shared cache/corpus helpers in src/search/corpus.rs, src/search/application.rs, src/system.rs, src/search/domain.rs, src/facade.rs, and src/main.rs. It does not route controller/autonomous preparation through a new path; the only controller-facing change is test expectation updates for telemetry semantics after sector-shard assembly.

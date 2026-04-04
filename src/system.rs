@@ -12,6 +12,10 @@ pub struct Telemetry {
     pub total_segments: AtomicUsize,
     pub bm25_index_cache_hits: AtomicUsize,
     pub bm25_index_builds: AtomicUsize,
+    pub sector_cache_hits: AtomicUsize,
+    pub sector_rebuilds: AtomicUsize,
+    pub sector_shard_cache_hits: AtomicUsize,
+    pub sector_shard_builds: AtomicUsize,
 }
 
 impl Default for Telemetry {
@@ -32,6 +36,10 @@ impl Telemetry {
             total_segments: AtomicUsize::new(0),
             bm25_index_cache_hits: AtomicUsize::new(0),
             bm25_index_builds: AtomicUsize::new(0),
+            sector_cache_hits: AtomicUsize::new(0),
+            sector_rebuilds: AtomicUsize::new(0),
+            sector_shard_cache_hits: AtomicUsize::new(0),
+            sector_shard_builds: AtomicUsize::new(0),
         }
     }
 
@@ -45,6 +53,10 @@ impl Telemetry {
         self.total_segments.store(0, Ordering::Relaxed);
         self.bm25_index_cache_hits.store(0, Ordering::Relaxed);
         self.bm25_index_builds.store(0, Ordering::Relaxed);
+        self.sector_cache_hits.store(0, Ordering::Relaxed);
+        self.sector_rebuilds.store(0, Ordering::Relaxed);
+        self.sector_shard_cache_hits.store(0, Ordering::Relaxed);
+        self.sector_shard_builds.store(0, Ordering::Relaxed);
     }
 
     pub fn heuristic_hit_rate(&self) -> f64 {
@@ -91,6 +103,12 @@ impl Clone for Telemetry {
                 self.bm25_index_cache_hits.load(Ordering::Relaxed),
             ),
             bm25_index_builds: AtomicUsize::new(self.bm25_index_builds.load(Ordering::Relaxed)),
+            sector_cache_hits: AtomicUsize::new(self.sector_cache_hits.load(Ordering::Relaxed)),
+            sector_rebuilds: AtomicUsize::new(self.sector_rebuilds.load(Ordering::Relaxed)),
+            sector_shard_cache_hits: AtomicUsize::new(
+                self.sector_shard_cache_hits.load(Ordering::Relaxed),
+            ),
+            sector_shard_builds: AtomicUsize::new(self.sector_shard_builds.load(Ordering::Relaxed)),
         }
     }
 }
@@ -112,6 +130,14 @@ impl PartialEq for Telemetry {
                 == other.bm25_index_cache_hits.load(Ordering::Relaxed)
             && self.bm25_index_builds.load(Ordering::Relaxed)
                 == other.bm25_index_builds.load(Ordering::Relaxed)
+            && self.sector_cache_hits.load(Ordering::Relaxed)
+                == other.sector_cache_hits.load(Ordering::Relaxed)
+            && self.sector_rebuilds.load(Ordering::Relaxed)
+                == other.sector_rebuilds.load(Ordering::Relaxed)
+            && self.sector_shard_cache_hits.load(Ordering::Relaxed)
+                == other.sector_shard_cache_hits.load(Ordering::Relaxed)
+            && self.sector_shard_builds.load(Ordering::Relaxed)
+                == other.sector_shard_builds.load(Ordering::Relaxed)
     }
 }
 

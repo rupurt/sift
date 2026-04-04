@@ -52,6 +52,10 @@ mod search_cli_tests {
             total_segments: 24,
             bm25_index_cache_hits: 0,
             bm25_index_builds: 1,
+            sector_cache_hits: 4,
+            sector_rebuilds: 1,
+            sector_shard_cache_hits: 3,
+            sector_shard_builds: 1,
         };
 
         renderer
@@ -72,6 +76,8 @@ mod search_cli_tests {
         assert!(output.contains("Indexing 4/10 files"));
         assert!(output.contains("blobs 7"));
         assert!(output.contains("fresh 2"));
+        assert!(output.contains("sector cache 4 rebuild 1"));
+        assert!(output.contains("sector bm25 cache 3 build 1"));
         assert!(output.contains("bm25 cache 0 build 1"));
     }
 
@@ -776,11 +782,15 @@ impl<W: Write> ProgressRenderer<W> {
                 estimated_remaining,
                 ..
             } => Some(format!(
-                "Indexing {files_processed}/{files_total} files | blobs {} | fresh {} | skipped {} | segments {} | bm25 cache {} build {}{}",
+                "Indexing {files_processed}/{files_total} files | blobs {} | fresh {} | skipped {} | segments {} | sector cache {} rebuild {} | sector bm25 cache {} build {} | bm25 cache {} build {}{}",
                 telemetry.blob_hits,
                 telemetry.fresh_artifact_builds,
                 telemetry.skipped_artifacts,
                 telemetry.total_segments,
+                telemetry.sector_cache_hits,
+                telemetry.sector_rebuilds,
+                telemetry.sector_shard_cache_hits,
+                telemetry.sector_shard_builds,
                 telemetry.bm25_index_cache_hits,
                 telemetry.bm25_index_builds,
                 Self::format_eta(*estimated_remaining),

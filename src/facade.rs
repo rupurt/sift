@@ -1753,6 +1753,7 @@ fn resolve_plan(strategy: &str, options: &SearchOptions) -> Result<crate::search
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::{SectorMap, resolve_sector_member_path, sector_bm25_shard_cache_path};
     use std::sync::Mutex;
 
     use tempfile::tempdir;
@@ -1768,6 +1769,19 @@ mod tests {
             "beta service catalog and latency measurements",
         )
         .expect("write beta doc");
+    }
+
+    fn write_sector_test_corpus(root: &Path) {
+        for index in 0..6 {
+            std::fs::write(
+                root.join(format!("doc-{index}.txt")),
+                format!(
+                    "document {index} discusses retrieval sectors and cache invalidation {}",
+                    "alpha ".repeat(index + 1)
+                ),
+            )
+            .expect("write sector test doc");
+        }
     }
 
     fn bm25_input(root: &Path) -> SearchInput {
@@ -1833,7 +1847,8 @@ mod tests {
         first
             .search(bm25_input(corpus.path()))
             .expect("first direct search");
-        assert!(first.telemetry_snapshot().bm25_index_builds > 0);
+        let first_telemetry = first.telemetry_snapshot();
+        assert!(first_telemetry.bm25_index_builds > 0 || first_telemetry.sector_shard_builds > 0);
 
         let second = Sift::builder()
             .without_ignore()
@@ -1843,6 +1858,125 @@ mod tests {
             .search(bm25_input(corpus.path()))
             .expect("second direct search");
         assert!(second.telemetry_snapshot().bm25_index_cache_hits > 0);
+    }
+
+    #[test]
+    fn direct_search_reuses_clean_sectors_on_warm_restart() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_sector_test_corpus(corpus.path());
+
+        let first = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        first
+            .search(bm25_input(corpus.path()))
+            .expect("first direct search");
+
+        let sector_map = SectorMap::load_for_root(cache.path(), corpus.path()).expect("sector map");
+        assert!(!sector_map.sectors.is_empty());
+        for sector in &sector_map.sectors {
+            let shard = sector
+                .shards
+                .bm25
+                .as_ref()
+                .expect("sector shard should be persisted");
+            assert!(
+                sector_bm25_shard_cache_path(
+                    cache.path(),
+                    corpus.path(),
+                    &sector.sector_id,
+                    &shard.key
+                )
+                .exists()
+            );
+        }
+
+        let second = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        second
+            .search(bm25_input(corpus.path()))
+            .expect("second direct search");
+
+        let telemetry = second.telemetry_snapshot();
+        assert!(telemetry.sector_cache_hits > 0);
+        assert_eq!(telemetry.fresh_artifact_builds, 0);
+        assert!(telemetry.bm25_index_cache_hits > 0);
+    }
+
+    #[test]
+    fn direct_search_rebuilds_only_the_dirty_sector() {
+        let corpus = tempdir().expect("temp corpus");
+        let cache = tempdir().expect("temp cache");
+        write_sector_test_corpus(corpus.path());
+
+        let first = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        first
+            .search(bm25_input(corpus.path()))
+            .expect("first direct search");
+
+        let before =
+            SectorMap::load_for_root(cache.path(), corpus.path()).expect("before sector map");
+        assert!(before.sectors.len() >= 2);
+        let changed_sector = before.sectors.first().expect("sector");
+        let changed_path = resolve_sector_member_path(
+            corpus.path(),
+            &changed_sector.proofs.first().expect("proof").relative_path,
+        );
+        std::fs::write(
+            &changed_path,
+            "changed retrieval sector content with a targeted dirty rebuild",
+        )
+        .expect("rewrite changed path");
+
+        let second = Sift::builder()
+            .without_ignore()
+            .with_cache_dir(cache.path())
+            .build();
+        second
+            .search(bm25_input(corpus.path()))
+            .expect("second direct search");
+
+        let after =
+            SectorMap::load_for_root(cache.path(), corpus.path()).expect("after sector map");
+        let before_by_id = before
+            .sectors
+            .iter()
+            .map(|sector| (sector.sector_id.clone(), sector))
+            .collect::<std::collections::HashMap<_, _>>();
+        let changed = after
+            .sectors
+            .iter()
+            .filter(|sector| {
+                before_by_id
+                    .get(&sector.sector_id)
+                    .map(|previous| {
+                        previous.membership.proof_fingerprint != sector.membership.proof_fingerprint
+                            || previous
+                                .shards
+                                .bm25
+                                .as_ref()
+                                .map(|shard| shard.key.as_str())
+                                != sector.shards.bm25.as_ref().map(|shard| shard.key.as_str())
+                    })
+                    .unwrap_or(true)
+            })
+            .map(|sector| sector.sector_id.clone())
+            .collect::<Vec<_>>();
+
+        assert_eq!(changed.len(), 1);
+        assert_eq!(changed[0], changed_sector.sector_id);
+
+        let telemetry = second.telemetry_snapshot();
+        assert_eq!(telemetry.sector_rebuilds, 1);
+        assert!(telemetry.sector_cache_hits >= before.sectors.len().saturating_sub(1));
+        assert!(telemetry.sector_shard_cache_hits > 0);
     }
 
     #[test]
@@ -1866,7 +2000,8 @@ mod tests {
         first
             .search_controller(request.clone())
             .expect("first controller search");
-        assert!(first.telemetry_snapshot().bm25_index_builds > 0);
+        let first_telemetry = first.telemetry_snapshot();
+        assert!(first_telemetry.bm25_index_builds > 0 || first_telemetry.sector_shard_builds > 0);
 
         let second = Sift::builder()
             .without_ignore()

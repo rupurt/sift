@@ -528,8 +528,8 @@ pub(crate) fn prepare_bm25_index(
                     "bm25 index cache miss for signature {}; building index",
                     signature
                 );
-                telemetry.bm25_index_builds.fetch_add(1, Ordering::Relaxed);
-                let built = Bm25Index::build(&corpus.artifacts);
+                let built =
+                    load_or_build_sector_bm25_index(cache_dir, &cache_root, corpus, telemetry)?;
                 if let Err(error) = crate::search::corpus::save_bm25_index_cache(
                     cache_dir,
                     &cache_root,
@@ -549,8 +549,8 @@ pub(crate) fn prepare_bm25_index(
                     error = %error,
                     "bm25 cache read failed; rebuilding index"
                 );
-                telemetry.bm25_index_builds.fetch_add(1, Ordering::Relaxed);
-                let built = Bm25Index::build(&corpus.artifacts);
+                let built =
+                    load_or_build_sector_bm25_index(cache_dir, &cache_root, corpus, telemetry)?;
                 if let Err(error) = crate::search::corpus::save_bm25_index_cache(
                     cache_dir,
                     &cache_root,
@@ -575,6 +575,80 @@ pub(crate) fn prepare_bm25_index(
     emit_indexing_complete(progress);
 
     Ok(index)
+}
+
+fn load_or_build_sector_bm25_index(
+    cache_dir: &std::path::Path,
+    root: &std::path::Path,
+    corpus: &LoadedCorpus,
+    telemetry: &crate::system::Telemetry,
+) -> Result<Bm25Index> {
+    let sector_map = crate::cache::SectorMap::load_for_root(cache_dir, root).unwrap_or_default();
+    let mut shards = Vec::new();
+
+    for sector in &sector_map.sectors {
+        let Some(shard_ref) = sector.shards.bm25.as_ref() else {
+            telemetry.bm25_index_builds.fetch_add(1, Ordering::Relaxed);
+            return Ok(Bm25Index::build(&corpus.artifacts));
+        };
+
+        let Some(shard) = crate::search::corpus::load_sector_bm25_shard(
+            cache_dir,
+            root,
+            &sector.sector_id,
+            &shard_ref.key,
+        )?
+        else {
+            telemetry.bm25_index_builds.fetch_add(1, Ordering::Relaxed);
+            return Ok(Bm25Index::build(&corpus.artifacts));
+        };
+
+        telemetry
+            .sector_shard_cache_hits
+            .fetch_add(1, Ordering::Relaxed);
+        shards.push(shard);
+    }
+
+    if shards.is_empty() {
+        telemetry.bm25_index_builds.fetch_add(1, Ordering::Relaxed);
+        Ok(Bm25Index::build(&corpus.artifacts))
+    } else {
+        Ok(combine_bm25_shards(&shards))
+    }
+}
+
+fn combine_bm25_shards(shards: &[Bm25Index]) -> Bm25Index {
+    let mut doc_freq = std::collections::HashMap::new();
+    let mut term_freqs = std::collections::HashMap::new();
+    let mut doc_lengths = std::collections::HashMap::new();
+    let mut total_length = 0usize;
+    let mut num_docs = 0usize;
+
+    for shard in shards {
+        for (term, frequency) in &shard.doc_freq {
+            *doc_freq.entry(term.clone()).or_insert(0) += frequency;
+        }
+        for (doc_id, frequencies) in &shard.term_freqs {
+            term_freqs.insert(doc_id.clone(), frequencies.clone());
+        }
+        for (doc_id, length) in &shard.doc_lengths {
+            doc_lengths.insert(doc_id.clone(), *length);
+            total_length += *length;
+            num_docs += 1;
+        }
+    }
+
+    Bm25Index {
+        doc_freq,
+        term_freqs,
+        doc_lengths,
+        avg_doc_len: if num_docs == 0 {
+            0.0
+        } else {
+            total_length as f64 / num_docs as f64
+        },
+        num_docs,
+    }
 }
 
 fn plan_uses_vector_retriever(plan: &SearchPlan) -> bool {

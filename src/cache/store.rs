@@ -115,6 +115,27 @@ where
     Ok(value)
 }
 
+pub(crate) fn load_locked_bincode<T>(path: &Path) -> Result<Option<T>>
+where
+    T: DeserializeOwned,
+{
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    let file = File::open(path)
+        .with_context(|| format!("failed to open cache file {}", path.display()))?;
+    file.lock_shared()
+        .with_context(|| format!("failed to acquire shared lock on {}", path.display()))?;
+
+    let value = bincode::deserialize_from(&file)
+        .with_context(|| format!("failed to deserialize cache file {}", path.display()))?;
+
+    file.unlock()
+        .with_context(|| format!("failed to release shared lock on {}", path.display()))?;
+    Ok(Some(value))
+}
+
 pub(crate) fn save_locked_bincode<T>(path: &Path, value: &T) -> Result<()>
 where
     T: Serialize,

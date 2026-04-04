@@ -15,3 +15,10 @@
 - Added `src/cache/sector.rs` with persisted `SectorMap` records, deterministic stable-hash partitioning, proof material, and lexical shard references keyed off the existing corpus cache identity.
 - Refactored locked bincode persistence into shared cache-store helpers and reused the shared corpus cache key in the existing BM25/manifests layout to keep the new sector substrate on the same cache authority.
 - Verified the slice with `cargo test sector` and a full `cargo test` run, leaving `VFnGb64p8` as the next direct-search execution story.
+
+## 2026-04-03T22:12:11-07:00
+
+- Completed implementation story `VFnGb64p8` for sector-aware direct-search startup.
+- Reworked `src/search/corpus.rs` to load clean sectors from persisted blobs, rebuild only dirty/untracked sectors, and persist a refreshed `SectorMap` plus sector-local BM25 shards from actual loaded artifacts.
+- Updated `src/search/application.rs` to combine persisted sector BM25 shards on whole-corpus cache misses, and extended telemetry/progress surfaces with sector cache and sector shard counters.
+- Added direct regression coverage for warm clean-sector restart reuse and one-sector dirty rebuild isolation, then verified the full workspace with `cargo test`.
