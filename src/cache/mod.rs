@@ -1,7 +1,9 @@
 pub mod model;
+pub mod sector;
 pub mod store;
 
 pub use model::*;
+pub use sector::*;
 pub use store::*;
 
 use anyhow::{Result, bail};
@@ -45,6 +47,10 @@ pub fn cache_dir(cache_type: &str) -> Result<PathBuf> {
         cache_type,
         cache_type.to_uppercase()
     )
+}
+
+pub fn corpus_cache_key(root: &Path) -> String {
+    blake3::hash(root.display().to_string().as_bytes()).to_string()
 }
 
 pub fn resolve_compatible_cache_path(path: &Path) -> PathBuf {

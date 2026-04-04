@@ -1,0 +1,5 @@
+---
+recorded_at: 2026-04-03T21:52:42.320747405-07:00
+mode: manual
+---
+Added src/cache/sector.rs plus shared locked-bincode helpers in src/cache/store.rs. Sector state reuses corpus_cache_key(root) and stores metadata under the existing artifacts namespace (artifacts/sectors and artifacts/indexes/<corpus_key>/sectors), so sector validity is anchored to manifest/blob/BM25-derived hashes instead of a parallel file-state authority.

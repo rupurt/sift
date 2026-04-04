@@ -9,8 +9,8 @@ use crate::cache::resolve_compatible_cache_path;
 use crate::config::Ignore;
 use anyhow::{Result, anyhow};
 use std::collections::HashSet;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -415,7 +415,11 @@ pub fn run_search_with_plan_and_progress(
         corpus_start.elapsed()
     );
 
-    let total_chunks: usize = corpus.artifacts.iter().map(|artifact| artifact.segments.len()).sum();
+    let total_chunks: usize = corpus
+        .artifacts
+        .iter()
+        .map(|artifact| artifact.segments.len())
+        .sum();
     let index = prepare_bm25_index(
         &request.path,
         &corpus,

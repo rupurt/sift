@@ -23,9 +23,9 @@ use crate::search::{
     SearchControllerResponse, SearchControllerState, SearchEmission, SearchEmissionMode,
     SearchEnvironment, SearchPhase, SearchPlan, SearchProgress, SearchRequest, SearchResponse,
     SearchServiceBuilder, SearchTelemetry, SearchTrace, SearchTurn, SearchTurnRequest,
-    SearchTurnResponse, SearchTurnTrace, StrategyPresetRegistry,
-    load_search_corpus_with_progress, replay_graph_decision, replay_graph_trace,
-    run_search_with_plan, run_search_with_plan_and_progress,
+    SearchTurnResponse, SearchTurnTrace, StrategyPresetRegistry, load_search_corpus_with_progress,
+    replay_graph_decision, replay_graph_trace, run_search_with_plan,
+    run_search_with_plan_and_progress,
 };
 use crate::system::Telemetry;
 
@@ -228,7 +228,9 @@ impl Sift {
             self.ignore.as_ref(),
             &LocalFileCorpusRepository,
             embedder,
-            progress.as_ref().map(|callback| callback as &dyn Fn(&SearchProgress)),
+            progress
+                .as_ref()
+                .map(|callback| callback as &dyn Fn(&SearchProgress)),
         )
     }
 
@@ -428,7 +430,9 @@ impl Sift {
             &corpus,
             self.cache_dir.as_deref(),
             &self.telemetry,
-            progress.as_ref().map(|callback| callback as &dyn Fn(&SearchProgress)),
+            progress
+                .as_ref()
+                .map(|callback| callback as &dyn Fn(&SearchProgress)),
         )?;
         let llm_reranker = SearchServiceBuilder::load_llm_reranker(&request.plan, &env_request)?;
         let env = SearchEnvironment::new_with_plan(
@@ -1767,11 +1771,8 @@ mod tests {
     }
 
     fn bm25_input(root: &Path) -> SearchInput {
-        SearchInput::new(root, "alpha retrieval").with_options(
-            SearchOptions::default()
-                .with_strategy("bm25")
-                .with_limit(5),
-        )
+        SearchInput::new(root, "alpha retrieval")
+            .with_options(SearchOptions::default().with_strategy("bm25").with_limit(5))
     }
 
     #[test]
@@ -1799,8 +1800,16 @@ mod tests {
         assert!(!response.hits.is_empty());
 
         let events = events.lock().expect("events lock");
-        assert!(events.iter().any(|event| matches!(event, SearchProgress::Indexing { .. })));
-        assert!(events.iter().any(|event| matches!(event, SearchProgress::Ranking { .. })));
+        assert!(
+            events
+                .iter()
+                .any(|event| matches!(event, SearchProgress::Indexing { .. }))
+        );
+        assert!(
+            events
+                .iter()
+                .any(|event| matches!(event, SearchProgress::Ranking { .. }))
+        );
         assert!(events.iter().any(|event| matches!(
             event,
             SearchProgress::Indexing {

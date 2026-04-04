@@ -8,7 +8,8 @@ use anyhow::{Context, Result, bail};
 use walkdir::WalkDir;
 
 use crate::cache::{
-    Manifest, get_file_heuristics, hash_file, load_blob, resolve_compatible_cache_path, save_blob,
+    Manifest, corpus_cache_key, get_file_heuristics, hash_file, load_blob,
+    resolve_compatible_cache_path, save_blob,
 };
 use blake3::Hasher;
 
@@ -193,11 +194,10 @@ pub fn compute_bm25_index_signature(artifacts: &[ContextArtifact]) -> String {
 }
 
 pub fn bm25_index_cache_path(cache_base: &Path, root: &Path, signature: &str) -> PathBuf {
-    let corpus_key = blake3::hash(root.display().to_string().as_bytes()).to_string();
     cache_base
         .join("artifacts")
         .join("indexes")
-        .join(corpus_key)
+        .join(corpus_cache_key(root))
         .join(format!("{}.bin", signature))
 }
 
@@ -561,9 +561,11 @@ struct CachePaths {
 
 impl CachePaths {
     fn for_root(base: &Path, root: &Path) -> Self {
-        let corpus_key = blake3::hash(root.display().to_string().as_bytes()).to_string();
         Self {
-            manifest_path: base.join("artifacts").join("manifests").join(corpus_key),
+            manifest_path: base
+                .join("artifacts")
+                .join("manifests")
+                .join(corpus_cache_key(root)),
             blobs_dir: base.join("artifacts").join("blobs"),
         }
     }

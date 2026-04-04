@@ -64,8 +64,7 @@ pub use crate::search::{
     SearchControllerRequest, SearchControllerResponse, SearchControllerState, SearchEmission,
     SearchEmissionMode, SearchHit, SearchPhase, SearchPlan, SearchProgress, SearchResponse,
     SearchTelemetry, SearchTrace, SearchTurn, SearchTurnRequest, SearchTurnResponse,
-    SearchTurnTrace,
-    ToolOutputInput, replay_graph_decision, replay_graph_trace,
+    SearchTurnTrace, ToolOutputInput, replay_graph_decision, replay_graph_trace,
 };
 
 #[doc(hidden)]

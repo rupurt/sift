@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use fs2::FileExt;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 use crate::cache::model::{CacheEntry, Manifest};
 use crate::search::domain::ContextArtifact;
@@ -68,44 +70,11 @@ pub fn get_file_heuristics(path: &Path) -> Result<CacheEntry> {
 
 impl Manifest {
     pub fn load(path: &Path) -> Result<Self> {
-        if !path.exists() {
-            return Ok(Self::default());
-        }
-
-        let file = File::open(path)
-            .with_context(|| format!("failed to open manifest {}", path.display()))?;
-        file.lock_shared()
-            .context("failed to acquire shared lock on manifest")?;
-
-        let manifest: Manifest = bincode::deserialize_from(&file).unwrap_or_default();
-
-        file.unlock()
-            .context("failed to release shared lock on manifest")?;
-        Ok(manifest)
+        load_locked_bincode_default(path)
     }
 
     pub fn save(&self, path: &Path) -> Result<()> {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).context("failed to create manifest directory")?;
-        }
-
-        let file = fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path)
-            .with_context(|| format!("failed to open manifest for writing {}", path.display()))?;
-
-        file.lock_exclusive()
-            .context("failed to acquire exclusive lock on manifest")?;
-
-        bincode::serialize_into(&file, self)
-            .with_context(|| format!("failed to serialize manifest to {}", path.display()))?;
-
-        file.unlock()
-            .context("failed to release exclusive lock on manifest")?;
-        Ok(())
+        save_locked_bincode(path, self)
     }
 
     pub fn check_heuristics(&self, path: &Path, current: &CacheEntry) -> Option<String> {
@@ -124,6 +93,54 @@ impl Manifest {
         entry.blake3_hash = hash;
         self.entries.insert(path, entry);
     }
+}
+
+pub(crate) fn load_locked_bincode_default<T>(path: &Path) -> Result<T>
+where
+    T: Default + DeserializeOwned,
+{
+    if !path.exists() {
+        return Ok(T::default());
+    }
+
+    let file = File::open(path)
+        .with_context(|| format!("failed to open cache file {}", path.display()))?;
+    file.lock_shared()
+        .with_context(|| format!("failed to acquire shared lock on {}", path.display()))?;
+
+    let value = bincode::deserialize_from(&file).unwrap_or_default();
+
+    file.unlock()
+        .with_context(|| format!("failed to release shared lock on {}", path.display()))?;
+    Ok(value)
+}
+
+pub(crate) fn save_locked_bincode<T>(path: &Path, value: &T) -> Result<()>
+where
+    T: Serialize,
+{
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create cache directory {}", parent.display()))?;
+    }
+
+    let file = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)
+        .with_context(|| format!("failed to open cache file for writing {}", path.display()))?;
+
+    file.lock_exclusive()
+        .with_context(|| format!("failed to acquire exclusive lock on {}", path.display()))?;
+
+    bincode::serialize_into(&file, value)
+        .with_context(|| format!("failed to serialize cache file {}", path.display()))?;
+
+    file.unlock()
+        .with_context(|| format!("failed to release exclusive lock on {}", path.display()))?;
+    Ok(())
 }
 
 pub fn save_blob(blobs_dir: &Path, hash: &str, document: &ContextArtifact) -> Result<()> {
