@@ -1,0 +1,9 @@
+---
+recorded_at: 2026-04-07T08:32:02.190768464-07:00
+command: sh -lc 'cd "$(git rev-parse --show-toplevel)" && rg -n "\"keel\": \\{" flake.lock && rg -n "\"rev\": \"e7a2a2ed00dd7342b94ac56a4eb32a3b683f4242\"" flake.lock && rg -n "git\\+ssh://git@github.com/spoke-sh/keel.git|ssh://git@github.com/spoke-sh/keel.git" flake.nix flake.lock'
+---
+21:    "keel": {
+37:        "rev": "e7a2a2ed00dd7342b94ac56a4eb32a3b683f4242",
+flake.lock:40:        "url": "ssh://git@github.com/spoke-sh/keel.git"
+flake.lock:44:        "url": "ssh://git@github.com/spoke-sh/keel.git"
+flake.nix:9:      url = "git+ssh://git@github.com/spoke-sh/keel.git";

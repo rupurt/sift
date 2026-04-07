@@ -1,0 +1,11 @@
+---
+recorded_at: 2026-04-07T08:32:05.090754737-07:00
+command: nix develop -c sh -lc 'cd "$(git rev-parse --show-toplevel)" && just keel doctor --status'
+---
+• [MSN] 1 mission to be verified
+• [EXC] 1 story executing
+• [HLT] 2 warnings, no structural errors detected
+
+--- stderr ---
+path '/home/alex/workspace/rupurt/sift/.keel' does not contain a 'flake.nix', searching up
+keel doctor --status
