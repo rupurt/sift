@@ -338,6 +338,8 @@ impl SearchServiceBuilder {
         // Register retrievers
         service.register_retriever(Box::new(Bm25Retriever));
         service.register_retriever(Box::new(PhraseRetriever));
+        service.register_retriever(Box::new(PathFuzzyRetriever));
+        service.register_retriever(Box::new(SegmentFuzzyRetriever));
         if let Some(e) = embedder {
             let final_embedder = if let Some(cache) = query_cache {
                 Arc::new(crate::search::domain::CachedEmbedder { inner: e, cache })

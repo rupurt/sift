@@ -4,7 +4,9 @@ This document defines the conceptual framework and "physics" that govern the des
 
 ## The Core Analogy
 
-Sift is not a file searcher; it is a **High-Energy Information Reactor**.
+Sift is not a file searcher; it is a **High-Energy Information Reactor**. That
+still allows path-shaped intent to influence retrieval as structural evidence
+without turning the reactor into an editor picker or a second planner.
 
 ### 1. The Corpus is Mass
 Data in its raw state (files on disk, conversational logs) is inert **Mass**. It has volume and density but no utility until acted upon.
@@ -12,7 +14,7 @@ Data in its raw state (files on disk, conversational logs) is inert **Mass**. It
 ### 2. Retrieval is Magnetism
 Retrieval is the force of **Attraction**. 
 - **The Query is the Magnet:** It generates a field that pulls relevant Mass into the containment area.
-- **Retrieval Strategies are Field Configurations:** BM25, Vector Similarity, and Phrase Matching are different ways to align the magnetic field to pull the most "charged" mass.
+- **Retrieval Strategies are Field Configurations:** BM25, phrase matching, path-fuzzy recall, segment-fuzzy evidence, and vector similarity are different ways to align the magnetic field to pull the most "charged" mass.
 - **Agentic Search is Pulsed Magnetism:** A controller can retune the field turn by turn, decomposing a hard query into smaller pulls instead of relying on one pass.
 - **The Shortlist is the Containment Field:** We pull raw mass into a tight, manageable volume (the shortlist) where it can be reacted upon.
 

@@ -193,6 +193,12 @@
 | [Adopt Sector Reuse Across Runtime Surfaces](epics/VFnGRPtQQ/voyages/VFnGWulCe/) | done |
 | [Implement Frontier Coverage Search Semantics](epics/VFnGRPtQQ/voyages/VFnGWurCd/) | done |
 
+### [Add Fuzzy Structural Retrieval Strategies](epics/VG7WSIxMB/) (done)
+
+| Voyage | Status |
+|--------|--------|
+| [Implement Fuzzy Path And Segment Retrieval](epics/VG7WSIxMB/voyages/VG7WmMIjI/) | done |
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |

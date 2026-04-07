@@ -85,11 +85,14 @@ pub trait SearchStorage: Send + Sync {
 
 ## Current State vs. Vision
 Currently, `sift` uses a semi-rigid `SearchPlan` and a mostly single-pass
-`execute` loop in `SearchService`. The codebase already has useful scaffolding
-for the next step, including trait-based engine boundaries and local
-`GenerativeModel` / `Conversation` support, but it does not yet have a
-first-class multi-turn search harness, `AgentTurn` domain model, or self-editing
-context loop.
+`execute` loop in `SearchService`. The shipped substrate now includes
+structural fuzzy retrieval lanes for path intent and snippet-bearing segment
+evidence, which downstream controllers can consume through explicit plans
+without handing planner authority back to `sift`. The codebase already has
+useful scaffolding for the next step, including trait-based engine boundaries
+and local `GenerativeModel` / `Conversation` support, but it does not yet have
+a first-class multi-turn search harness, `AgentTurn` domain model, or
+self-editing context loop.
 
 This research proposes transitioning those internal patterns into a public
 trait-based engine framework that can formally support hybrid retrieval and

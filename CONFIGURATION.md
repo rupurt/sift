@@ -51,7 +51,8 @@ data/raw/
 | `shortlist` | Integer | `8` | Number of fused candidates passed to reranking. |
 
 `hybrid` is the default runtime strategy. `page-index-hybrid` is the richer
-benchmark champion preset used in comparative evaluation docs.
+benchmark champion preset used in comparative evaluation docs, with structural
+fuzzy retrieval for path-heavy and snippet-heavy recall.
 
 ### Built-in Strategies
 
@@ -61,14 +62,15 @@ The current registry exposes the following named plans:
 - `bm25`: Same execution plan as `lexical`, but reported under the `bm25` name.
 - `vector`: Dense-vector-only semantic search.
 - `hybrid`: BM25 + vector fusion with no reranking.
+- `path-hybrid`: BM25 + path-fuzzy retrieval with position-aware reranking for filename/path-shaped queries.
 - `legacy-hybrid`: `page-index-hybrid` retrieval stack without expansion.
-- `page-index-hybrid`: SPLADE expansion + BM25 + phrase + vector + position-aware reranking.
-- `page-index-llm`: HyDE expansion + BM25 + phrase + vector + Qwen reranking.
-- `page-index-qwen`: No expansion + BM25 + phrase + vector + Qwen reranking.
-- `page-index-splade`: SPLADE expansion + BM25 + phrase + vector + position-aware reranking.
-- `page-index-classified`: Classified expansion + BM25 + phrase + vector + position-aware reranking.
-- `page-index-jina`: SPLADE expansion + BM25 + phrase + vector + Jina reranking.
-- `page-index-gemma`: SPLADE expansion + BM25 + phrase + vector + Gemma reranking.
+- `page-index-hybrid`: SPLADE expansion + BM25 + phrase + path-fuzzy + segment-fuzzy + vector + position-aware reranking.
+- `page-index-llm`: HyDE expansion + BM25 + phrase + path-fuzzy + segment-fuzzy + vector + Qwen reranking.
+- `page-index-qwen`: No expansion + BM25 + phrase + path-fuzzy + segment-fuzzy + vector + Qwen reranking.
+- `page-index-splade`: SPLADE expansion + BM25 + phrase + path-fuzzy + segment-fuzzy + vector + position-aware reranking.
+- `page-index-classified`: Classified expansion + BM25 + phrase + path-fuzzy + segment-fuzzy + vector + position-aware reranking.
+- `page-index-jina`: SPLADE expansion + BM25 + phrase + path-fuzzy + segment-fuzzy + vector + Jina reranking.
+- `page-index-gemma`: SPLADE expansion + BM25 + phrase + path-fuzzy + segment-fuzzy + vector + Gemma reranking.
 
 ### Strategy Matrix
 
@@ -78,27 +80,28 @@ The current registry exposes the following named plans:
 | `bm25` | `none` | `bm25` | `rrf` | `none` |
 | `vector` | `none` | `vector` | `rrf` | `none` |
 | `hybrid` | `none` | `bm25, vector` | `rrf` | `none` |
-| `legacy-hybrid` | `none` | `bm25, phrase, vector` | `rrf` | `position-aware` |
-| `page-index-hybrid` | `splade` | `bm25, phrase, vector` | `rrf` | `position-aware` |
-| `page-index-llm` | `hyde` | `bm25, phrase, vector` | `rrf` | `llm` |
-| `page-index-qwen` | `none` | `bm25, phrase, vector` | `rrf` | `llm` |
-| `page-index-splade` | `splade` | `bm25, phrase, vector` | `rrf` | `position-aware` |
-| `page-index-classified` | `classified` | `bm25, phrase, vector` | `rrf` | `position-aware` |
-| `page-index-jina` | `splade` | `bm25, phrase, vector` | `rrf` | `jina` |
-| `page-index-gemma` | `splade` | `bm25, phrase, vector` | `rrf` | `gemma` |
+| `path-hybrid` | `none` | `bm25, path-fuzzy` | `rrf` | `position-aware` |
+| `legacy-hybrid` | `none` | `bm25, phrase, path-fuzzy, segment-fuzzy, vector` | `rrf` | `position-aware` |
+| `page-index-hybrid` | `splade` | `bm25, phrase, path-fuzzy, segment-fuzzy, vector` | `rrf` | `position-aware` |
+| `page-index-llm` | `hyde` | `bm25, phrase, path-fuzzy, segment-fuzzy, vector` | `rrf` | `llm` |
+| `page-index-qwen` | `none` | `bm25, phrase, path-fuzzy, segment-fuzzy, vector` | `rrf` | `llm` |
+| `page-index-splade` | `splade` | `bm25, phrase, path-fuzzy, segment-fuzzy, vector` | `rrf` | `position-aware` |
+| `page-index-classified` | `classified` | `bm25, phrase, path-fuzzy, segment-fuzzy, vector` | `rrf` | `position-aware` |
+| `page-index-jina` | `splade` | `bm25, phrase, path-fuzzy, segment-fuzzy, vector` | `rrf` | `jina` |
+| `page-index-gemma` | `splade` | `bm25, phrase, path-fuzzy, segment-fuzzy, vector` | `rrf` | `gemma` |
 
 ### CLI Overrides
 
 The executable can override parts of the configured strategy per request:
 
 ```bash
-sift search --intent "find the trait definition" --retrievers bm25,phrase --reranking none "engine"
+sift search --intent "find the trait definition" --retrievers bm25,path-fuzzy,segment-fuzzy --reranking position-aware "engine"
 ```
 
 Available overrides:
 
 - `--intent`
-- `--retrievers bm25,phrase,vector`
+- `--retrievers bm25,phrase,path-fuzzy,segment-fuzzy,vector`
 - `--fusion rrf`
 - `--reranking none|position-aware|llm|jina|gemma`
 - `--limit`
@@ -158,7 +161,8 @@ optimizer.
 
 ### Position-aware Reranking
 
-This reranker adds structural bonuses such as filename and heading matches.
+This reranker adds deterministic structural bonuses such as filename stem,
+path-component, heading, and definition-like snippet matches.
 
 ### Qwen / Gemma / Jina Reranking
 

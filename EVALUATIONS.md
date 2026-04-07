@@ -59,9 +59,13 @@ just sift eval all --dataset scifact --json
 ```
 
 Current registered strategies include `lexical`, `bm25`, `vector`, `hybrid`,
-`legacy-hybrid`, `page-index-hybrid`, `page-index-llm`, `page-index-qwen`,
-`page-index-splade`, `page-index-classified`, `page-index-jina`, and
-`page-index-gemma`.
+`path-hybrid`, `legacy-hybrid`, `page-index-hybrid`, `page-index-llm`,
+`page-index-qwen`, `page-index-splade`, `page-index-classified`,
+`page-index-jina`, and `page-index-gemma`.
+
+The richer page-index family now evaluates structural fuzzy retrieval as part of
+the core substrate: path-aware recall for filename-like intent plus snippet-
+bearing fuzzy segment evidence for downstream synthesis consumers.
 
 If a strategy depends on a gated Hugging Face model and `HF_TOKEN` is missing
 or lacks access, `eval all` skips that strategy instead of aborting the entire

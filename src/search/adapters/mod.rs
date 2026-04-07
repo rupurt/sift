@@ -7,12 +7,14 @@ use crate::vector::{aggregate_segment_hits, score_segments_manually};
 use anyhow::Result;
 
 pub mod cli;
+mod fuzzy;
 pub mod gemma;
 pub mod jina;
 pub mod llm_utils;
 pub mod qwen;
 
 pub use self::cli::*;
+pub use self::fuzzy::*;
 pub use self::gemma::*;
 pub use self::jina::*;
 pub use self::llm_utils::*;
@@ -40,10 +42,13 @@ pub struct PositionAwareReranker;
 impl Reranker for PositionAwareReranker {
     fn rerank(
         &self,
-        _query: &str,
+        query: &str,
         mut candidates: CandidateList,
         limit: usize,
     ) -> Result<CandidateList> {
+        for candidate in &mut candidates.results {
+            candidate.score += structural_rerank_bonus(query, candidate);
+        }
         candidates.results.sort_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)

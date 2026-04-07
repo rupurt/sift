@@ -45,6 +45,32 @@ impl SearchPlan {
         }
     }
 
+    pub fn default_path_hybrid() -> Self {
+        Self {
+            name: "path-hybrid".to_string(),
+            query_expansion: QueryExpansionPolicy::None,
+            retrievers: vec![RetrieverPolicy::Bm25, RetrieverPolicy::PathFuzzy],
+            fusion: FusionPolicy::Rrf,
+            reranking: RerankingPolicy::PositionAware,
+        }
+    }
+
+    pub fn default_page_index_hybrid() -> Self {
+        Self {
+            name: "page-index-hybrid".to_string(),
+            query_expansion: QueryExpansionPolicy::Splade,
+            retrievers: vec![
+                RetrieverPolicy::Bm25,
+                RetrieverPolicy::Phrase,
+                RetrieverPolicy::PathFuzzy,
+                RetrieverPolicy::SegmentFuzzy,
+                RetrieverPolicy::Vector,
+            ],
+            fusion: FusionPolicy::Rrf,
+            reranking: RerankingPolicy::PositionAware,
+        }
+    }
+
     pub fn categorize_score(&self, score: f64) -> ScoreConfidence {
         if score > 0.8 {
             ScoreConfidence::High
@@ -201,6 +227,10 @@ pub enum RetrieverPolicy {
     Bm25,
     Phrase,
     Vector,
+    #[serde(rename = "path-fuzzy", alias = "pathfuzzy")]
+    PathFuzzy,
+    #[serde(rename = "segment-fuzzy", alias = "segmentfuzzy")]
+    SegmentFuzzy,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ValueEnum)]
@@ -1706,18 +1736,9 @@ impl StrategyPresetRegistry {
             reranking: RerankingPolicy::None,
         };
         registry.register("hybrid", hybrid_plan);
+        registry.register("path-hybrid", SearchPlan::default_path_hybrid());
 
-        let page_index_hybrid_plan = SearchPlan {
-            name: "page-index-hybrid".to_string(),
-            query_expansion: QueryExpansionPolicy::Splade,
-            retrievers: vec![
-                RetrieverPolicy::Bm25,
-                RetrieverPolicy::Phrase,
-                RetrieverPolicy::Vector,
-            ],
-            fusion: FusionPolicy::Rrf,
-            reranking: RerankingPolicy::PositionAware,
-        };
+        let page_index_hybrid_plan = SearchPlan::default_page_index_hybrid();
         registry.register("page-index-hybrid", page_index_hybrid_plan.clone());
         registry.register(
             "legacy-hybrid",
@@ -1733,11 +1754,7 @@ impl StrategyPresetRegistry {
         let page_index_llm_plan = SearchPlan {
             name: "page-index-llm".to_string(),
             query_expansion: QueryExpansionPolicy::Hyde,
-            retrievers: vec![
-                RetrieverPolicy::Bm25,
-                RetrieverPolicy::Phrase,
-                RetrieverPolicy::Vector,
-            ],
+            retrievers: page_index_hybrid_plan.retrievers.clone(),
             fusion: FusionPolicy::Rrf,
             reranking: RerankingPolicy::Llm,
         };
@@ -1749,11 +1766,7 @@ impl StrategyPresetRegistry {
             SearchPlan {
                 name: "page-index-qwen".to_string(),
                 query_expansion: QueryExpansionPolicy::None,
-                retrievers: vec![
-                    RetrieverPolicy::Bm25,
-                    RetrieverPolicy::Phrase,
-                    RetrieverPolicy::Vector,
-                ],
+                retrievers: page_index_hybrid_plan.retrievers.clone(),
                 fusion: FusionPolicy::Rrf,
                 reranking: RerankingPolicy::Llm,
             },
@@ -1765,11 +1778,7 @@ impl StrategyPresetRegistry {
             SearchPlan {
                 name: "page-index-splade".to_string(),
                 query_expansion: QueryExpansionPolicy::Splade,
-                retrievers: vec![
-                    RetrieverPolicy::Bm25,
-                    RetrieverPolicy::Phrase,
-                    RetrieverPolicy::Vector,
-                ],
+                retrievers: page_index_hybrid_plan.retrievers.clone(),
                 fusion: FusionPolicy::Rrf,
                 reranking: RerankingPolicy::PositionAware,
             },
@@ -1781,11 +1790,7 @@ impl StrategyPresetRegistry {
             SearchPlan {
                 name: "page-index-classified".to_string(),
                 query_expansion: QueryExpansionPolicy::Classified,
-                retrievers: vec![
-                    RetrieverPolicy::Bm25,
-                    RetrieverPolicy::Phrase,
-                    RetrieverPolicy::Vector,
-                ],
+                retrievers: page_index_hybrid_plan.retrievers.clone(),
                 fusion: FusionPolicy::Rrf,
                 reranking: RerankingPolicy::PositionAware,
             },
@@ -1797,11 +1802,7 @@ impl StrategyPresetRegistry {
             SearchPlan {
                 name: "page-index-jina".to_string(),
                 query_expansion: QueryExpansionPolicy::Splade,
-                retrievers: vec![
-                    RetrieverPolicy::Bm25,
-                    RetrieverPolicy::Phrase,
-                    RetrieverPolicy::Vector,
-                ],
+                retrievers: page_index_hybrid_plan.retrievers.clone(),
                 fusion: FusionPolicy::Rrf,
                 reranking: RerankingPolicy::Jina,
             },
@@ -1813,11 +1814,7 @@ impl StrategyPresetRegistry {
             SearchPlan {
                 name: "page-index-gemma".to_string(),
                 query_expansion: QueryExpansionPolicy::Splade,
-                retrievers: vec![
-                    RetrieverPolicy::Bm25,
-                    RetrieverPolicy::Phrase,
-                    RetrieverPolicy::Vector,
-                ],
+                retrievers: page_index_hybrid_plan.retrievers.clone(),
                 fusion: FusionPolicy::Rrf,
                 reranking: RerankingPolicy::Gemma,
             },
@@ -2060,7 +2057,7 @@ pub enum OutputFormat {
 mod tests {
     use super::{
         QueryExpansionPolicy, RerankingPolicy, RetrieverPolicy, SearchCoverageMode,
-        SearchCoverageSnapshot, StrategyPresetRegistry,
+        SearchCoverageSnapshot, SearchPlan, StrategyPresetRegistry,
     };
     use crate::cache::FrontierLedger;
 
@@ -2074,6 +2071,52 @@ mod tests {
         assert_eq!(plan.query_expansion, QueryExpansionPolicy::None);
         assert_eq!(plan.retrievers, vec![RetrieverPolicy::Vector]);
         assert_eq!(plan.reranking, RerankingPolicy::None);
+    }
+
+    #[test]
+    fn default_registry_includes_structural_fuzzy_strategies() {
+        let page_index = StrategyPresetRegistry::default_registry()
+            .resolve("page-index-hybrid")
+            .expect("page-index-hybrid preset should be registered");
+
+        assert_eq!(
+            page_index.retrievers,
+            vec![
+                RetrieverPolicy::Bm25,
+                RetrieverPolicy::Phrase,
+                RetrieverPolicy::PathFuzzy,
+                RetrieverPolicy::SegmentFuzzy,
+                RetrieverPolicy::Vector,
+            ]
+        );
+
+        let path_hybrid = StrategyPresetRegistry::default_registry()
+            .resolve("path-hybrid")
+            .expect("path-hybrid preset should be registered");
+        assert_eq!(
+            path_hybrid.retrievers,
+            vec![RetrieverPolicy::Bm25, RetrieverPolicy::PathFuzzy]
+        );
+        assert_eq!(path_hybrid.reranking, RerankingPolicy::PositionAware);
+    }
+
+    #[test]
+    fn search_plan_default_page_index_hybrid_includes_structural_fuzzy_retrievers() {
+        let plan = SearchPlan::default_page_index_hybrid();
+
+        assert_eq!(plan.name, "page-index-hybrid");
+        assert_eq!(plan.query_expansion, QueryExpansionPolicy::Splade);
+        assert_eq!(
+            plan.retrievers,
+            vec![
+                RetrieverPolicy::Bm25,
+                RetrieverPolicy::Phrase,
+                RetrieverPolicy::PathFuzzy,
+                RetrieverPolicy::SegmentFuzzy,
+                RetrieverPolicy::Vector,
+            ]
+        );
+        assert_eq!(plan.reranking, RerankingPolicy::PositionAware);
     }
 
     #[test]

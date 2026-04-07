@@ -173,6 +173,13 @@ Use this mode when you need:
 - explicit pruning counts
 - a protocol or latent emission derived from the same search
 
+Embedders that care about filename/path recall or synthesis-ready snippets
+should prefer an explicit `SearchPlan`, for example
+`SearchPlan::default_page_index_hybrid()`, when calling context assembly or
+controller/autonomous APIs. That is the intended adoption path for downstream
+tools such as `paddles`: richer direct retrieval, but planner ownership stays
+outside `sift`.
+
 ## Mode 3: Single Turn with Explicit Emission
 
 Use `Sift::search_turn` when you need turn IDs, session IDs, traces, and an

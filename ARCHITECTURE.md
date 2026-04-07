@@ -121,6 +121,7 @@ Stores binary serialized assets, including extracted text, term frequencies, and
 
 ### Implemented now
 - A composable hybrid retrieval core (`SearchPlan`, retrievers, fusion, reranking).
+- Structural fuzzy retrieval lanes for path intent and snippet-bearing segment evidence inside the same direct-search substrate.
 - Trait seams for `SearchEngine`, `SearchIR`, `SearchExecution`, and `SearchStorage`.
 - Local generative model access and stateful `Conversation` hooks.
 - CLI surfaces for direct search, `search --agent`, and evaluation.
@@ -146,13 +147,15 @@ Adapters implement the core search traits, enabling pluggable behavior across th
 ### 2. Retrieval (`Retriever`)
 - **Bm25Retriever:** Lexical scoring using the BM25 algorithm.
 - **PhraseRetriever:** High-precision exact phrase matching.
+- **PathFuzzyRetriever:** Approximate filename and path-component matching for path-shaped intent.
+- **SegmentFuzzyRetriever:** Typo-tolerant fuzzy line/segment matching that returns snippet-bearing evidence.
 - **SegmentVectorRetriever:** Semantic scoring via dense vector embeddings.
 
 ### 3. Fusion (`Fuser`)
 - **RrfFuser:** Combines multiple candidate lists using Reciprocal Rank Fusion (RRF).
 
 ### 4. Reranking (`Reranker`)
-- **PositionAwareReranker:** Applies structural bonuses (filename, heading matches).
+- **PositionAwareReranker:** Applies deterministic structural bonuses for path, filename stem, heading, and definition-like snippet matches.
 - **QwenReranker:** Deep semantic reranking using the Qwen 2.5 family.
 - **GemmaReranker:** Deep semantic reranking using the Gemma 3 family.
 - **JinaReranker:** Integration with Jina Reranker v3 for high-precision cross-encoding.

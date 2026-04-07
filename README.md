@@ -25,7 +25,7 @@ For project background and design rationale, read the introductory post:
 - **Shared runtime cache:** Direct search, `search --agent`, and the crate-root controller/autonomous APIs reuse the same cache root across fresh processes.
 - **Visible indexing:** Interactive `sift search` runs show live stderr progress for indexing and cache reuse while preparation is in flight.
 - **Default interactive strategy:** The default config strategy is `hybrid`.
-- **Current champion preset:** `page-index-hybrid` is the richer benchmark preset for comparative evaluation.
+- **Current champion preset:** `page-index-hybrid` is the richer benchmark preset, combining BM25, phrase, path-fuzzy, segment-fuzzy, and vector retrieval before structural reranking.
 - **Layered pipeline:** Query Expansion -> Retrieval -> Fusion -> Reranking.
 - **Executable surface:** `search`, `eval`, `dataset`, `optimize`, and `config` are the supported CLI commands.
 - **Library surface:** `search`, `search_with_progress`, `assemble_context`, `search_turn`, `search_controller`, and `search_autonomous` are supported at the crate root.
@@ -90,6 +90,12 @@ Run the current benchmark champion preset explicitly:
 sift search --strategy page-index-hybrid tests/fixtures/rich-docs "architecture decision"
 ```
 
+Use the focused path-heavy preset when filename or path intent dominates:
+
+```bash
+sift search --strategy path-hybrid src "sift_request_factory"
+```
+
 Use a simpler lexical-only plan:
 
 ```bash
@@ -125,7 +131,7 @@ sift search --strategy hybrid --agent "trace the cache invalidation path" \
 Override individual pipeline stages:
 
 ```bash
-sift search --retrievers bm25,phrase --reranking none "query"
+sift search --retrievers bm25,path-fuzzy,segment-fuzzy --reranking position-aware "query"
 ```
 
 Emit JSON instead of text:
@@ -173,6 +179,11 @@ surface lives at the crate root and includes:
 Everything under `sift::internal` exists to support the bundled executable,
 benchmarks, and repository-internal tests. It is not part of the stable
 embedding contract.
+
+Embedders that need stronger filename/path recall and synthesis-ready snippets
+can opt into `SearchPlan::default_page_index_hybrid()` through the library
+request types. That keeps planner ownership outside `sift`, which matches how
+downstream tools such as `paddles` should consume the direct retrieval layer.
 
 When you point `Sift::builder()` or `SearchOptions` at a cache directory, direct
 search, controller execution, and autonomous runtime calls all reuse that same
