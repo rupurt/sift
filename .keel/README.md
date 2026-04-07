@@ -199,6 +199,12 @@
 |--------|--------|
 | [Implement Fuzzy Path And Segment Retrieval](epics/VG7WSIxMB/voyages/VG7WmMIjI/) | done |
 
+### [Lift Structural Retrieval Documentation Fidelity](epics/VG8oL9Xok/) (done)
+
+| Voyage | Status |
+|--------|--------|
+| [Refresh Foundational Structural Retrieval Docs](epics/VG8oL9Xok/voyages/VG8oUK3wL/) | done |
+
 ### [Raw Document Retrieval Architecture Research](epics/1vzJVa000/) (done)
 
 | Voyage | Status |

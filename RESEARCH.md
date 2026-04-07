@@ -35,7 +35,7 @@ The **Intermediate Representation (IR)** should evolve beyond a static
 `SearchPlan` struct. It becomes a trait that "compiles" a user query into an
 executable **Graph of Operations**.
 
-- **Node:** Represents a discrete operation (e.g., `LexicalRetrieval`, `VectorRetrieval`, `Expansion`, `DecomposeQuery`, `PruneContext`, `EmitTurn`).
+- **Node:** Represents a discrete operation (e.g., `LexicalRetrieval`, `PathFuzzyRetrieval`, `SegmentFuzzyRetrieval`, `VectorRetrieval`, `Expansion`, `DecomposeQuery`, `PruneContext`, `EmitTurn`).
 - **Edge:** Represents the data flow and dependencies (e.g., `CandidateList`).
 
 ```rust
@@ -82,6 +82,7 @@ pub trait SearchStorage: Send + Sync {
 2. **Dynamic IR:** Users can create custom IR compilers that generate branching or iterative search strategies based on query classification and accumulated evidence.
 3. **Agentic Search:** A controller can treat retrieval as a reusable subgraph, decompose multi-hop queries, prune context, and emit structured turns without introducing a separate search stack.
 4. **Execution Profiling:** By making `Execution` a trait, we can swap in a `TracingExecutor` that records sub-millisecond spans for every node in the graph without polluting the domain logic.
+5. **Structural Evidence Routing:** Future graph planners can choose path-fuzzy or segment-fuzzy nodes explicitly instead of treating all recall as one undifferentiated lexical step.
 
 ## Current State vs. Vision
 Currently, `sift` uses a semi-rigid `SearchPlan` and a mostly single-pass

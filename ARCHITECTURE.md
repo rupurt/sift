@@ -56,13 +56,17 @@ is still planned beyond those DTOs.
 The Intermediate Representation (IR) translates user queries into an executable
 plan. Today `SearchIR` is a thin wrapper around `SearchPlan`; the target state
 is a richer **Graph of Operations** that can express branching and iterative
-agentic search.
+agentic search. In the shipped direct-search substrate, the most expressive
+plan family now combines lexical, exact, path-fuzzy, segment-fuzzy, and vector
+lanes before shortlist reranking.
 
 ### 3. SearchExecution (The Fusion Runtime)
 Orchestrates traversal of the plan or graph and the reaction process. Today the
 default runtime is a sequential `PipelineExecution`; by keeping execution as a
 trait, Sift can grow toward turn-based controllers, parallel walks, or other
-specialized runtimes.
+specialized runtimes. The current runtime already executes multiple retriever
+lanes and fuses them through RRF before applying deterministic or model-backed
+reranking.
 
 ### 4. SearchStorage (The Mass Repository)
 Abstracts the corpus and indices. Today the primary storage is the local
@@ -151,6 +155,11 @@ Adapters implement the core search traits, enabling pluggable behavior across th
 - **SegmentFuzzyRetriever:** Typo-tolerant fuzzy line/segment matching that returns snippet-bearing evidence.
 - **SegmentVectorRetriever:** Semantic scoring via dense vector embeddings.
 
+The page-index preset family uses all five retrieval lanes together. That
+combination is intentional: BM25 and phrase matching preserve exactness, path
+fuzzy covers filename intent, segment fuzzy produces synthesis-ready snippets,
+and vector retrieval bridges semantic vocabulary gaps.
+
 ### 3. Fusion (`Fuser`)
 - **RrfFuser:** Combines multiple candidate lists using Reciprocal Rank Fusion (RRF).
 
@@ -159,3 +168,8 @@ Adapters implement the core search traits, enabling pluggable behavior across th
 - **QwenReranker:** Deep semantic reranking using the Qwen 2.5 family.
 - **GemmaReranker:** Deep semantic reranking using the Gemma 3 family.
 - **JinaReranker:** Integration with Jina Reranker v3 for high-precision cross-encoding.
+
+`PositionAwareReranker` is the lightweight structural compression stage. It is
+not a placeholder for deep semantics; its job is to turn the fused shortlist
+into a better-ordered direct-search result set using bounded deterministic
+signals that downstream controllers and synthesis consumers can reason about.

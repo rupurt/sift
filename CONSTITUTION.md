@@ -29,6 +29,7 @@ Search results and evaluations must be reproducible.
 Search is a pipeline, not a single algorithm.
 - We do not hardcode "hybrid" or "agentic" as single functions. We compose them via explicit plans, graphs, and turns over `Query Expansion -> Retrieval -> Fusion -> Reranking`.
 - Strategies are defined as data (Presets/Plans) and executed by an orchestrator, allowing for rapid experimentation and objective benchmarking.
+- Structural fuzzy retrieval is part of that composable substrate. Path-aware and segment-aware recall must remain explicit retriever lanes rather than hidden side effects in one oversized ranker.
 - Agentic controllers must remain inspectable and replayable; hidden background state is not an acceptable substitute for an explicit search trace.
 
 ## 6. Local First
@@ -49,9 +50,13 @@ Implementation does not end at a clean compile.
 ## 9. Intent-Driven Hybrid And Agentic IR
 `sift` is built as a modern Hybrid and Agentic Information Retrieval (IR) system
 that captures user **intent**, not just keyword matches. The hybrid core uses
-lexical retrieval, semantic retrieval, and reranking to bridge the vocabulary
-gap between a user's question and the technical implementation in source code.
+lexical retrieval, structural fuzzy retrieval, semantic retrieval, and
+reranking to bridge the vocabulary gap and the structural gap between a user's
+question and the technical implementation in source code.
 
 The agentic layer decomposes search into explicit turns that can manage context,
 reuse local models, and emit results to humans or other tools without violating
 the local-first contract.
+
+Downstream embedders may select richer direct-search plans, but that does not
+transfer planner ownership into the retrieval layer.

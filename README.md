@@ -154,6 +154,20 @@ Trace the pipeline and timings at different levels:
 - `-vv`: Detailed retriever timings and cache traces
 - `-vvv`: Granular internal scoring data
 
+## Strategy Guide
+
+Use the shipped presets intentionally:
+
+- `hybrid`: Lowest-friction default when you want BM25 plus semantic recall without structural reranking.
+- `path-hybrid`: Best when the query is shaped like a filename, path fragment, module, or symbol stem and you want deterministic path-sensitive reranking.
+- `page-index-hybrid`: Best all-around direct-search preset when you want stronger recall plus snippet-bearing structural evidence for downstream synthesis or context assembly.
+- `page-index-llm` / `page-index-jina` / `page-index-gemma`: Best when the richer shortlist is already useful and you want a heavier semantic pass on top of it.
+
+The structural fuzzy lanes are intentionally narrow:
+
+- `path-fuzzy` recovers artifacts from approximate filename and path-component intent.
+- `segment-fuzzy` recovers typo-tolerant line and segment evidence, which is especially useful when a downstream tool needs snippet-bearing support rather than just an artifact path.
+
 ## Embedded Library
 
 `sift` can also be embedded from another Rust project. The supported public
@@ -184,6 +198,11 @@ Embedders that need stronger filename/path recall and synthesis-ready snippets
 can opt into `SearchPlan::default_page_index_hybrid()` through the library
 request types. That keeps planner ownership outside `sift`, which matches how
 downstream tools such as `paddles` should consume the direct retrieval layer.
+
+If an embedder only needs filename/path-heavy recovery, `SearchPlan::default_path_hybrid()`
+is the lighter structural option. The intended `paddles` adoption path is still
+explicit direct retrieval selection, not handing search planning back into
+`sift`.
 
 When you point `Sift::builder()` or `SearchOptions` at a cache directory, direct
 search, controller execution, and autonomous runtime calls all reuse that same
@@ -324,17 +343,21 @@ flowchart TD
 
     F -->|Lexical| F1[BM25]
     F -->|Exact| F2[Phrase]
-    F -->|Semantic| F3[Vector - SIMD Dot Product]
+    F -->|Path Intent| F3[Path Fuzzy]
+    F -->|Snippet Evidence| F4[Segment Fuzzy]
+    F -->|Semantic| F5[Vector - SIMD Dot Product]
 
     subgraph QueryCache ["Query Embedding Cache"]
-      F3
+      F5
     end
 
     F1 --> G[Reciprocal Rank Fusion]
     F2 --> G
     F3 --> G
+    F4 --> G
+    F5 --> G
     G --> H{Reranking}
-    H -->|Basic| H1[Position-Aware]
+    H -->|Basic| H1[Position-Aware: Path + Heading + Definition Bonuses]
     H -->|Advanced| H2[LLM - Deep Semantic Pass]
     H1 --> K{Emission}
     H2 --> K
@@ -367,6 +390,10 @@ contract.
 - **[EVALUATIONS.md](EVALUATIONS.md):** Retrieval and agentic evaluation workflows.
 - **[LIBRARY.md](LIBRARY.md):** Crate-root embedding guide for all supported library modes.
 - **[ARCHITECTURE.md](ARCHITECTURE.md):** Architecture, execution seams, and implementation status.
+- **[WORLD.md](WORLD.md):** Conceptual model for retrieval, emission, and structural evidence.
+- **[RESEARCH.md](RESEARCH.md):** Forward-looking graph-IR and execution direction.
+- **[CONSTITUTION.md](CONSTITUTION.md):** Non-negotiable engineering and architecture principles.
+- **[RELEASE.md](RELEASE.md):** Release checklist and artifact verification process.
 
 ## License
 

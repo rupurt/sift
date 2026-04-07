@@ -23,6 +23,7 @@ The transition from a list of candidates to a final result is a **Fusion Reactio
 - **Compression:** The Reranker compresses the containment field, forcing the most relevant candidates into close proximity.
 - **Reaction:** The LLM acts as the catalyst, reacting with the compressed candidates to release "Energy" (Intent-aligned value).
 - **Context Management:** An agentic controller can vent or retain energy between turns, pruning stale evidence to keep the reactor stable.
+- **Structural Evidence:** Fuzzy segment evidence and bounded structural bonuses make the emitted energy easier to reuse in later synthesis without requiring a second planning authority.
 - **The Emission Port:** The Reactor must have configurable ports to bleed off different types of energy:
     - **Latent Emission:** Raw embedding vectors (The signal before it is formed).
     - **Protocol Emission:** Structured domain records (Turns, Logic Lineage).

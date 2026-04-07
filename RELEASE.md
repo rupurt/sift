@@ -57,6 +57,9 @@ Once the GitHub Action completes:
 1.  Go to the [Releases](https://github.com/rupurt/sift/releases) page.
 2.  Verify that all artifacts (tarballs and installers) are attached.
 3.  Ensure the `checksums.txt` file is present.
+4.  If the release changed built-in strategies, reranking behavior, or public
+    `SearchPlan` helpers, verify the foundational docs were updated in the same
+    release train.
 
 ---
 

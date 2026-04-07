@@ -119,6 +119,18 @@ The executable does not currently expose a raw `--expansion` flag. Expansion is
 selected indirectly through the chosen strategy. If you need an explicit custom
 expansion policy, use an explicit `SearchPlan` through the library surface.
 
+### Strategy Selection Guide
+
+Use the presets based on the shape of the query and the consumer:
+
+- Choose `hybrid` when you want a fast, general-purpose direct-search default.
+- Choose `path-hybrid` when the query is mostly a filename, module path, or symbol stem and you want a lightweight structural lane.
+- Choose `page-index-hybrid` when you want the richest direct-search preset with structural fuzzy recall plus snippet-bearing evidence.
+- Choose the `page-index-*` reranker variants when the richer shortlist is already useful and you want a heavier semantic pass for final ordering.
+
+Retriever overrides are the low-level escape hatch. Prefer named presets unless
+you are deliberately experimenting with the field configuration.
+
 ### `[embedding]`
 
 `[model]` is still accepted for backward compatibility, but `[embedding]` is
@@ -163,6 +175,11 @@ optimizer.
 
 This reranker adds deterministic structural bonuses such as filename stem,
 path-component, heading, and definition-like snippet matches.
+
+### Structural Fuzzy Retrievers
+
+- `path-fuzzy` targets approximate filename and path intent.
+- `segment-fuzzy` targets typo-tolerant line and segment evidence and usually improves snippet quality for downstream synthesis consumers.
 
 ### Qwen / Gemma / Jina Reranking
 

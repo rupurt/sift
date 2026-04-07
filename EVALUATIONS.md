@@ -67,6 +67,11 @@ The richer page-index family now evaluates structural fuzzy retrieval as part of
 the core substrate: path-aware recall for filename-like intent plus snippet-
 bearing fuzzy segment evidence for downstream synthesis consumers.
 
+SciFact remains useful for retrieval quality baselines, but it is text-centric.
+If you are evaluating filename-heavy recall or snippet-bearing structural
+evidence, pair SciFact with repo-local fixtures or manual query probes that
+look like real development workflows.
+
 If a strategy depends on a gated Hugging Face model and `HF_TOKEN` is missing
 or lacks access, `eval all` skips that strategy instead of aborting the entire
 run.
@@ -114,6 +119,15 @@ just sift eval quality --strategy hybrid --dataset scifact --query-limit 10
 just sift eval latency --strategy hybrid --dataset scifact --query-limit 10
 just sift eval all --dataset scifact --query-limit 10
 ```
+
+### Structural Retrieval Checks
+
+When you are validating the newer structural lanes, use comparisons that match
+the behavior you care about:
+
+- Compare `path-hybrid` against `bm25` for filename- or path-shaped queries.
+- Compare `page-index-hybrid` against `hybrid` when snippet-bearing evidence quality matters.
+- Keep full `cargo test` coverage in the loop so documentation claims stay anchored to the shipped substrate.
 
 ## Agentic Evaluations
 

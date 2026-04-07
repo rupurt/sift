@@ -117,6 +117,10 @@ cache/build counts. When you configure `with_cache_dir`, those metrics come from
 the same shared cache root that `search`, `search_controller`, and
 `search_autonomous` reuse across fresh processes.
 
+If your embedder wants the richer shipped direct-search preset, prefer
+`.with_strategy("page-index-hybrid")` or `.with_strategy("path-hybrid")`
+rather than manually reconstructing the retriever stack from scratch.
+
 ### Direct Search Knobs
 
 `SearchOptions` supports:
@@ -180,6 +184,12 @@ controller/autonomous APIs. That is the intended adoption path for downstream
 tools such as `paddles`: richer direct retrieval, but planner ownership stays
 outside `sift`.
 
+Useful helper plans:
+
+- `SearchPlan::default_lexical()` for BM25-only retrieval
+- `SearchPlan::default_path_hybrid()` for lightweight path-aware direct retrieval
+- `SearchPlan::default_page_index_hybrid()` for the richer structural fuzzy page-index stack
+
 ## Mode 3: Single Turn with Explicit Emission
 
 Use `Sift::search_turn` when you need turn IDs, session IDs, traces, and an
@@ -226,13 +236,7 @@ use sift::{
 fn main() -> anyhow::Result<()> {
     let engine = Sift::builder().build();
 
-    let plan = SearchPlan {
-        name: "controller-lexical".to_string(),
-        query_expansion: QueryExpansionPolicy::None,
-        retrievers: vec![RetrieverPolicy::Bm25],
-        fusion: FusionPolicy::Rrf,
-        reranking: RerankingPolicy::None,
-    };
+    let plan = SearchPlan::default_page_index_hybrid();
 
     let response = engine.search_controller(
         SearchControllerRequest::new(
@@ -261,6 +265,10 @@ This mode gives you:
 
 It is deterministic and plan-driven. It does not currently invent turns or do
 autonomous decomposition by itself.
+
+For downstream tools such as `paddles`, this is the recommended controller-side
+seam: the caller owns the turn plan and simply chooses a richer `SearchPlan`
+when it wants better path recall or snippet-bearing structural evidence.
 
 Controller execution uses the same sector-aware corpus preparation seam as
 direct search. Reusing the same cache directory lets a fresh controller process
