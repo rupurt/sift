@@ -209,6 +209,19 @@ internal model specs or loaded config structs. Those are useful for advanced
 embedding, but they are tighter couplings than the crate-root request/response
 surface.
 
+## Nix Build Topology
+
+Sift's flake now treats CUDA as an explicit opt-in instead of the default Linux
+path:
+
+- `nix develop` and `nix build .#sift` stay CPU-only.
+- `nix develop .#cuda` and `nix build .#sift-cuda` opt into the CUDA toolchain.
+- `just sift --cuda ...` enables the Cargo `cuda` feature for runtime flows and
+  should be used from the CUDA shell when you actually want GPU execution.
+
+This keeps default CI and downstream consumers lightweight while preserving a
+clear GPU lane for local evaluation work.
+
 ## Environment Variables
 
 | Variable | Description |

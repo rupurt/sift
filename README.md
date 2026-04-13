@@ -55,6 +55,26 @@ Download the latest pre-built binaries and installers for your platform from the
 - **macOS:** `.tar.gz` archives plus the cross-platform shell installer
 - **Windows:** `.zip` archives, `.msi`, and the PowerShell installer
 
+## Development Shells
+
+The default Nix shell and package outputs are CPU-first:
+
+```bash
+nix develop
+nix build .#sift
+```
+
+CUDA is available as an explicit opt-in for local GPU work:
+
+```bash
+nix develop .#cuda
+nix build .#sift-cuda
+just sift --cuda search . "query"
+```
+
+This keeps CI and downstream consumers from pulling the CUDA toolchain unless
+they intentionally choose the GPU lane.
+
 ## CLI Interface
 
 The executable currently exposes the following command groups:
