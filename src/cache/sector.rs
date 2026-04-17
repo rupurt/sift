@@ -96,19 +96,10 @@ impl SectorMap {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct SectorPartition {
     pub strategy: SectorPartitionStrategy,
     pub member_count: usize,
-}
-
-impl Default for SectorPartition {
-    fn default() -> Self {
-        Self {
-            strategy: SectorPartitionStrategy::default(),
-            member_count: 0,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

@@ -634,7 +634,7 @@ fn source_cache_slug(source: &ModelSource) -> String {
     for ch in raw.chars() {
         if ch.is_ascii_alphanumeric() {
             slug.push(ch.to_ascii_lowercase());
-        } else if slug.chars().last() != Some('-') {
+        } else if !slug.ends_with('-') {
             slug.push('-');
         }
     }

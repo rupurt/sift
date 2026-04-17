@@ -363,10 +363,10 @@ fn subsequence_score(query_compact: &str, candidate_lower: &str) -> f64 {
         if is_boundary(&candidate_chars, index) {
             raw_score += 0.3;
         }
-        if let Some(previous) = previous_match {
-            if index == previous + 1 {
-                raw_score += 0.35;
-            }
+        if let Some(previous) = previous_match
+            && index == previous + 1
+        {
+            raw_score += 0.35;
         }
 
         first_match.get_or_insert(index);

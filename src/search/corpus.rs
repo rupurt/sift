@@ -311,16 +311,17 @@ struct FileSectorCandidate {
     cached_hash: Option<String>,
 }
 
-struct RebuildHooks<'a> {
-    after_breadcrumb_checkpoint: Option<&'a mut dyn FnMut(&BreadcrumbJournal) -> Result<()>>,
+type BreadcrumbCheckpointHook<'a> = &'a mut dyn FnMut(&BreadcrumbJournal) -> Result<()>;
+
+#[derive(Clone, Copy)]
+struct SectorCacheRefs<'a> {
+    base: &'a Path,
+    paths: &'a CachePaths,
 }
 
-impl<'a> Default for RebuildHooks<'a> {
-    fn default() -> Self {
-        Self {
-            after_breadcrumb_checkpoint: None,
-        }
-    }
+#[derive(Default)]
+struct RebuildHooks<'a> {
+    after_breadcrumb_checkpoint: Option<BreadcrumbCheckpointHook<'a>>,
 }
 
 fn load_file_artifacts_with_sector_cache<F: FnMut()>(
@@ -332,13 +333,16 @@ fn load_file_artifacts_with_sector_cache<F: FnMut()>(
     telemetry: &crate::system::Telemetry,
     on_processed: &mut F,
 ) -> Result<Vec<ContextArtifact>> {
+    let cache = SectorCacheRefs {
+        base: cache_base,
+        paths: cache_paths,
+    };
     let mut hooks = RebuildHooks::default();
     load_file_artifacts_with_sector_cache_impl(
         root,
         file_paths,
         manifest,
-        cache_base,
-        cache_paths,
+        cache,
         telemetry,
         on_processed,
         &mut hooks,
@@ -349,12 +353,13 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
     root: &Path,
     file_paths: &[PathBuf],
     manifest: &mut Manifest,
-    cache_base: &Path,
-    cache_paths: &CachePaths,
+    cache: SectorCacheRefs<'_>,
     telemetry: &crate::system::Telemetry,
     on_processed: &mut F,
     hooks: &mut RebuildHooks<'_>,
 ) -> Result<Vec<ContextArtifact>> {
+    let cache_base = cache.base;
+    let cache_paths = cache.paths;
     let cached_sector_map = match SectorMap::load_for_root(cache_base, root) {
         Ok(map) => map,
         Err(error) => {
@@ -501,9 +506,9 @@ fn load_file_artifacts_with_sector_cache_impl<F: FnMut()>(
         };
 
         if let Some(journal) = breadcrumb.as_mut()
-            && !resumed_active_sector
+            && resumed_active_sector
                 .as_ref()
-                .is_some_and(|active| active.sector_id == sector.sector_id)
+                .is_none_or(|active| active.sector_id != sector.sector_id)
         {
             frontier.start_dirty_rebuild(sector.sector_id.clone(), sector.proofs.len(), false, 0);
             telemetry.replace_frontier_ledger(frontier.clone());
@@ -943,6 +948,7 @@ pub fn save_sector_bm25_shard(
 }
 
 #[cfg(test)]
+#[allow(clippy::items_after_test_module)]
 mod tests {
     use std::sync::atomic::Ordering;
 
@@ -1013,8 +1019,10 @@ mod tests {
             corpus.path(),
             &file_paths,
             &mut manifest,
-            cache.path(),
-            &cache_paths,
+            SectorCacheRefs {
+                base: cache.path(),
+                paths: &cache_paths,
+            },
             &telemetry,
             &mut || {
                 processed += 1;
@@ -1134,8 +1142,10 @@ mod tests {
             corpus.path(),
             &file_paths,
             &mut manifest,
-            cache.path(),
-            &cache_paths,
+            SectorCacheRefs {
+                base: cache.path(),
+                paths: &cache_paths,
+            },
             &interrupted_telemetry,
             &mut || {},
             &mut hooks,
